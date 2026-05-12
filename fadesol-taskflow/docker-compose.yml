@@ -1,0 +1,13 @@
+# Docker Compose services will be added progressively during implementation.
+# Planned services:
+# - frontend
+# - api-gateway
+# - auth-service
+# - user-service
+# - project-service
+# - task-service
+# - dashboard-service
+# - clickup-service
+# - postgres
+
+services: {}
