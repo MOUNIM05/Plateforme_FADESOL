@@ -1,0 +1,263 @@
+@import url("https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&display=swap");
+
+.ft-login-page {
+  width: 100vw;
+  height: 100vh;
+  height: 100svh;
+  position: relative;
+  display: grid;
+  place-items: center;
+  padding: 20px;
+  overflow: hidden;
+  background-size: 100% 100%;
+  background-position: center center;
+  background-repeat: no-repeat;
+  color: #ffffff;
+  font-family: Inter, system-ui, sans-serif;
+}
+
+.ft-login-overlay {
+  position: absolute;
+  inset: 0;
+  background:
+    radial-gradient(circle at center, rgba(3, 10, 28, 0.12), rgba(3, 10, 28, 0.42)),
+    linear-gradient(rgba(3, 10, 28, 0.28), rgba(3, 10, 28, 0.48));
+  pointer-events: none;
+}
+
+.ft-login-card {
+  width: 440px;
+  max-width: calc(100vw - 40px);
+  position: relative;
+  z-index: 1;
+  padding: 34px 40px 38px;
+  border-radius: 26px;
+  border: 1px solid rgba(255, 255, 255, 0.18);
+  background: rgba(18, 28, 52, 0.62);
+  box-shadow: 0 30px 90px rgba(0, 0, 0, 0.45);
+  backdrop-filter: blur(22px);
+  -webkit-backdrop-filter: blur(22px);
+}
+
+.ft-login-logo {
+  width: 185px;
+  height: auto;
+  display: block;
+  object-fit: contain;
+  margin: 0 auto 18px;
+  padding: 0;
+  border-radius: 0;
+  background: transparent;
+  box-shadow: none;
+}
+
+.ft-login-heading {
+  text-align: center;
+  margin-bottom: 26px;
+}
+
+.ft-login-heading h1 {
+  margin: 0 0 12px;
+  font-size: 38px;
+  line-height: 1;
+  font-weight: 800;
+  letter-spacing: 1px;
+  color: #ffffff;
+}
+
+.ft-login-heading p {
+  margin: 0;
+  color: rgba(255, 255, 255, 0.78);
+  font-size: 15px;
+  font-weight: 400;
+  line-height: 1.45;
+}
+
+.ft-login-form {
+  display: grid;
+  gap: 18px;
+}
+
+.ft-field {
+  display: grid;
+  gap: 10px;
+}
+
+.ft-field > span {
+  color: rgba(255, 255, 255, 0.9);
+  font-size: 14px;
+  font-weight: 600;
+}
+
+.ft-input-wrap {
+  height: 50px;
+  display: grid;
+  grid-template-columns: 52px 1fr 52px;
+  align-items: center;
+  border: 1px solid rgba(255, 255, 255, 0.22);
+  border-radius: 999px;
+  background: rgba(255, 255, 255, 0.22);
+  color: rgba(255, 255, 255, 0.82);
+  box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.16);
+  transition: border-color 0.2s ease, box-shadow 0.2s ease, background 0.2s ease;
+}
+
+.ft-input-wrap:focus-within {
+  border-color: #22c55e;
+  box-shadow: 0 0 0 4px rgba(34, 197, 94, 0.15);
+}
+
+.ft-input-wrap > svg {
+  justify-self: center;
+}
+
+.ft-input-wrap input {
+  width: 100%;
+  height: 100%;
+  border: 0;
+  outline: 0;
+  background: transparent;
+  color: #ffffff;
+  font-size: 16px;
+  font-weight: 400;
+}
+
+.ft-input-wrap input::placeholder {
+  color: rgba(255, 255, 255, 0.62);
+}
+
+.ft-input-wrap input:-webkit-autofill,
+.ft-input-wrap input:-webkit-autofill:hover,
+.ft-input-wrap input:-webkit-autofill:focus {
+  -webkit-text-fill-color: #ffffff;
+  box-shadow: 0 0 0 1000px rgba(70, 84, 112, 0.92) inset;
+  transition: background-color 9999s ease-out;
+}
+
+.ft-password-toggle {
+  width: 40px;
+  height: 40px;
+  border: 0;
+  display: grid;
+  place-items: center;
+  justify-self: center;
+  border-radius: 999px;
+  color: rgba(255, 255, 255, 0.72);
+  background: transparent;
+}
+
+.ft-login-options {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 18px;
+  margin-top: -2px;
+  margin-bottom: 2px;
+}
+
+.ft-remember {
+  display: inline-flex;
+  align-items: center;
+  gap: 12px;
+  color: rgba(255, 255, 255, 0.9);
+  font-size: 14px;
+}
+
+.ft-remember input {
+  width: 18px;
+  height: 18px;
+  accent-color: #1ed760;
+}
+
+.ft-forgot-link {
+  border: 0;
+  padding: 0;
+  color: #22c55e;
+  background: transparent;
+  font-size: 14px;
+  font-weight: 600;
+}
+
+.ft-login-error {
+  margin: -4px 0 0;
+  padding: 12px 14px;
+  border-radius: 16px;
+  color: #fee2e2;
+  background: rgba(185, 28, 28, 0.28);
+  border: 1px solid rgba(248, 113, 113, 0.35);
+}
+
+.ft-login-button {
+  width: 100%;
+  height: 52px;
+  border: 0;
+  border-radius: 999px;
+  color: #ffffff;
+  background: linear-gradient(135deg, #16a34a, #22c55e);
+  box-shadow: 0 16px 35px rgba(34, 197, 94, 0.28);
+  font-size: 16px;
+  font-weight: 700;
+  transition: transform 0.18s ease, box-shadow 0.18s ease, filter 0.18s ease;
+}
+
+.ft-login-button:hover:not(:disabled) {
+  transform: translateY(-1px);
+  filter: brightness(1.08);
+  box-shadow: 0 22px 45px rgba(34, 197, 94, 0.36);
+}
+
+.ft-login-button:disabled {
+  cursor: not-allowed;
+  opacity: 0.72;
+}
+
+@media (max-width: 768px) {
+  .ft-login-page {
+    padding: 18px;
+    overflow-y: auto;
+    background-size: cover;
+    background-position: center;
+  }
+
+  .ft-login-card {
+    width: min(420px, 92vw);
+    padding: 32px 28px;
+    border-radius: 28px;
+  }
+
+  .ft-login-logo {
+    width: 170px;
+  }
+
+  .ft-login-heading {
+    margin-bottom: 28px;
+  }
+
+  .ft-login-heading p {
+    font-size: 16px;
+  }
+
+  .ft-login-options {
+    align-items: flex-start;
+    flex-direction: column;
+  }
+}
+
+@media (max-width: 460px) {
+  .ft-login-card {
+    width: 94vw;
+    padding: 30px 20px;
+  }
+
+  .ft-login-logo {
+    width: 158px;
+  }
+
+  .ft-input-wrap {
+    grid-template-columns: 46px 1fr 46px;
+  }
+
+  .ft-login-button {
+    height: 56px;
+  }
+}
