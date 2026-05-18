@@ -1,11 +1,11 @@
 from fastapi import APIRouter, Depends
 from sqlalchemy.orm import Session
 
-from app.database import get_db
+from app.db.session import get_db
 from app.dependencies import require_roles
 from app.modules.users import service
-from app.schemas.user_schema import UserCreate, UserResponse, UserUpdate
-from app.utils.constants import UserRole
+from app.modules.users.schemas import UserCreate, UserResponse, UserUpdate
+from app.shared.constants import UserRole
 
 
 # Router خاص بعمليات المستخدمين.

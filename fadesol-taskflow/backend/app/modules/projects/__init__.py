@@ -1,0 +1,1 @@
+"""Projects business module."""

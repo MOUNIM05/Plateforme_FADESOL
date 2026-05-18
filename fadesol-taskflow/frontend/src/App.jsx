@@ -1,5 +1,6 @@
 import { useEffect, useState } from "react";
-import AppLayout from "./components/layout/AppLayout";
+import DashboardLayout from "./layouts/DashboardLayout";
+import Dashboard from "./pages/Dashboard";
 import LoginPage from "./pages/LoginPage";
 import { getCurrentUser } from "./services/authService";
 
@@ -53,6 +54,12 @@ function App() {
     setHasToken(true);
   }
 
+  function handleLogout() {
+    localStorage.removeItem("access_token");
+    setCurrentUser(null);
+    setHasToken(false);
+  }
+
   if (!hasToken) {
     return <LoginPage onLoginSuccess={handleLoginSuccess} />;
   }
@@ -68,7 +75,11 @@ function App() {
     );
   }
 
-  return <AppLayout currentUser={currentUser} />;
+  return (
+    <DashboardLayout currentUser={currentUser} onLogout={handleLogout}>
+      <Dashboard currentUser={currentUser} />
+    </DashboardLayout>
+  );
 }
 
 export default App;

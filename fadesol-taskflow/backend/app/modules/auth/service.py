@@ -2,8 +2,8 @@ from fastapi import HTTPException, status
 from sqlalchemy.orm import Session
 
 from app.modules.users.crud import get_user_by_email
-from app.schemas.auth_schema import LoginRequest
-from app.security import create_access_token, verify_password
+from app.core.security import create_access_token, verify_password
+from app.modules.auth.schemas import LoginRequest
 
 
 def login_service(db: Session, login_data: LoginRequest):

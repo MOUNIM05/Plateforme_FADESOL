@@ -4,11 +4,11 @@ from fastapi import Depends, HTTPException, status
 from fastapi.security import HTTPAuthorizationCredentials, HTTPBearer
 from sqlalchemy.orm import Session
 
-from app.database import get_db
-from app.models.user import User
+from app.core.security import decode_access_token
+from app.db.session import get_db
+from app.modules.users.models import User
 from app.modules.users.crud import get_user_by_id
-from app.security import decode_access_token
-from app.utils.constants import UserRole
+from app.shared.constants import UserRole
 
 
 DbSession = Annotated[Session, Depends(get_db)]

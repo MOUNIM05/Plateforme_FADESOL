@@ -2,7 +2,7 @@ from fastapi import HTTPException, status
 from sqlalchemy.orm import Session
 
 from app.modules.users import crud
-from app.schemas.user_schema import UserCreate, UserUpdate
+from app.modules.users.schemas import UserCreate, UserUpdate
 
 
 def create_user_service(db: Session, user_data: UserCreate):
@@ -41,6 +41,15 @@ def update_user_service(db: Session, user_id: int, user_data: UserUpdate):
             status_code=status.HTTP_404_NOT_FOUND,
             detail="Utilisateur introuvable.",
         )
+
+    if user_data.email and user_data.email != user.email:
+        existing_user = crud.get_user_by_email(db, user_data.email)
+
+        if existing_user:
+            raise HTTPException(
+                status_code=status.HTTP_400_BAD_REQUEST,
+                detail="Un utilisateur avec cet email existe déjà.",
+            )
 
     return crud.update_user(db, user, user_data)
 

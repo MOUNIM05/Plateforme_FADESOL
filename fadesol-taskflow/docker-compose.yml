@@ -1,13 +1,16 @@
-# Docker Compose services will be added progressively during implementation.
-# Planned services:
-# - frontend
-# - api-gateway
-# - auth-service
-# - user-service
-# - project-service
-# - task-service
-# - dashboard-service
-# - clickup-service
-# - postgres
+services:
+  postgres:
+    image: postgres:16
+    container_name: fadesol_taskflow_postgres
+    restart: unless-stopped
+    environment:
+      POSTGRES_DB: fadesol_taskflow
+      POSTGRES_USER: postgres
+      POSTGRES_PASSWORD: mounim
+    ports:
+      - "5432:5432"
+    volumes:
+      - fadesol_postgres_data:/var/lib/postgresql/data
 
-services: {}
+volumes:
+  fadesol_postgres_data:
