@@ -1,17 +1,16 @@
 import axios from "axios";
 
-// Création d'une instance Axios centrale.
-// Elle permet de communiquer avec le backend FastAPI.
+const apiBaseUrl =
+  import.meta.env.VITE_API_BASE_URL || import.meta.env.VITE_API_URL || "http://localhost:8000";
+
 const api = axios.create({
-  baseURL: import.meta.env.VITE_API_URL,
+  baseURL: `${apiBaseUrl.replace(/\/$/, "")}/api`,
   timeout: 8000,
   headers: {
     "Content-Type": "application/json",
   },
 });
 
-// Intercepteur exécuté avant chaque requête.
-// Si un token JWT existe dans localStorage, on l'ajoute automatiquement.
 api.interceptors.request.use((config) => {
   const token = localStorage.getItem("access_token");
 
@@ -22,7 +21,6 @@ api.interceptors.request.use((config) => {
   return config;
 });
 
-// Debug temporaire: permet de vérifier que Vite utilise bien frontend/.env.
-console.log("Axios base URL:", import.meta.env.VITE_API_URL);
+console.log("Axios base URL:", `${apiBaseUrl.replace(/\/$/, "")}/api`);
 
 export default api;

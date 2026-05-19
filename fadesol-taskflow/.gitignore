@@ -1,5 +1,6 @@
 # Python
 __pycache__/
+*.pyc
 *.py[cod]
 .pytest_cache/
 .mypy_cache/
@@ -16,6 +17,7 @@ build/
 
 # Environment files
 .env
+**/.env
 .env.*
 !.env.example
 

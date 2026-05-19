@@ -1,0 +1,1 @@
+from app.models.clickup_sync_log import JournalSynchronisationClickUp

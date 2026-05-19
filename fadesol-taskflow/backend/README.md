@@ -1,54 +1,145 @@
 # Fadesol TaskFlow Backend
 
-## Architecture Decision
+Backend FastAPI en architecture microservices.
 
-For the MVP PFE, the backend is designed as a modular monolith with FastAPI.
-This means the project runs as one backend application, but the code is organized
-by business modules: authentication, users, services, projects, tasks, dashboard,
-messages, and ClickUp synchronization.
-
-This architecture is suitable for the PFE because it keeps development realistic
-within the available time while still following professional backend principles.
-Each module has its own routes, service layer, and CRUD layer. Routes stay thin,
-business rules live in services, and database queries live in CRUD files.
-
-The result is maintainable because each responsibility has a clear place.
-It is also scalable at the code level: if the platform grows after the MVP,
-a module such as ClickUp synchronization or messaging can later be extracted into
-a real microservice without rewriting the whole application.
-
-Direction / RH / Administration is modeled as an internal Fadesol service, not as
-an application role. The only application roles are Administrator, Manager, and
-Employee.
-
-## Current Status
-
-This is the backend skeleton only. Business logic, database models, schemas,
-authentication routes, and module implementations will be added progressively.
-
-## Skeleton Creation Commands
-
-```powershell
-cd fadesol-taskflow/backend
-
-New-Item -ItemType Directory -Force app, app\models, app\schemas, app\modules, app\modules\auth, app\modules\users, app\modules\services, app\modules\projects, app\modules\tasks, app\modules\dashboard, app\modules\messages, app\modules\clickup, app\utils
-
-New-Item -ItemType File -Force app\main.py, app\config.py, app\database.py, app\dependencies.py, app\security.py
-New-Item -ItemType File -Force requirements.txt, Dockerfile, .env.example, README.md
-```
-
-## Run Locally
-
-```powershell
-cd backend
-python -m venv .venv
-.\.venv\Scripts\Activate.ps1
-pip install -r requirements.txt
-uvicorn app.main:app --reload
-```
-
-Health check:
+## Services
 
 ```text
-GET http://localhost:8000/health
+backend/
+  services/
+    api_gateway/
+    auth_service/
+    user_service/
+    service_fadesol_service/
+    project_service/
+    task_service/
+    message_service/
+    clickup_service/
+    dashboard_service/
+  shared/
+  docker/
+    init-db.sql
+  .env.example
+  .dockerignore
+```
+
+Chaque microservice contient son application FastAPI dans `app/`, son `requirements.txt`, et son `Dockerfile`.
+
+## Ports
+
+```text
+api_gateway             8000
+auth_service            8001
+user_service            8002
+service_fadesol_service 8003
+project_service         8004
+task_service            8005
+message_service         8006
+clickup_service         8007
+dashboard_service       8008
+pgAdmin                 5050
+PostgreSQL              5432
+```
+
+## Docker
+
+Prerequis:
+
+- Docker Desktop installe
+- Docker Desktop lance
+
+Depuis la racine du projet `fadesol-taskflow`:
+
+```powershell
+docker compose build
+```
+
+```powershell
+docker compose up
+```
+
+```powershell
+docker compose up -d
+```
+
+```powershell
+docker compose down
+```
+
+```powershell
+docker compose logs -f auth_service
+```
+
+```powershell
+docker compose up --build
+```
+
+Voir les conteneurs:
+
+```powershell
+docker compose ps
+```
+
+## URLs De Test
+
+```text
+http://localhost:8000/health
+http://localhost:8001/health
+http://localhost:8002/health
+http://localhost:8003/health
+http://localhost:8004/health
+http://localhost:8005/health
+http://localhost:8006/health
+http://localhost:8007/health
+http://localhost:8008/health
+```
+
+pgAdmin:
+
+```text
+http://localhost:5050
+```
+
+Identifiants pgAdmin:
+
+```text
+email: admin@fadesol.com
+password: admin
+```
+
+PostgreSQL:
+
+```text
+host: postgres_db
+port: 5432
+user: postgres
+password: postgres
+```
+
+Databases creees automatiquement:
+
+```text
+auth_db
+user_db
+service_fadesol_db
+project_db
+task_db
+message_db
+clickup_db
+dashboard_db
+```
+
+## Validation Locale
+
+```powershell
+python -m compileall backend/services
+python -m compileall backend/shared
+```
+
+Exemple lancement local hors Docker:
+
+```powershell
+cd backend/services/auth_service
+pip install -r requirements.txt
+uvicorn app.main:app --reload --port 8001
 ```

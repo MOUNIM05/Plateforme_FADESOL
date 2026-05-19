@@ -1,16 +1,273 @@
 services:
-  postgres:
+  postgres_db:
     image: postgres:16
-    container_name: fadesol_taskflow_postgres
+    container_name: postgres_db
     restart: unless-stopped
+    env_file: .env
     environment:
-      POSTGRES_DB: fadesol_taskflow
-      POSTGRES_USER: postgres
-      POSTGRES_PASSWORD: mounim
+      POSTGRES_USER: ${POSTGRES_USER}
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD}
+      POSTGRES_DB: ${POSTGRES_DB}
     ports:
       - "5432:5432"
     volumes:
-      - fadesol_postgres_data:/var/lib/postgresql/data
+      - postgres_data:/var/lib/postgresql/data
+      - ./backend/docker/init-db.sql:/docker-entrypoint-initdb.d/init-db.sql
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U ${POSTGRES_USER}"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+      start_period: 10s
+
+  pgadmin:
+    image: dpage/pgadmin4:8
+    container_name: pgadmin
+    restart: unless-stopped
+    env_file: .env
+    environment:
+      PGADMIN_DEFAULT_EMAIL: ${PGADMIN_DEFAULT_EMAIL}
+      PGADMIN_DEFAULT_PASSWORD: ${PGADMIN_DEFAULT_PASSWORD}
+    ports:
+      - "5050:80"
+    depends_on:
+      postgres_db:
+        condition: service_healthy
+    healthcheck:
+      test: ["CMD-SHELL", "wget -qO- http://localhost:80/misc/ping >/dev/null"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+      start_period: 15s
+
+  api_gateway:
+    build:
+      context: ./backend
+      dockerfile: services/api_gateway/Dockerfile
+    container_name: api_gateway
+    restart: unless-stopped
+    ports:
+      - "8000:8000"
+    env_file: .env
+    environment:
+      AUTH_SERVICE_URL: ${AUTH_SERVICE_URL}
+      USER_SERVICE_URL: ${USER_SERVICE_URL}
+      SERVICE_FADESOL_URL: ${SERVICE_FADESOL_URL}
+      PROJECT_SERVICE_URL: ${PROJECT_SERVICE_URL}
+      TASK_SERVICE_URL: ${TASK_SERVICE_URL}
+      MESSAGE_SERVICE_URL: ${MESSAGE_SERVICE_URL}
+      CLICKUP_SERVICE_URL: ${CLICKUP_SERVICE_URL}
+      DASHBOARD_SERVICE_URL: ${DASHBOARD_SERVICE_URL}
+    depends_on:
+      auth_service:
+        condition: service_healthy
+      user_service:
+        condition: service_healthy
+    healthcheck:
+      test: ["CMD-SHELL", "python -c \"import urllib.request; urllib.request.urlopen('http://localhost:8000/health').read()\""]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+      start_period: 20s
+
+  auth_service:
+    build:
+      context: ./backend
+      dockerfile: services/auth_service/Dockerfile
+    container_name: auth_service
+    restart: unless-stopped
+    ports:
+      - "8001:8001"
+    env_file: .env
+    environment:
+      DATABASE_URL: postgresql://postgres:${POSTGRES_PASSWORD}@postgres_db:5432/auth_db
+      AUTH_DATABASE_URL: postgresql://postgres:${POSTGRES_PASSWORD}@postgres_db:5432/auth_db
+      SECRET_KEY: ${SECRET_KEY}
+      JWT_SECRET_KEY: ${JWT_SECRET_KEY}
+      ALGORITHM: ${ALGORITHM}
+      JWT_ALGORITHM: ${JWT_ALGORITHM}
+      ACCESS_TOKEN_EXPIRE_MINUTES: ${ACCESS_TOKEN_EXPIRE_MINUTES}
+      JWT_EXPIRE_MINUTES: ${JWT_EXPIRE_MINUTES}
+    depends_on:
+      postgres_db:
+        condition: service_healthy
+    healthcheck:
+      test: ["CMD-SHELL", "python -c \"import urllib.request; urllib.request.urlopen('http://localhost:8001/health').read()\""]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+      start_period: 15s
+
+  user_service:
+    build:
+      context: ./backend
+      dockerfile: services/user_service/Dockerfile
+    container_name: user_service
+    restart: unless-stopped
+    ports:
+      - "8002:8002"
+    env_file: .env
+    environment:
+      DATABASE_URL: postgresql://postgres:${POSTGRES_PASSWORD}@postgres_db:5432/user_db
+      USER_DATABASE_URL: postgresql://postgres:${POSTGRES_PASSWORD}@postgres_db:5432/user_db
+      SECRET_KEY: ${SECRET_KEY}
+      JWT_SECRET_KEY: ${JWT_SECRET_KEY}
+      ALGORITHM: ${ALGORITHM}
+      JWT_ALGORITHM: ${JWT_ALGORITHM}
+    depends_on:
+      postgres_db:
+        condition: service_healthy
+    healthcheck:
+      test: ["CMD-SHELL", "python -c \"import urllib.request; urllib.request.urlopen('http://localhost:8002/health').read()\""]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+      start_period: 15s
+
+  service_fadesol_service:
+    build:
+      context: ./backend
+      dockerfile: services/service_fadesol_service/Dockerfile
+    container_name: service_fadesol_service
+    restart: unless-stopped
+    ports:
+      - "8003:8003"
+    env_file: .env
+    environment:
+      DATABASE_URL: postgresql://postgres:${POSTGRES_PASSWORD}@postgres_db:5432/service_fadesol_db
+      SERVICE_FADESOL_DATABASE_URL: postgresql://postgres:${POSTGRES_PASSWORD}@postgres_db:5432/service_fadesol_db
+    depends_on:
+      postgres_db:
+        condition: service_healthy
+    healthcheck:
+      test: ["CMD-SHELL", "python -c \"import urllib.request; urllib.request.urlopen('http://localhost:8003/health').read()\""]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+      start_period: 15s
+
+  project_service:
+    build:
+      context: ./backend
+      dockerfile: services/project_service/Dockerfile
+    container_name: project_service
+    restart: unless-stopped
+    ports:
+      - "8004:8004"
+    env_file: .env
+    environment:
+      DATABASE_URL: postgresql://postgres:${POSTGRES_PASSWORD}@postgres_db:5432/project_db
+      PROJECT_DATABASE_URL: postgresql://postgres:${POSTGRES_PASSWORD}@postgres_db:5432/project_db
+    depends_on:
+      postgres_db:
+        condition: service_healthy
+    healthcheck:
+      test: ["CMD-SHELL", "python -c \"import urllib.request; urllib.request.urlopen('http://localhost:8004/health').read()\""]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+      start_period: 15s
+
+  task_service:
+    build:
+      context: ./backend
+      dockerfile: services/task_service/Dockerfile
+    container_name: task_service
+    restart: unless-stopped
+    ports:
+      - "8005:8005"
+    env_file: .env
+    environment:
+      DATABASE_URL: postgresql://postgres:${POSTGRES_PASSWORD}@postgres_db:5432/task_db
+      TASK_DATABASE_URL: postgresql://postgres:${POSTGRES_PASSWORD}@postgres_db:5432/task_db
+    depends_on:
+      postgres_db:
+        condition: service_healthy
+    healthcheck:
+      test: ["CMD-SHELL", "python -c \"import urllib.request; urllib.request.urlopen('http://localhost:8005/health').read()\""]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+      start_period: 15s
+
+  message_service:
+    build:
+      context: ./backend
+      dockerfile: services/message_service/Dockerfile
+    container_name: message_service
+    restart: unless-stopped
+    ports:
+      - "8006:8006"
+    env_file: .env
+    environment:
+      DATABASE_URL: postgresql://postgres:${POSTGRES_PASSWORD}@postgres_db:5432/message_db
+      MESSAGE_DATABASE_URL: postgresql://postgres:${POSTGRES_PASSWORD}@postgres_db:5432/message_db
+    depends_on:
+      postgres_db:
+        condition: service_healthy
+    healthcheck:
+      test: ["CMD-SHELL", "python -c \"import urllib.request; urllib.request.urlopen('http://localhost:8006/health').read()\""]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+      start_period: 15s
+
+  clickup_service:
+    build:
+      context: ./backend
+      dockerfile: services/clickup_service/Dockerfile
+    container_name: clickup_service
+    restart: unless-stopped
+    ports:
+      - "8007:8007"
+    env_file: .env
+    environment:
+      DATABASE_URL: postgresql://postgres:${POSTGRES_PASSWORD}@postgres_db:5432/clickup_db
+      CLICKUP_DATABASE_URL: postgresql://postgres:${POSTGRES_PASSWORD}@postgres_db:5432/clickup_db
+    depends_on:
+      postgres_db:
+        condition: service_healthy
+    healthcheck:
+      test: ["CMD-SHELL", "python -c \"import urllib.request; urllib.request.urlopen('http://localhost:8007/health').read()\""]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+      start_period: 15s
+
+  dashboard_service:
+    build:
+      context: ./backend
+      dockerfile: services/dashboard_service/Dockerfile
+    container_name: dashboard_service
+    restart: unless-stopped
+    ports:
+      - "8008:8008"
+    env_file: .env
+    environment:
+      DATABASE_URL: postgresql://postgres:${POSTGRES_PASSWORD}@postgres_db:5432/dashboard_db
+    depends_on:
+      postgres_db:
+        condition: service_healthy
+    healthcheck:
+      test: ["CMD-SHELL", "python -c \"import urllib.request; urllib.request.urlopen('http://localhost:8008/health').read()\""]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+      start_period: 15s
+
+  frontend:
+    build:
+      context: ./frontend
+      dockerfile: Dockerfile
+    container_name: frontend
+    restart: unless-stopped
+    ports:
+      - "5173:5173"
+    env_file:
+      - .env
+    depends_on:
+      api_gateway:
+        condition: service_healthy
 
 volumes:
-  fadesol_postgres_data:
+  postgres_data:
