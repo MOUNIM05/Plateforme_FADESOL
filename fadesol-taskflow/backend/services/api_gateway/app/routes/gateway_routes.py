@@ -10,31 +10,19 @@ from app.core.config import settings
 
 
 router = APIRouter(tags=["Gateway"])
+root_router = APIRouter(tags=["Gateway"])
 
 
-@router.get("/services")
-def list_services():
-    return {
-        "auth_service": settings.AUTH_SERVICE_URL,
-        "user_service": settings.USER_SERVICE_URL,
-        "service_fadesol_service": settings.SERVICE_FADESOL_URL,
-        "project_service": settings.PROJECT_SERVICE_URL,
-        "task_service": settings.TASK_SERVICE_URL,
-        "dashboard_service": settings.DASHBOARD_SERVICE_URL,
-        "message_service": settings.MESSAGE_SERVICE_URL,
-        "clickup_service": settings.CLICKUP_SERVICE_URL,
-    }
-
-
-@router.api_route("/auth/{path:path}", methods=["GET", "POST", "PUT", "PATCH", "DELETE"])
-async def proxy_auth(path: str, request: Request):
+async def proxy_request(request: Request, target_url: str, service_name: str):
     body = await request.body()
-    target_url = f"{settings.AUTH_SERVICE_URL.rstrip('/')}/api/auth/{path}"
     headers = {
         key: value
         for key, value in request.headers.items()
         if key.lower() not in {"host", "content-length", "connection"}
     }
+
+    if request.url.query:
+        target_url = f"{target_url}?{request.url.query}"
 
     proxied_request = UrlRequest(
         target_url,
@@ -59,5 +47,68 @@ async def proxy_auth(path: str, request: Request):
     except URLError:
         return JSONResponse(
             status_code=502,
-            content={"detail": "Auth service indisponible."},
+            content={"detail": f"{service_name} indisponible."},
         )
+
+
+def build_user_service_url(path: str = "") -> str:
+    user_base_url = settings.USER_SERVICE_URL.rstrip("/")
+
+    if not path:
+        return f"{user_base_url}/api/users/"
+
+    return f"{user_base_url}/api/users/{path}"
+
+
+def build_user_health_url() -> str:
+    return f"{settings.USER_SERVICE_URL.rstrip('/')}/health"
+
+
+@router.get("/services")
+def list_services():
+    return {
+        "auth_service": settings.AUTH_SERVICE_URL,
+        "user_service": settings.USER_SERVICE_URL,
+        "service_fadesol_service": settings.SERVICE_FADESOL_URL,
+        "project_service": settings.PROJECT_SERVICE_URL,
+        "task_service": settings.TASK_SERVICE_URL,
+        "dashboard_service": settings.DASHBOARD_SERVICE_URL,
+        "message_service": settings.MESSAGE_SERVICE_URL,
+        "clickup_service": settings.CLICKUP_SERVICE_URL,
+    }
+
+
+@router.api_route("/auth/{path:path}", methods=["GET", "POST", "PUT", "PATCH", "DELETE"])
+async def proxy_auth(path: str, request: Request):
+    target_url = f"{settings.AUTH_SERVICE_URL.rstrip('/')}/api/auth/{path}"
+    return await proxy_request(request, target_url, "Auth service")
+
+
+@router.api_route("/users", methods=["GET", "POST", "PUT", "PATCH", "DELETE"])
+async def proxy_api_users_root(request: Request):
+    return await proxy_request(request, build_user_service_url(), "User service")
+
+
+@router.get("/users/health")
+async def proxy_api_users_health(request: Request):
+    return await proxy_request(request, build_user_health_url(), "User service")
+
+
+@router.api_route("/users/{path:path}", methods=["GET", "POST", "PUT", "PATCH", "DELETE"])
+async def proxy_api_users(path: str, request: Request):
+    return await proxy_request(request, build_user_service_url(path), "User service")
+
+
+@root_router.api_route("/users", methods=["GET", "POST", "PUT", "PATCH", "DELETE"])
+async def proxy_users_root(request: Request):
+    return await proxy_request(request, build_user_service_url(), "User service")
+
+
+@root_router.get("/users/health")
+async def proxy_users_health(request: Request):
+    return await proxy_request(request, build_user_health_url(), "User service")
+
+
+@root_router.api_route("/users/{path:path}", methods=["GET", "POST", "PUT", "PATCH", "DELETE"])
+async def proxy_users(path: str, request: Request):
+    return await proxy_request(request, build_user_service_url(path), "User service")

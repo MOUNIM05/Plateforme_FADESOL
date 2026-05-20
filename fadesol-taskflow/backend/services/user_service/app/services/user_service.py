@@ -1,8 +1,23 @@
+import json
+from urllib.error import HTTPError, URLError
+from urllib.request import Request as UrlRequest
+from urllib.request import urlopen
+
+from fastapi import HTTPException, status
+from passlib.context import CryptContext
 from sqlalchemy.orm import Session
 
+from app.core.config import settings
 from app.models.user import User
 from app.schemas.user_schema import UserCreate, UserUpdate
 from shared.exceptions import bad_request, not_found
+
+
+pwd_context = CryptContext(schemes=["bcrypt"], deprecated="auto")
+
+
+def hash_password(password: str) -> str:
+    return pwd_context.hash(password)
 
 
 def get_user_by_email(db: Session, email: str) -> User | None:
@@ -17,6 +32,43 @@ def list_users(db: Session, skip: int = 0, limit: int = 100) -> list[User]:
     return db.query(User).offset(skip).limit(limit).all()
 
 
+def create_auth_account(user: User, password: str) -> None:
+    target_url = f"{settings.AUTH_SERVICE_URL.rstrip('/')}/api/auth/register"
+    body = json.dumps(
+        {
+            "user_id": user.id,
+            "email": user.email,
+            "password": password,
+            "role": user.role,
+            "is_enabled": user.is_active,
+        }
+    ).encode("utf-8")
+    request = UrlRequest(
+        target_url,
+        data=body,
+        headers={"Content-Type": "application/json"},
+        method="POST",
+    )
+
+    try:
+        with urlopen(request, timeout=10) as response:
+            response.read()
+    except HTTPError as exc:
+        detail = "Impossible de creer le compte d'authentification."
+        try:
+            payload = json.loads(exc.read().decode("utf-8"))
+            detail = payload.get("detail", detail)
+        except (json.JSONDecodeError, UnicodeDecodeError):
+            pass
+
+        raise HTTPException(status_code=exc.code, detail=detail) from exc
+    except URLError as exc:
+        raise HTTPException(
+            status_code=status.HTTP_502_BAD_GATEWAY,
+            detail="Auth service indisponible pour creer le compte utilisateur.",
+        ) from exc
+
+
 def create_user(db: Session, payload: UserCreate) -> User:
     if get_user_by_email(db, payload.email):
         raise bad_request("Un utilisateur avec cet email existe deja.")
@@ -27,6 +79,7 @@ def create_user(db: Session, payload: UserCreate) -> User:
         prenom=payload.prenom or payload.first_name,
         nom=payload.nom or payload.last_name,
         email=payload.email,
+        mot_de_passe_hash=hash_password(payload.password),
         role=payload.role.value,
         service_id=payload.service_id,
         service=payload.service.value if payload.service else None,
@@ -34,9 +87,15 @@ def create_user(db: Session, payload: UserCreate) -> User:
         est_actif=payload.est_actif if payload.est_actif is not None else payload.is_active,
     )
 
-    db.add(user)
-    db.commit()
-    db.refresh(user)
+    try:
+        db.add(user)
+        db.flush()
+        create_auth_account(user, payload.password)
+        db.commit()
+        db.refresh(user)
+    except Exception:
+        db.rollback()
+        raise
 
     return user
 

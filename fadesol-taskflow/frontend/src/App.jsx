@@ -1,7 +1,9 @@
 import { useEffect, useState } from "react";
+import { Navigate, Route, Routes } from "react-router-dom";
 import DashboardLayout from "./layouts/DashboardLayout";
 import Dashboard from "./pages/Dashboard";
 import LoginPage from "./pages/LoginPage";
+import Users from "./pages/Users";
 import { getCurrentUser } from "./services/authService";
 
 function App() {
@@ -77,7 +79,14 @@ function App() {
 
   return (
     <DashboardLayout currentUser={currentUser} onLogout={handleLogout}>
-      <Dashboard currentUser={currentUser} />
+      <Routes>
+        <Route path="/" element={<Dashboard currentUser={currentUser} />} />
+        <Route
+          path="/users"
+          element={<Users currentUser={currentUser} onLogout={handleLogout} />}
+        />
+        <Route path="*" element={<Navigate to="/" replace />} />
+      </Routes>
     </DashboardLayout>
   );
 }

@@ -41,3 +41,19 @@ def require_admin(claims: dict = Depends(get_current_claims)) -> dict:
         )
 
     return claims
+
+
+def require_roles(allowed_roles: list[str]):
+    def role_checker(claims: dict = Depends(get_current_claims)) -> dict:
+        if claims.get("role") not in allowed_roles:
+            raise HTTPException(
+                status_code=status.HTTP_403_FORBIDDEN,
+                detail="Acces refuse pour ce role.",
+            )
+
+        return claims
+
+    return role_checker
+
+
+require_admin_or_manager = require_roles([UserRole.ADMIN.value, UserRole.MANAGER.value])

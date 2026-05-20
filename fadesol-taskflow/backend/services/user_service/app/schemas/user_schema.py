@@ -1,6 +1,6 @@
 from datetime import datetime
 
-from pydantic import BaseModel
+from pydantic import BaseModel, Field
 
 from shared.enums import FadesolService, UserRole
 
@@ -19,7 +19,7 @@ class UserBase(BaseModel):
 
 
 class UserCreate(UserBase):
-    pass
+    password: str = Field(min_length=8)
 
 
 class UserUpdate(BaseModel):

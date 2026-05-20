@@ -11,12 +11,20 @@ const emptyForm = {
   last_name: "",
   email: "",
   password: "",
-  role: "Employé",
+  role: "Employee",
   service_id: "",
   is_active: true,
 };
 
-const roles = ["Administrateur", "Manager", "Employé"];
+const roleOptions = [
+  { label: "Administrateur", value: "Admin" },
+  { label: "Manager", value: "Manager" },
+  { label: "Employé", value: "Employee" },
+];
+
+function getRoleLabel(roleValue) {
+  return roleOptions.find((role) => role.value === roleValue)?.label || roleValue;
+}
 
 function normalizePayload(formData, includePassword = true) {
   const payload = {
@@ -24,7 +32,7 @@ function normalizePayload(formData, includePassword = true) {
     last_name: formData.last_name.trim(),
     email: formData.email.trim(),
     role: formData.role,
-    service_id: formData.service_id === "" ? null : Number(formData.service_id),
+    service_id: formData.service_id === "" ? null : formData.service_id,
     is_active: formData.is_active,
   };
 
@@ -221,8 +229,8 @@ function Users({ currentUser, onLogout }) {
             <label>
               Rôle
               <select name="role" value={formData.role} onChange={handleChange}>
-                {roles.map((role) => (
-                  <option key={role} value={role}>{role}</option>
+                {roleOptions.map((role) => (
+                  <option key={role.value} value={role.value}>{role.label}</option>
                 ))}
               </select>
             </label>
@@ -256,8 +264,8 @@ function Users({ currentUser, onLogout }) {
           <div className="filters-row">
             <select value={roleFilter} onChange={(event) => setRoleFilter(event.target.value)}>
               <option value="">Tous les rôles</option>
-              {roles.map((role) => (
-                <option key={role} value={role}>{role}</option>
+              {roleOptions.map((role) => (
+                <option key={role.value} value={role.value}>{role.label}</option>
               ))}
             </select>
             <select value={serviceFilter} onChange={(event) => setServiceFilter(event.target.value)}>
@@ -281,7 +289,7 @@ function Users({ currentUser, onLogout }) {
               <div className="table-row" key={user.id}>
                 <span>{user.first_name} {user.last_name}</span>
                 <span>{user.email}</span>
-                <span><mark>{user.role}</mark></span>
+                <span><mark>{getRoleLabel(user.role)}</mark></span>
                 <span>{user.service_id ?? "Aucun"}</span>
                 <span className="row-actions">
                   <button type="button" onClick={() => startEdit(user)}>Modifier</button>

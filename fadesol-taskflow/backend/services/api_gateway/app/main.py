@@ -1,6 +1,7 @@
 from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
 
+from app.routes.gateway_routes import root_router as gateway_root_router
 from app.routes.gateway_routes import router as gateway_router
 
 
@@ -16,6 +17,7 @@ app.add_middleware(
     allow_headers=["*"],
 )
 app.include_router(gateway_router, prefix="/api")
+app.include_router(gateway_root_router)
 
 
 @app.get("/health")
