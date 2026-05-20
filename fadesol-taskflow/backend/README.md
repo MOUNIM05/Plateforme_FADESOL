@@ -138,8 +138,63 @@ python -m compileall backend/shared
 
 Exemple lancement local hors Docker:
 
+Mode local sans Docker ni PostgreSQL:
+
+```powershell
+cd backend
+.\start-local-backend.ps1
+```
+
+Ce script lance:
+
+```text
+API Gateway  http://127.0.0.1:8000
+Auth Service http://127.0.0.1:8001
+SQLite       backend/.local/auth_local.db
+```
+
+Si Windows garde temporairement le port 8000 bloque, le script utilise automatiquement 8010 ou 8020 et met a jour `frontend/.env.local`.
+
+Compte local cree automatiquement:
+
+```text
+email: admin@fadesol.com
+password: admin12345
+```
+
+Arreter le backend local:
+
+```powershell
+.\stop-local-backend.ps1
+```
+
+API Gateway:
+
+```powershell
+cd backend
+uvicorn app.main:app --reload --port 8000
+```
+
+Auth service:
+
 ```powershell
 cd backend/services/auth_service
+$env:PYTHONPATH = (Resolve-Path ../..).Path
 pip install -r requirements.txt
 uvicorn app.main:app --reload --port 8001
+```
+
+Exemple pour le service Fadesol:
+
+```powershell
+cd backend/services/service_fadesol_service
+$env:PYTHONPATH = (Resolve-Path ../..).Path
+uvicorn app.main:app --reload --port 8003
+```
+
+Si Windows indique que le port est deja utilise:
+
+```powershell
+netstat -ano -p TCP | findstr :8003
+Stop-Process -Id <PID>
 ```

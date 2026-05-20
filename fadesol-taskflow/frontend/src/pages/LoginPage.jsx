@@ -1,9 +1,10 @@
 import { useState } from "react";
 import { Eye, EyeOff, LockKeyhole, Mail } from "lucide-react";
 import { getCurrentUser, loginUser } from "../services/authService";
-import fadesolLogo from "../assets/fadesol-logo-login.png";
+import { API_BASE_URL } from "../services/api";
+import fadesolLogo from "../assets/fadesol-logo.png";
 import loginBackground from "../assets/login-energy-bg.png";
-import "./LoginPage.css";
+import "../styles/login.css";
 
 function LoginPage({ onLoginSuccess }) {
   const [email, setEmail] = useState("");
@@ -34,7 +35,7 @@ function LoginPage({ onLoginSuccess }) {
       if (err.response) {
         setError(err.response.data.detail || "Email ou mot de passe incorrect.");
       } else if (err.request) {
-        setError("Impossible de contacter le backend. Vérifie le port 8003.");
+        setError(`Impossible de contacter le backend. Vérifie l'API Gateway: ${API_BASE_URL}.`);
       } else {
         setError("Erreur inconnue pendant la connexion.");
       }

@@ -1,25 +1,30 @@
 const services = [
   ["Technique", "28%", "#16a34a"],
   ["Commercial", "22%", "#2563eb"],
-  ["Achat", "15%", "#f59e0b"],
-  ["Magasin / Stock", "14%", "#8b5cf6"],
-  ["Comptabilité & Management", "12%", "#06b6d4"],
-  ["Direction / RH", "9%", "#ef4444"],
+  ["Achat", "15%", "#f97316"],
+  ["Magasin / Stock", "14%", "#7c3aed"],
+  ["Comptabilité & Management", "12%", "#22c55e"],
+  ["Direction / RH", "9%", "#94a3b8"],
 ];
 
 function ServiceDistribution() {
   return (
-    <section className="ft-card ft-service-distribution">
-      <div className="ft-card-header">
+    <section className="dashboard-card">
+      <div className="card-header">
         <div>
           <h2>Répartition par service</h2>
-          <p>Charge de travail par service interne</p>
+          <p>Total 6 Services</p>
         </div>
       </div>
 
-      <div className="ft-donut-wrap">
-        <div className="ft-donut" />
-        <div className="ft-service-list">
+      <div className="donut-layout">
+        <div className="donut-chart service-donut">
+          <div>
+            <strong>6</strong>
+            <span>Services</span>
+          </div>
+        </div>
+        <div className="legend-list">
           {services.map(([name, percent, color]) => (
             <div key={name}>
               <span><i style={{ background: color }} /> {name}</span>

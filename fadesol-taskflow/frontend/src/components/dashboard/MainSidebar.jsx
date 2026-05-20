@@ -11,10 +11,9 @@ import {
   KeyRound,
   LogOut,
   MessageSquareText,
-  Moon,
   RefreshCw,
   Settings,
-  UserRoundCog,
+  ShieldCheck,
   UsersRound,
 } from "lucide-react";
 import fadesolLogo from "../../assets/fadesol-logo.png";
@@ -22,7 +21,7 @@ import energyIcon from "../../assets/fadesol-energy-icon.png";
 
 const sections = [
   {
-    title: "Organisation",
+    title: "ORGANISATION",
     items: [
       { label: "Dashboard", icon: BarChart3 },
       { label: "Services", icon: Building2 },
@@ -31,30 +30,30 @@ const sections = [
     ],
   },
   {
-    title: "Projets & Tâches",
+    title: "PROJETS & TÂCHES",
     items: [
       { label: "Projets", icon: FolderKanban },
       { label: "Tâches", icon: ClipboardList },
-      { label: "Sous-tâches", icon: UserRoundCog },
+      { label: "Sous-tâches", icon: ShieldCheck },
       { label: "Calendrier", icon: CalendarDays },
     ],
   },
   {
-    title: "Communication",
+    title: "COMMUNICATION",
     items: [
-      { label: "Messagerie", icon: MessageSquareText },
-      { label: "Notifications", icon: Bell },
+      { label: "Messagerie", icon: MessageSquareText, badge: 4 },
+      { label: "Notifications", icon: Bell, badge: 12 },
     ],
   },
   {
-    title: "Intégration",
+    title: "INTÉGRATION",
     items: [
       { label: "ClickUp Sync", icon: RefreshCw },
       { label: "Historique Sync", icon: History },
     ],
   },
   {
-    title: "Système",
+    title: "SYSTÈME",
     items: [
       { label: "Reporting", icon: BarChart3 },
       { label: "Paramètres", icon: Settings },
@@ -62,95 +61,78 @@ const sections = [
   },
 ];
 
-function MainSidebar({
-  activeItem,
-  currentUser,
-  darkMode,
-  collapsed,
-  onSelect,
-  onToggleDarkMode,
-  onToggleCollapse,
-  onLogout,
-}) {
+function MainSidebar({ activeItem, currentUser, collapsed, onSelect, onToggleCollapse, onLogout }) {
   const fullName =
     currentUser?.first_name && currentUser?.last_name
       ? `${currentUser.first_name} ${currentUser.last_name}`
       : "Abdelmounim Maani";
+  const role = currentUser?.role || "Administrateur";
 
   return (
-    <aside className={`ft-main-sidebar ${collapsed ? "is-collapsed" : ""}`}>
-      <header className="ft-main-sidebar__brand">
-        <div className="ft-sidebar-branding">
+    <aside className="main-sidebar">
+      <header className="sidebar-brand">
+        <div className="sidebar-brand__identity">
           {collapsed ? (
-            <img
-              src={energyIcon}
-              alt="Fadesol energy"
-              className="sidebar-logo-icon"
-            />
+            <img src={energyIcon} alt="Fadesol energy" className="sidebar-logo-icon" />
           ) : (
-            <img
-              src={fadesolLogo}
-              alt="Fadesol Power Solutions"
-              className="sidebar-logo-full"
-            />
+            <>
+              <img src={fadesolLogo} alt="Fadesol Power Solutions" className="sidebar-logo-full" />
+              <div>
+                <strong>Fadesol TaskFlow</strong>
+                <span>Workspace interne</span>
+              </div>
+            </>
           )}
         </div>
 
         <button
           type="button"
+          className="sidebar-collapse"
           onClick={onToggleCollapse}
           aria-label={collapsed ? "Déplier la navigation" : "Réduire la navigation"}
+          title={collapsed ? "Déplier" : "Réduire"}
         >
           {collapsed ? <ChevronRight size={18} /> : <ChevronLeft size={18} />}
         </button>
       </header>
 
-      <div className="ft-main-sidebar__sections">
+      <nav className="sidebar-nav" aria-label="Navigation principale">
         {sections.map((section) => (
-          <section key={section.title} className="ft-menu-section">
+          <section key={section.title} className="sidebar-section">
             <h3>{section.title}</h3>
-            {section.items.map((item) => {
-              const Icon = item.icon;
-              const active = activeItem === item.label;
+            <div className="sidebar-section__items">
+              {section.items.map((item) => {
+                const Icon = item.icon;
+                const active = activeItem === item.label;
 
-              return (
-                <button
-                  key={item.label}
-                  type="button"
-                  className={active ? "is-active" : ""}
-                  onClick={() => onSelect(item.label)}
-                  title={collapsed ? item.label : undefined}
-                >
-                  <Icon size={18} />
-                  <span>{item.label}</span>
-                </button>
-              );
-            })}
+                return (
+                  <button
+                    key={item.label}
+                    type="button"
+                    className={active ? "is-active" : ""}
+                    onClick={() => onSelect(item.label)}
+                    title={collapsed ? item.label : undefined}
+                  >
+                    <Icon size={20} />
+                    <span className="sidebar-link-label">{item.label}</span>
+                    {item.badge ? <b>{item.badge}</b> : null}
+                  </button>
+                );
+              })}
+            </div>
           </section>
         ))}
+      </nav>
 
-        <button
-          type="button"
-          className="ft-dark-toggle"
-          onClick={onToggleDarkMode}
-          title={collapsed ? "Dark mode" : undefined}
-        >
-          <span>
-            <Moon size={18} />
-            <span>Dark mode</span>
-          </span>
-          <i className={darkMode ? "is-on" : ""} />
-        </button>
-      </div>
-
-      <footer className="ft-sidebar-user">
-        <div className="ft-user-avatar">AM</div>
-        <div className="ft-sidebar-user__text">
+      <footer className="sidebar-profile">
+        <div className="sidebar-avatar">AM</div>
+        <div className="sidebar-profile__copy">
           <strong>{fullName}</strong>
-          <span>{currentUser?.role || "Administrateur"}</span>
+          <span>{role}</span>
         </div>
-        <button type="button" onClick={onLogout} title="Log out">
+        <button type="button" onClick={onLogout} title="Se déconnecter" aria-label="Se déconnecter">
           <LogOut size={18} />
+          <span>Se déconnecter</span>
         </button>
       </footer>
     </aside>

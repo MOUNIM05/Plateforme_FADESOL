@@ -1,4 +1,4 @@
-import { useEffect, useMemo, useState } from "react";
+import { useCallback, useEffect, useMemo, useState } from "react";
 import {
   createUser,
   deleteUser,
@@ -45,7 +45,7 @@ function Users({ currentUser, onLogout }) {
   const [error, setError] = useState("");
   const [loading, setLoading] = useState(false);
 
-  async function loadUsers() {
+  const loadUsers = useCallback(async function loadUsers() {
     setError("");
     setMessage("");
     setLoading(true);
@@ -66,11 +66,13 @@ function Users({ currentUser, onLogout }) {
     } finally {
       setLoading(false);
     }
-  }
+  }, []);
 
   useEffect(() => {
+    // Users are fetched once when the page is opened from the premium sidebar.
+    // eslint-disable-next-line react-hooks/set-state-in-effect
     loadUsers();
-  }, []);
+  }, [loadUsers]);
 
   const filteredUsers = useMemo(() => {
     return users.filter((user) => {
@@ -297,7 +299,7 @@ function Users({ currentUser, onLogout }) {
                   <span />
                   <span />
                 </div>
-                <strong>This Folder is empty</strong>
+                <strong>Aucun utilisateur</strong>
                 <p>Aucun utilisateur trouvé pour ces filtres.</p>
               </div>
             )}

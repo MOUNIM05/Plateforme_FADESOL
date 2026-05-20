@@ -26,7 +26,7 @@ def list_services():
     }
 
 
-@router.api_route("/auth/{path:path}", methods=["GET", "POST", "PUT", "PATCH", "DELETE"])
+@router.api_route("/auth/{path:path}", methods=["GET", "POST", "PUT", "PATCH", "DELETE", "OPTIONS"])
 async def proxy_auth(path: str, request: Request):
     body = await request.body()
     target_url = f"{settings.AUTH_SERVICE_URL.rstrip('/')}/api/auth/{path}"
