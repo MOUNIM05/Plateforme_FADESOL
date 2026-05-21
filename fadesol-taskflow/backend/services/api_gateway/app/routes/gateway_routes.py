@@ -64,7 +64,33 @@ def build_user_health_url() -> str:
     return f"{settings.USER_SERVICE_URL.rstrip('/')}/health"
 
 
-@router.get("/services")
+def build_fadesol_service_url(path: str = "") -> str:
+    service_base_url = settings.SERVICE_FADESOL_URL.rstrip("/")
+
+    if not path:
+        return f"{service_base_url}/api/services/"
+
+    return f"{service_base_url}/api/services/{path}"
+
+
+def build_fadesol_service_health_url() -> str:
+    return f"{settings.SERVICE_FADESOL_URL.rstrip('/')}/health"
+
+
+def build_project_service_url(path: str = "") -> str:
+    project_base_url = settings.PROJECT_SERVICE_URL.rstrip("/")
+
+    if not path:
+        return f"{project_base_url}/api/projects/"
+
+    return f"{project_base_url}/api/projects/{path}"
+
+
+def build_project_health_url() -> str:
+    return f"{settings.PROJECT_SERVICE_URL.rstrip('/')}/health"
+
+
+@router.get("/gateway/services")
 def list_services():
     return {
         "auth_service": settings.AUTH_SERVICE_URL,
@@ -99,6 +125,36 @@ async def proxy_api_users(path: str, request: Request):
     return await proxy_request(request, build_user_service_url(path), "User service")
 
 
+@router.api_route("/services", methods=["GET", "POST", "PUT", "PATCH", "DELETE"])
+async def proxy_api_services_root(request: Request):
+    return await proxy_request(request, build_fadesol_service_url(), "Service Fadesol service")
+
+
+@router.get("/services/health")
+async def proxy_api_services_health(request: Request):
+    return await proxy_request(request, build_fadesol_service_health_url(), "Service Fadesol service")
+
+
+@router.api_route("/services/{path:path}", methods=["GET", "POST", "PUT", "PATCH", "DELETE"])
+async def proxy_api_services(path: str, request: Request):
+    return await proxy_request(request, build_fadesol_service_url(path), "Service Fadesol service")
+
+
+@router.api_route("/projects", methods=["GET", "POST", "PUT", "PATCH", "DELETE"])
+async def proxy_api_projects_root(request: Request):
+    return await proxy_request(request, build_project_service_url(), "Project service")
+
+
+@router.get("/projects/health")
+async def proxy_api_projects_health(request: Request):
+    return await proxy_request(request, build_project_health_url(), "Project service")
+
+
+@router.api_route("/projects/{path:path}", methods=["GET", "POST", "PUT", "PATCH", "DELETE"])
+async def proxy_api_projects(path: str, request: Request):
+    return await proxy_request(request, build_project_service_url(path), "Project service")
+
+
 @root_router.api_route("/users", methods=["GET", "POST", "PUT", "PATCH", "DELETE"])
 async def proxy_users_root(request: Request):
     return await proxy_request(request, build_user_service_url(), "User service")
@@ -112,3 +168,33 @@ async def proxy_users_health(request: Request):
 @root_router.api_route("/users/{path:path}", methods=["GET", "POST", "PUT", "PATCH", "DELETE"])
 async def proxy_users(path: str, request: Request):
     return await proxy_request(request, build_user_service_url(path), "User service")
+
+
+@root_router.api_route("/services", methods=["GET", "POST", "PUT", "PATCH", "DELETE"])
+async def proxy_services_root(request: Request):
+    return await proxy_request(request, build_fadesol_service_url(), "Service Fadesol service")
+
+
+@root_router.get("/services/health")
+async def proxy_services_health(request: Request):
+    return await proxy_request(request, build_fadesol_service_health_url(), "Service Fadesol service")
+
+
+@root_router.api_route("/services/{path:path}", methods=["GET", "POST", "PUT", "PATCH", "DELETE"])
+async def proxy_services(path: str, request: Request):
+    return await proxy_request(request, build_fadesol_service_url(path), "Service Fadesol service")
+
+
+@root_router.api_route("/projects", methods=["GET", "POST", "PUT", "PATCH", "DELETE"])
+async def proxy_projects_root(request: Request):
+    return await proxy_request(request, build_project_service_url(), "Project service")
+
+
+@root_router.get("/projects/health")
+async def proxy_projects_health(request: Request):
+    return await proxy_request(request, build_project_health_url(), "Project service")
+
+
+@root_router.api_route("/projects/{path:path}", methods=["GET", "POST", "PUT", "PATCH", "DELETE"])
+async def proxy_projects(path: str, request: Request):
+    return await proxy_request(request, build_project_service_url(path), "Project service")

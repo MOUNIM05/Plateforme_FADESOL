@@ -6,6 +6,7 @@ import Dashboard from "./pages/Dashboard";
 import Login from "./pages/Login";
 import ModulePage from "./pages/ModulePage";
 import Profile from "./pages/Profile";
+import Projects from "./pages/Projects";
 import Users from "./pages/Users";
 import ProtectedRoute from "./routes/ProtectedRoute";
 import RoleRoute from "./routes/RoleRoute";
@@ -74,7 +75,7 @@ function AppRoutes() {
             />
             <Route
               path="/projects"
-              element={<ModulePage type="projects" title="Projets" description="Suivi des projets internes et clients." cards={moduleCards.projects} />}
+              element={<Projects />}
             />
             <Route
               path="/reporting"

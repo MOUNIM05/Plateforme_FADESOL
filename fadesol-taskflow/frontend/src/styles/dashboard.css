@@ -1127,6 +1127,7 @@
 
 .user-form input,
 .user-form select,
+.user-form textarea,
 .filters-row select,
 .search-filter input {
   width: 100%;
@@ -1139,8 +1140,16 @@
   outline: 0;
 }
 
+.user-form textarea {
+  min-height: 120px;
+  resize: vertical;
+  padding: 12px;
+  line-height: 1.5;
+}
+
 .user-form input:focus,
 .user-form select:focus,
+.user-form textarea:focus,
 .filters-row select:focus,
 .search-filter input:focus {
   border-color: #16a34a;
@@ -1241,6 +1250,49 @@
   display: grid;
   grid-template-columns: 1fr 1fr;
   gap: 10px;
+}
+
+.project-list {
+  display: grid;
+  gap: 12px;
+}
+
+.project-list article {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 14px;
+  padding: 14px;
+  border: 1px solid #eef2f1;
+  border-radius: 14px;
+  background: #f8fafc;
+}
+
+.project-list strong,
+.project-list span {
+  display: block;
+}
+
+.project-list strong {
+  color: #0f172a;
+  font-size: 14px;
+}
+
+.project-list span {
+  margin-top: 5px;
+  color: #64748b;
+  font-size: 13px;
+  font-weight: 700;
+}
+
+.project-list mark {
+  flex: 0 0 auto;
+  border-radius: 999px;
+  padding: 6px 10px;
+  color: #16a34a;
+  background: #e8f7ef;
+  font-size: 12px;
+  font-weight: 800;
 }
 
 .filters-row {
