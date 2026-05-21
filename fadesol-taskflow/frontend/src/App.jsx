@@ -3,7 +3,7 @@ import { AuthProvider, ROLES, useAuth } from "./context/AuthContext";
 import DashboardLayout from "./layouts/DashboardLayout";
 import AccessDenied from "./pages/AccessDenied";
 import Dashboard from "./pages/Dashboard";
-import Login from "./pages/Login";
+import Login from "./pages/LoginPage";
 import ModulePage from "./pages/ModulePage";
 import Profile from "./pages/Profile";
 import Users from "./pages/Users";
