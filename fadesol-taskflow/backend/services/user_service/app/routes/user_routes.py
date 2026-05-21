@@ -1,7 +1,7 @@
 from fastapi import APIRouter, Depends
 from sqlalchemy.orm import Session
 
-from app.core.security import require_admin, require_admin_or_manager
+from app.core.security import get_current_claims, require_admin, require_admin_or_manager
 from app.db.database import get_db
 from app.schemas.user_schema import UserCreate, UserResponse, UserUpdate
 from app.services.user_service import (
@@ -27,6 +27,21 @@ def create(payload: UserCreate, db: Session = Depends(get_db)):
 @router.get("/", response_model=list[UserResponse], dependencies=[Depends(require_admin_or_manager)])
 def list_all(skip: int = 0, limit: int = 100, db: Session = Depends(get_db)):
     return list_users(db, skip, limit)
+
+
+@router.get("/me/profile", response_model=UserResponse)
+def get_my_profile(claims: dict = Depends(get_current_claims), db: Session = Depends(get_db)):
+    user_id = claims.get("user_id")
+
+    if not user_id:
+        raise not_found("Profil utilisateur introuvable.")
+
+    user = get_user_by_id(db, int(user_id))
+
+    if not user:
+        raise not_found("Profil utilisateur introuvable.")
+
+    return user
 
 
 @router.get("/{user_id}", response_model=UserResponse, dependencies=[Depends(require_admin_or_manager)])

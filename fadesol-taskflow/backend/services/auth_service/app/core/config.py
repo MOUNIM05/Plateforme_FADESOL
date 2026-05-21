@@ -13,6 +13,7 @@ class Settings:
     JWT_EXPIRE_MINUTES: int = int(
         os.getenv("ACCESS_TOKEN_EXPIRE_MINUTES") or os.getenv("JWT_EXPIRE_MINUTES", "60")
     )
+    INTERNAL_SERVICE_SECRET: str = os.getenv("INTERNAL_SERVICE_SECRET", "user-service-sync")
 
 
 settings = Settings()

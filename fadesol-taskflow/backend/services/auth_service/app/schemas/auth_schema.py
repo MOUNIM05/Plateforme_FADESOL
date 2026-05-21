@@ -7,10 +7,17 @@ from shared.enums import UserRole
 
 class RegisterRequest(BaseModel):
     email: str
-    password: str = Field(min_length=8)
+    password: str = Field(min_length=6)
     role: UserRole = UserRole.EMPLOYEE
     user_id: int | None = None
     is_enabled: bool = True
+
+
+class AuthAccountSyncRequest(BaseModel):
+    email: str | None = None
+    role: UserRole | None = None
+    is_enabled: bool | None = None
+    password: str | None = Field(default=None, min_length=6)
 
 
 class LoginRequest(BaseModel):

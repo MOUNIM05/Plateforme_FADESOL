@@ -69,6 +69,71 @@ def create_auth_account(user: User, password: str) -> None:
         ) from exc
 
 
+def sync_auth_account(user: User) -> None:
+    target_url = f"{settings.AUTH_SERVICE_URL.rstrip('/')}/api/auth/sync/users/{user.id}"
+    body = json.dumps(
+        {
+            "email": user.email,
+            "role": user.role,
+            "is_enabled": user.is_active,
+        }
+    ).encode("utf-8")
+    request = UrlRequest(
+        target_url,
+        data=body,
+        headers={
+            "Content-Type": "application/json",
+            "X-Internal-Service-Secret": settings.INTERNAL_SERVICE_SECRET,
+        },
+        method="PUT",
+    )
+
+    try:
+        with urlopen(request, timeout=10) as response:
+            response.read()
+    except HTTPError as exc:
+        detail = "Impossible de synchroniser le compte d'authentification."
+        try:
+            payload = json.loads(exc.read().decode("utf-8"))
+            detail = payload.get("detail", detail)
+        except (json.JSONDecodeError, UnicodeDecodeError):
+            pass
+
+        raise HTTPException(status_code=exc.code, detail=detail) from exc
+    except URLError as exc:
+        raise HTTPException(
+            status_code=status.HTTP_502_BAD_GATEWAY,
+            detail="Auth service indisponible pour synchroniser le compte utilisateur.",
+        ) from exc
+
+
+def delete_auth_account(user_id: int) -> None:
+    target_url = f"{settings.AUTH_SERVICE_URL.rstrip('/')}/api/auth/sync/users/{user_id}"
+    request = UrlRequest(
+        target_url,
+        headers={"X-Internal-Service-Secret": settings.INTERNAL_SERVICE_SECRET},
+        method="DELETE",
+    )
+
+    try:
+        with urlopen(request, timeout=10) as response:
+            response.read()
+    except HTTPError as exc:
+        detail = "Impossible de supprimer le compte d'authentification."
+        try:
+            payload = json.loads(exc.read().decode("utf-8"))
+            detail = payload.get("detail", detail)
+        except (json.JSONDecodeError, UnicodeDecodeError):
+            pass
+
+        raise HTTPException(status_code=exc.code, detail=detail) from exc
+    except URLError as exc:
+        raise HTTPException(
+            status_code=status.HTTP_502_BAD_GATEWAY,
+            detail="Auth service indisponible pour supprimer le compte utilisateur.",
+        ) from exc
+
+
 def create_user(db: Session, payload: UserCreate) -> User:
     if get_user_by_email(db, payload.email):
         raise bad_request("Un utilisateur avec cet email existe deja.")
@@ -126,8 +191,14 @@ def update_user(db: Session, user_id: int, payload: UserUpdate) -> User:
     if payload.is_active is not None and payload.est_actif is None:
         user.est_actif = payload.is_active
 
-    db.commit()
-    db.refresh(user)
+    try:
+        db.flush()
+        sync_auth_account(user)
+        db.commit()
+        db.refresh(user)
+    except Exception:
+        db.rollback()
+        raise
 
     return user
 
@@ -138,8 +209,15 @@ def delete_user(db: Session, user_id: int) -> None:
     if not user:
         raise not_found("Utilisateur introuvable.")
 
-    db.delete(user)
-    db.commit()
+    try:
+        auth_user_id = user.id
+        db.delete(user)
+        db.flush()
+        delete_auth_account(auth_user_id)
+        db.commit()
+    except Exception:
+        db.rollback()
+        raise
 
 
 def set_user_active_state(db: Session, user_id: int, is_active: bool) -> User:

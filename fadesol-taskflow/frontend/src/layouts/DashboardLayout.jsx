@@ -1,55 +1,53 @@
 import { useState } from "react";
-import { useLocation, useNavigate } from "react-router-dom";
-import IconSidebar from "../components/dashboard/IconSidebar";
+import { Outlet, useLocation, useNavigate } from "react-router-dom";
 import MainSidebar from "../components/dashboard/MainSidebar";
+import { useAuth } from "../context/AuthContext";
 import "../styles/dashboard.css";
 
 const itemRoutes = {
-  Dashboard: "/",
+  Dashboard: "/dashboard",
   Utilisateurs: "/users",
+  Services: "/services",
+  Projets: "/projects",
+  Tâches: "/tasks",
+  "Mes tâches": "/tasks",
+  Messagerie: "/messages",
+  "ClickUp Sync": "/clickup",
+  Reporting: "/reporting",
+  Paramètres: "/settings",
+  Profile: "/profile",
 };
 
 function getActiveItem(pathname) {
-  if (pathname.startsWith("/users")) {
-    return "Utilisateurs";
-  }
+  const match = Object.entries(itemRoutes).find(([, route]) => pathname.startsWith(route));
 
-  return "Dashboard";
+  return match?.[0] || "Dashboard";
 }
 
-function DashboardLayout({ children, currentUser, onLogout }) {
+function DashboardLayout() {
   const location = useLocation();
   const navigate = useNavigate();
-  const [darkMode, setDarkMode] = useState(false);
+  const { currentUser, logout } = useAuth();
   const [sidebarCollapsed, setSidebarCollapsed] = useState(false);
   const activeItem = getActiveItem(location.pathname);
 
   function handleSelect(itemLabel) {
-    const route = itemRoutes[itemLabel];
-
-    if (route) {
-      navigate(route);
-    }
+    navigate(itemRoutes[itemLabel] || "/dashboard");
   }
 
   return (
-    <div
-      className={`ft-dashboard-layout ${darkMode ? "is-dark-preview" : ""} ${
-        sidebarCollapsed ? "is-sidebar-collapsed" : ""
-      }`}
-    >
-      <IconSidebar activeItem={activeItem} onSelect={handleSelect} />
+    <div className={`dashboard-shell ${sidebarCollapsed ? "sidebar-collapsed" : ""}`}>
       <MainSidebar
         activeItem={activeItem}
         currentUser={currentUser}
-        darkMode={darkMode}
         collapsed={sidebarCollapsed}
         onSelect={handleSelect}
-        onToggleDarkMode={() => setDarkMode((current) => !current)}
         onToggleCollapse={() => setSidebarCollapsed((current) => !current)}
-        onLogout={onLogout}
+        onLogout={logout}
       />
-      <main className="ft-dashboard-main">{children}</main>
+      <main className="dashboard-main">
+        <Outlet />
+      </main>
     </div>
   );
 }
