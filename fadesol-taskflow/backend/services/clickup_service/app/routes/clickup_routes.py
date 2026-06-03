@@ -9,12 +9,19 @@ from app.services.clickup_service import (
     list_sync_logs,
     mark_failed,
     mark_success,
+    sync_tasks_placeholder,
     update_sync_log,
 )
 from shared.exceptions import not_found
 
 
 router = APIRouter(prefix="/clickup/sync-logs", tags=["ClickUp"])
+placeholder_router = APIRouter(prefix="/clickup", tags=["ClickUp"])
+
+
+@placeholder_router.post("/sync-tasks")
+def sync_tasks():
+    return sync_tasks_placeholder()
 
 
 @router.get("/", response_model=list[ClickUpSyncResponse])

@@ -5,7 +5,9 @@ import AccessDenied from "./pages/AccessDenied";
 import Dashboard from "./pages/Dashboard";
 import Login from "./pages/LoginPage";
 import ModulePage from "./pages/ModulePage";
+import MyTasks from "./pages/MyTasks";
 import Profile from "./pages/Profile";
+import Tasks from "./pages/Tasks";
 import Users from "./pages/Users";
 import ProtectedRoute from "./routes/ProtectedRoute";
 import RoleRoute from "./routes/RoleRoute";
@@ -81,10 +83,8 @@ function AppRoutes() {
               element={<ModulePage type="reporting" title="Reporting" description="Indicateurs et analyses par rôle." cards={moduleCards.reporting} />}
             />
           </Route>
-          <Route
-            path="/tasks"
-            element={<ModulePage type="tasks" title="Tâches" description="Suivi des tâches selon votre périmètre." cards={moduleCards.tasks} />}
-          />
+          <Route path="/my-tasks" element={<MyTasks />} />
+          <Route path="/tasks" element={<Tasks />} />
           <Route
             path="/messages"
             element={<ModulePage type="messages" title="Messagerie" description="Communication interne Fadesol TaskFlow." cards={moduleCards.messages} />}

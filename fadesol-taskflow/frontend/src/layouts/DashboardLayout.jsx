@@ -10,7 +10,7 @@ const itemRoutes = {
   Services: "/services",
   Projets: "/projects",
   Tâches: "/tasks",
-  "Mes tâches": "/tasks",
+  "Mes tâches": "/my-tasks",
   Messagerie: "/messages",
   "ClickUp Sync": "/clickup",
   Reporting: "/reporting",

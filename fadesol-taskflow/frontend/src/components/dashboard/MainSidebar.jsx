@@ -58,8 +58,8 @@ const sections = [
 
 function MainSidebar({ activeItem, currentUser, collapsed, onSelect, onToggleCollapse, onLogout }) {
   const fullName =
-    currentUser?.first_name && currentUser?.last_name
-      ? `${currentUser.first_name} ${currentUser.last_name}`
+    currentUser?.prenom && currentUser?.nom
+      ? `${currentUser.prenom} ${currentUser.nom}`
       : currentUser?.email || "Utilisateur Fadesol";
   const role = normalizeRole(currentUser?.role);
   const initials = getInitials(currentUser);

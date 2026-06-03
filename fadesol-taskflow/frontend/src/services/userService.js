@@ -2,8 +2,10 @@ import api from "./api";
 
 // Appel simple utilisé pour tester les permissions par rôle.
 // Le backend autorise Admin + Manager et refuse Employé avec 403.
-export async function getUsers() {
-  const response = await api.get("/users/");
+export async function getUsers(serviceId) {
+  const response = await api.get("/users/", {
+    params: serviceId ? { id_service: serviceId } : undefined,
+  });
 
   return response.data;
 }

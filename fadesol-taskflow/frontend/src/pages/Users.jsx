@@ -18,13 +18,13 @@ import {
 } from "../services/userService";
 
 const emptyForm = {
-  first_name: "",
-  last_name: "",
+  prenom: "",
+  nom: "",
   email: "",
   password: "",
   role: ROLES.EMPLOYEE,
-  service_id: "",
-  is_active: true,
+  id_service: "",
+  est_actif: true,
 };
 
 const roleOptions = [
@@ -45,13 +45,13 @@ const serviceOptions = [
 
 function normalizePayload(formData, includePassword = true) {
   const payload = {
-    first_name: formData.first_name.trim(),
-    last_name: formData.last_name.trim(),
+    prenom: formData.prenom.trim(),
+    nom: formData.nom.trim(),
     email: formData.email.trim(),
     role: formData.role,
-    service_id: formData.service_id === "" ? null : formData.service_id,
-    service: formData.service_id === "" ? null : formData.service_id,
-    is_active: formData.is_active,
+    id_service: formData.id_service === "" ? null : formData.id_service,
+    service: formData.id_service === "" ? null : formData.id_service,
+    est_actif: formData.est_actif,
   };
 
   if (includePassword) {
@@ -139,13 +139,13 @@ function Users() {
 
   const filteredUsers = useMemo(() => {
     return users.filter((user) => {
-      const fullName = `${user.first_name || user.prenom || ""} ${user.last_name || user.nom || ""}`;
+      const fullName = `${user.prenom || user.first_name || ""} ${user.nom || user.last_name || ""}`;
       const searchable = `${fullName} ${user.email || ""}`.toLowerCase();
       const matchesSearch = searchable.includes(searchQuery.trim().toLowerCase());
       const matchesRole = roleFilter === "" || normalizeRole(user.role) === roleFilter;
       const matchesService =
         serviceFilter === "" ||
-        String(user.service_id ?? "") === String(serviceFilter);
+        String(user.id_service ?? user.service_id ?? "") === String(serviceFilter);
 
       return matchesSearch && matchesRole && matchesService;
     });
@@ -175,13 +175,13 @@ function Users() {
     setMessage("");
     setError("");
     setFormData({
-      first_name: user.first_name,
-      last_name: user.last_name,
+      prenom: user.prenom || user.first_name || "",
+      nom: user.nom || user.last_name || "",
       email: user.email,
       password: "",
       role: user.role,
-      service_id: user.service || user.service_id || "",
-      is_active: user.is_active,
+      id_service: user.service || user.id_service || user.service_id || "",
+      est_actif: user.est_actif ?? user.is_active ?? true,
     });
   }
 
@@ -324,11 +324,11 @@ function Users() {
           <div className="form-grid">
             <label>
               Prénom
-              <input name="first_name" value={formData.first_name} onChange={handleChange} required />
+              <input name="prenom" value={formData.prenom} onChange={handleChange} required />
             </label>
             <label>
               Nom
-              <input name="last_name" value={formData.last_name} onChange={handleChange} required />
+              <input name="nom" value={formData.nom} onChange={handleChange} required />
             </label>
             <label>
               Email
@@ -358,7 +358,7 @@ function Users() {
             </label>
             <label>
               Service
-              <select name="service_id" value={formData.service_id} onChange={handleChange}>
+              <select name="id_service" value={formData.id_service} onChange={handleChange}>
                 {serviceOptions.map((service) => (
                   <option key={service.value || "none"} value={service.value}>
                     {service.label}
@@ -369,7 +369,7 @@ function Users() {
           </div>
 
           <label className="toggle-line">
-            <input name="is_active" type="checkbox" checked={formData.is_active} onChange={handleChange} />
+            <input name="est_actif" type="checkbox" checked={formData.est_actif} onChange={handleChange} />
             Compte actif
           </label>
 
@@ -391,7 +391,7 @@ function Users() {
               <div className="selected-profile-card__head">
                 <div className="profile-avatar-large">{getInitials(selectedUser)}</div>
                 <div>
-                  <h4>{selectedUser.first_name || selectedUser.prenom} {selectedUser.last_name || selectedUser.nom}</h4>
+                  <h4>{selectedUser.prenom || selectedUser.first_name} {selectedUser.nom || selectedUser.last_name}</h4>
                   <p>{selectedUser.email}</p>
                 </div>
               </div>
@@ -403,11 +403,11 @@ function Users() {
                 </div>
                 <div>
                   <dt>Service</dt>
-                  <dd>{selectedUser.service || selectedUser.service_id || "Non affecté"}</dd>
+                  <dd>{selectedUser.service || selectedUser.id_service || selectedUser.service_id || "Non affecté"}</dd>
                 </div>
                 <div>
                   <dt>Statut</dt>
-                  <dd>{selectedUser.is_active ? "Actif" : "Désactivé"}</dd>
+                  <dd>{selectedUser.est_actif ?? selectedUser.is_active ? "Actif" : "Désactivé"}</dd>
                 </div>
               </dl>
 
@@ -475,10 +475,10 @@ function Users() {
 
             {filteredUsers.map((user) => (
               <div className="table-row" key={user.id}>
-                <span>{user.first_name || user.prenom} {user.last_name || user.nom}</span>
+                <span>{user.prenom || user.first_name} {user.nom || user.last_name}</span>
                 <span>{user.email}</span>
                 <span><mark>{getRoleLabel(user.role)}</mark></span>
-                <span>{user.service || user.service_id || "Aucun"}</span>
+                <span>{user.service || user.id_service || user.service_id || "Aucun"}</span>
                 {canManageUsers && (
                   <span className="row-actions">
                     <button type="button" onClick={() => setSelectedUser(user)}>

@@ -6,12 +6,18 @@ from sqlalchemy.orm import Session, declarative_base, sessionmaker
 from app.core.config import settings
 
 
+# Engine SQLAlchemy connecte ce microservice a sa propre base d'authentification.
 engine = create_engine(settings.DATABASE_URL)
+
+# SessionLocal fabrique une session par requete FastAPI.
 SessionLocal = sessionmaker(bind=engine, autocommit=False, autoflush=False)
+
+# Base sert de classe mere aux modeles ORM de ce service.
 Base = declarative_base()
 
 
 def get_db() -> Generator[Session, None, None]:
+    # Dependency FastAPI : ouvre une session, la fournit a la route, puis la ferme proprement.
     db = SessionLocal()
 
     try:

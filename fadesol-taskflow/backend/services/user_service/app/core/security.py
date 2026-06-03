@@ -12,6 +12,7 @@ bearer_scheme = HTTPBearer(auto_error=True)
 def get_current_claims(
     credentials: HTTPAuthorizationCredentials = Depends(bearer_scheme),
 ) -> dict:
+    # Decode le JWT envoye par le frontend pour connaitre l'utilisateur et son role.
     try:
         payload = jwt.decode(
             credentials.credentials,
@@ -34,6 +35,7 @@ def get_current_claims(
 
 
 def require_admin(claims: dict = Depends(get_current_claims)) -> dict:
+    # Les operations sensibles comme creer ou supprimer un utilisateur sont reservees a l'Admin.
     if claims.get("role") != UserRole.ADMIN.value:
         raise HTTPException(
             status_code=status.HTTP_403_FORBIDDEN,
@@ -44,6 +46,7 @@ def require_admin(claims: dict = Depends(get_current_claims)) -> dict:
 
 
 def require_roles(allowed_roles: list[str]):
+    # Fabrique une dependency FastAPI reutilisable pour proteger les routes selon plusieurs roles.
     def role_checker(claims: dict = Depends(get_current_claims)) -> dict:
         if claims.get("role") not in allowed_roles:
             raise HTTPException(

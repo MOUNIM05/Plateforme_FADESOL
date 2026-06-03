@@ -35,7 +35,7 @@ export function getRoleLabel(role) {
 
 export function getInitials(user) {
   const source =
-    [user?.first_name || user?.prenom, user?.last_name || user?.nom].filter(Boolean).join(" ") ||
+    [user?.prenom || user?.first_name, user?.nom || user?.last_name].filter(Boolean).join(" ") ||
     user?.email ||
     "FT";
 

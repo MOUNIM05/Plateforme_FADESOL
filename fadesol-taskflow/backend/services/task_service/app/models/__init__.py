@@ -1,2 +1,2 @@
-from app.models.subtask import SousTache
-from app.models.task import Tache
+from app.models.subtask import SousTache, SubTask
+from app.models.task import Tache, Task

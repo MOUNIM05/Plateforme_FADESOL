@@ -9,8 +9,8 @@ import {
 
 function Topbar({ currentUser }) {
   const initials =
-    currentUser?.first_name && currentUser?.last_name
-      ? `${currentUser.first_name[0]}${currentUser.last_name[0]}`
+    currentUser?.prenom && currentUser?.nom
+      ? `${currentUser.prenom[0]}${currentUser.nom[0]}`
       : "AM";
 
   return (

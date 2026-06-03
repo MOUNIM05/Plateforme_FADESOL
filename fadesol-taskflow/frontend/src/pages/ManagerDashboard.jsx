@@ -52,7 +52,7 @@ const urgentTasks = [
 ];
 
 function ManagerDashboard({ currentUser }) {
-  const displayName = currentUser?.first_name || currentUser?.prenom || currentUser?.email || "Manager";
+  const displayName = currentUser?.prenom || currentUser?.first_name || currentUser?.email || "Manager";
 
   return (
     <div className="dashboard-page">

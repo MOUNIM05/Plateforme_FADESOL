@@ -5,6 +5,13 @@ from app.schemas.clickup_sync_schema import ClickUpSyncCreate, ClickUpSyncUpdate
 from shared.exceptions import not_found
 
 
+def sync_tasks_placeholder() -> dict:
+    return {
+        "status": "not_configured",
+        "message": "ClickUp synchronization will be implemented later",
+    }
+
+
 def list_sync_logs(db: Session, skip: int = 0, limit: int = 100) -> list[JournalSynchronisationClickUp]:
     return db.query(JournalSynchronisationClickUp).offset(skip).limit(limit).all()
 

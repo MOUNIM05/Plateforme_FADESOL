@@ -41,7 +41,7 @@ function Profile() {
   }, []);
 
   const fullName =
-    [user?.first_name || user?.prenom, user?.last_name || user?.nom]
+    [user?.prenom || user?.first_name, user?.nom || user?.last_name]
       .filter(Boolean)
       .join(" ") || "Utilisateur Fadesol";
 
@@ -88,11 +88,11 @@ function Profile() {
             </div>
             <div>
               <dt>Service</dt>
-              <dd>{user?.service || user?.service_id || "Non affecté"}</dd>
+              <dd>{user?.service || user?.id_service || user?.service_id || "Non affecté"}</dd>
             </div>
             <div>
               <dt>Statut</dt>
-              <dd>{user?.is_enabled ?? user?.is_active ? "Actif" : "Désactivé"}</dd>
+              <dd>{user?.is_enabled ?? user?.est_actif ?? user?.is_active ? "Actif" : "Désactivé"}</dd>
             </div>
             <div>
               <dt>Créé le</dt>

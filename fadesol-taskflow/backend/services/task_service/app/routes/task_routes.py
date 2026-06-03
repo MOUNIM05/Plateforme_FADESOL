@@ -1,39 +1,67 @@
-from fastapi import APIRouter, Depends
+from fastapi import APIRouter, Depends, Request
 from sqlalchemy.orm import Session
 
 from app.db.database import get_db
-from app.schemas.task_schema import TacheCreate, TacheResponse, TacheUpdate
+from app.schemas.task_schema import TaskAssign, TaskCreate, TaskImportFromClickUp, TaskResponse, TaskStatusUpdate, TaskUpdate
 from app.services.task_service import (
+    assign_task,
     assigner_task,
     changer_statut_task,
     create_task,
     delete_task,
-    get_task,
-    list_tasks,
+    get_task_by_id,
+    get_tasks,
+    resolve_current_user_uuid,
     synchroniser_clickup,
     update_task,
+    update_task_status,
+    upsert_task_from_clickup,
 )
 from shared.enums import StatutTache
 from shared.exceptions import not_found
 from shared.responses import MessageResponse
 
 
-router = APIRouter(prefix="/taches", tags=["Taches"])
+router = APIRouter(prefix="/tasks", tags=["Tasks"])
+legacy_router = APIRouter(prefix="/taches", tags=["Taches"])
 
 
-@router.get("/", response_model=list[TacheResponse])
-def list_all(skip: int = 0, limit: int = 100, db: Session = Depends(get_db)):
-    return list_tasks(db, skip, limit)
+@router.get("/", response_model=list[TaskResponse])
+def list_all(
+    request: Request,
+    skip: int = 0,
+    limit: int = 100,
+    status: str | None = None,
+    priority: str | None = None,
+    assigned_to: str | None = None,
+    db: Session = Depends(get_db),
+):
+    # Liste les taches avec filtres optionnels par statut, priorite et utilisateur assigne.
+    assigned_filter = assigned_to
+
+    if assigned_to == "me":
+        # Le filtre "me" est resolu via user_service a partir du token transmis dans les headers.
+        assigned_filter = resolve_current_user_uuid(request.headers.get("authorization"))
+
+    return get_tasks(db, skip=skip, limit=limit, status=status, priority=priority, assigned_to=assigned_filter)
 
 
-@router.post("/", response_model=TacheResponse)
-def create(payload: TacheCreate, db: Session = Depends(get_db)):
+@router.post("/", response_model=TaskResponse)
+def create(payload: TaskCreate, db: Session = Depends(get_db)):
+    # Cree une tache locale dans la table taches.
     return create_task(db, payload)
 
 
-@router.get("/{task_id}", response_model=TacheResponse)
+@router.post("/import-clickup", response_model=TaskResponse)
+def import_clickup(payload: TaskImportFromClickUp, db: Session = Depends(get_db)):
+    # Cree ou met a jour une tache provenant de ClickUp grace a son identifiant distant.
+    return upsert_task_from_clickup(db, payload)
+
+
+@router.get("/{task_id}", response_model=TaskResponse)
 def get_one(task_id: str, db: Session = Depends(get_db)):
-    task = get_task(db, task_id)
+    # Consultation d'une tache precise par son UUID.
+    task = get_task_by_id(db, task_id)
 
     if not task:
         raise not_found("Tache introuvable.")
@@ -41,27 +69,82 @@ def get_one(task_id: str, db: Session = Depends(get_db)):
     return task
 
 
-@router.put("/{task_id}", response_model=TacheResponse)
-def update(task_id: str, payload: TacheUpdate, db: Session = Depends(get_db)):
+@router.put("/{task_id}", response_model=TaskResponse)
+def update(task_id: str, payload: TaskUpdate, db: Session = Depends(get_db)):
+    # Modifie les champs envoyes dans le payload sans changer les autres.
     return update_task(db, task_id, payload)
 
 
-@router.patch("/{task_id}/assigner/{utilisateur_id}", response_model=TacheResponse)
-def assign(task_id: str, utilisateur_id: str, db: Session = Depends(get_db)):
-    return assigner_task(db, task_id, utilisateur_id)
+@router.patch("/{task_id}/assign", response_model=TaskResponse)
+def assign_with_payload(task_id: str, payload: TaskAssign, db: Session = Depends(get_db)):
+    # Affecte la tache a un utilisateur identifie par UUID.
+    return assign_task(db, task_id, payload)
 
 
-@router.patch("/{task_id}/statut/{statut}", response_model=TacheResponse)
-def change_status(task_id: str, statut: StatutTache, db: Session = Depends(get_db)):
-    return changer_statut_task(db, task_id, statut)
-
-
-@router.patch("/{task_id}/clickup", response_model=TacheResponse)
-def sync_clickup(task_id: str, clickup_task_id: str | None = None, db: Session = Depends(get_db)):
-    return synchroniser_clickup(db, task_id, clickup_task_id)
+@router.patch("/{task_id}/status", response_model=TaskResponse)
+def update_status(task_id: str, payload: TaskStatusUpdate, db: Session = Depends(get_db)):
+    # Endpoint specialise pour changer uniquement le statut d'une tache.
+    return update_task_status(db, task_id, payload)
 
 
 @router.delete("/{task_id}", response_model=MessageResponse)
 def delete(task_id: str, db: Session = Depends(get_db)):
+    # Supprime une tache de la base task_db.
+    delete_task(db, task_id)
+    return {"message": "Tache supprimee avec succes."}
+
+
+@legacy_router.get("/", response_model=list[TaskResponse])
+def legacy_list_all(
+    request: Request,
+    skip: int = 0,
+    limit: int = 100,
+    statut: str | None = None,
+    priorite: str | None = None,
+    assignee_a: str | None = None,
+    db: Session = Depends(get_db),
+):
+    # Routes historiques en francais gardees pour compatibilite avec l'ancien frontend ou les tests.
+    assigned_filter = assignee_a
+
+    if assignee_a == "me":
+        assigned_filter = resolve_current_user_uuid(request.headers.get("authorization"))
+
+    return get_tasks(db, skip=skip, limit=limit, status=statut, priority=priorite, assigned_to=assigned_filter)
+
+
+@legacy_router.post("/", response_model=TaskResponse)
+def legacy_create(payload: TaskCreate, db: Session = Depends(get_db)):
+    return create_task(db, payload)
+
+
+@legacy_router.get("/{task_id}", response_model=TaskResponse)
+def legacy_get_one(task_id: str, db: Session = Depends(get_db)):
+    return get_one(task_id, db)
+
+
+@legacy_router.put("/{task_id}", response_model=TaskResponse)
+def legacy_update(task_id: str, payload: TaskUpdate, db: Session = Depends(get_db)):
+    return update_task(db, task_id, payload)
+
+
+@legacy_router.patch("/{task_id}/assigner/{utilisateur_id}", response_model=TaskResponse)
+def legacy_assign(task_id: str, utilisateur_id: str, db: Session = Depends(get_db)):
+    return assigner_task(db, task_id, utilisateur_id)
+
+
+@legacy_router.patch("/{task_id}/statut/{statut}", response_model=TaskResponse)
+def change_status(task_id: str, statut: StatutTache, db: Session = Depends(get_db)):
+    return changer_statut_task(db, task_id, statut)
+
+
+@legacy_router.patch("/{task_id}/clickup", response_model=TaskResponse)
+def sync_clickup(task_id: str, clickup_task_id: str | None = None, db: Session = Depends(get_db)):
+    # Marque manuellement une tache comme synchronisee avec ClickUp.
+    return synchroniser_clickup(db, task_id, clickup_task_id)
+
+
+@legacy_router.delete("/{task_id}", response_model=MessageResponse)
+def legacy_delete(task_id: str, db: Session = Depends(get_db)):
     delete_task(db, task_id)
     return {"message": "Tache supprimee avec succes."}
