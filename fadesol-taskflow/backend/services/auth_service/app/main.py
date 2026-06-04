@@ -1,3 +1,9 @@
+"""Point d'entree FastAPI du microservice auth_service.
+
+Ce fichier cree l'application, branche les routes et initialise les tables
+necessaires au stockage des comptes d'authentification.
+"""
+
 from fastapi import FastAPI
 
 from app import models  # noqa: F401
@@ -15,11 +21,13 @@ app.include_router(auth_router, prefix="/api")
 
 @app.on_event("startup")
 def on_startup():
+    """Initialise la base locale du service auth au demarrage."""
     # Au demarrage, SQLAlchemy cree les tables manquantes de ce microservice uniquement.
     Base.metadata.create_all(bind=engine)
 
 
 @app.get("/health")
 def health_check():
+    """Retourne un indicateur simple pour verifier que le service est disponible."""
     # Endpoint simple utilise par Docker, le gateway ou un outil de monitoring pour verifier le service.
     return {"status": "ok", "service": "auth_service"}

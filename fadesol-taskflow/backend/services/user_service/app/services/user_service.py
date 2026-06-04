@@ -1,3 +1,8 @@
+"""Logique metier du service utilisateur.
+
+Ce module gere les profils utilisateurs et synchronise les comptes auth.
+"""
+
 import json
 from urllib.error import HTTPError, URLError
 from urllib.request import Request as UrlRequest
@@ -17,20 +22,24 @@ pwd_context = CryptContext(schemes=["bcrypt"], deprecated="auto")
 
 
 def hash_password(password: str) -> str:
+    """Hash le mot de passe recu a la creation utilisateur."""
     # Hash local utilise pour ne jamais stocker le mot de passe en clair dans user_service.
     return pwd_context.hash(password)
 
 
 def get_user_by_email(db: Session, email: str) -> User | None:
+    """Retourne un utilisateur par email."""
     # Recherche par email pour garantir l'unicite avant creation ou modification.
     return db.query(User).filter(User.email == email).first()
 
 
 def get_user_by_id(db: Session, user_id: int) -> User | None:
+    """Retourne un utilisateur par identifiant interne."""
     return db.query(User).filter(User.id == user_id).first()
 
 
 def list_users(db: Session, skip: int = 0, limit: int = 100, service_id: str | None = None) -> list[User]:
+    """Liste les utilisateurs, avec filtre facultatif par service."""
     # Construit la requete de liste avec pagination et filtre facultatif par service.
     query = db.query(User)
 
@@ -41,6 +50,7 @@ def list_users(db: Session, skip: int = 0, limit: int = 100, service_id: str | N
 
 
 def create_auth_account(user: User, password: str) -> None:
+    """Demande a auth_service de creer le compte de connexion."""
     # Apres creation du profil, user_service demande a auth_service de creer le compte de connexion.
     target_url = f"{settings.AUTH_SERVICE_URL.rstrip('/')}/api/auth/register"
     body = json.dumps(
@@ -79,6 +89,7 @@ def create_auth_account(user: User, password: str) -> None:
 
 
 def sync_auth_account(user: User) -> None:
+    """Synchronise email, role et etat actif dans auth_service."""
     # Synchronise les champs qui influencent l'authentification : email, role et etat actif.
     target_url = f"{settings.AUTH_SERVICE_URL.rstrip('/')}/api/auth/sync/users/{user.id}"
     body = json.dumps(
@@ -118,6 +129,7 @@ def sync_auth_account(user: User) -> None:
 
 
 def delete_auth_account(user_id: int) -> None:
+    """Demande a auth_service de supprimer le compte associe."""
     # Supprime le compte auth correspondant pour eviter un login orphelin.
     target_url = f"{settings.AUTH_SERVICE_URL.rstrip('/')}/api/auth/sync/users/{user_id}"
     request = UrlRequest(
@@ -146,6 +158,7 @@ def delete_auth_account(user_id: int) -> None:
 
 
 def create_user(db: Session, payload: UserCreate) -> User:
+    """Cree le profil utilisateur et le compte auth correspondant."""
     # L'email est unique dans user_service et auth_service.
     if get_user_by_email(db, payload.email):
         raise bad_request("Un utilisateur avec cet email existe deja.")
@@ -180,6 +193,7 @@ def create_user(db: Session, payload: UserCreate) -> User:
 
 
 def update_user(db: Session, user_id: int, payload: UserUpdate) -> User:
+    """Met a jour un profil utilisateur et synchronise auth_service."""
     # Recupere le profil puis applique uniquement les champs envoyes par le client.
     user = get_user_by_id(db, user_id)
 
@@ -229,6 +243,7 @@ def update_user(db: Session, user_id: int, payload: UserUpdate) -> User:
 
 
 def delete_user(db: Session, user_id: int) -> None:
+    """Supprime un utilisateur et son compte d'authentification."""
     # Supprime le profil et le compte auth associe dans une meme transaction logique.
     user = get_user_by_id(db, user_id)
 
@@ -247,6 +262,7 @@ def delete_user(db: Session, user_id: int) -> None:
 
 
 def set_user_active_state(db: Session, user_id: int, is_active: bool) -> User:
+    """Active ou desactive un utilisateur."""
     # Active/desactive le profil utilisateur; les deux champs restent alignes.
     user = get_user_by_id(db, user_id)
 

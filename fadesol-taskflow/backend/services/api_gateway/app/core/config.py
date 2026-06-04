@@ -1,3 +1,9 @@
+"""Configuration de l'API Gateway.
+
+Chaque URL de microservice est lue depuis l'environnement afin de fonctionner
+en local comme dans Docker.
+"""
+
 import os
 
 
@@ -18,3 +24,5 @@ class Settings:
 
 
 settings = Settings()
+
+# Instance unique de configuration du gateway.

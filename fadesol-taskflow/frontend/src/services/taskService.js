@@ -37,6 +37,12 @@ export async function getSubtasksByTask(taskId) {
   return response.data;
 }
 
+export async function getTaskProgress(taskId) {
+  const response = await api.get(`/tasks/${taskId}/progress`);
+
+  return response.data;
+}
+
 export async function createSubtask(taskId, subtaskData) {
   const response = await api.post(`/tasks/${taskId}/subtasks`, subtaskData);
 

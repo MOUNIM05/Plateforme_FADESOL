@@ -1,3 +1,8 @@
+"""Routes historiques des sous-taches.
+
+Les routes modernes de sous-taches sont aussi exposees sous /tasks/{task_id}/subtasks.
+"""
+
 from fastapi import APIRouter, Depends
 from sqlalchemy.orm import Session
 
@@ -22,18 +27,21 @@ router = APIRouter(prefix="/sous-taches", tags=["Sous-taches"])
 
 @router.get("/", response_model=list[SousTacheResponse])
 def list_all(skip: int = 0, limit: int = 100, db: Session = Depends(get_db)):
+    """Liste toutes les sous-taches."""
     # Liste les sous-taches avec pagination simple.
     return list_subtasks(db, skip, limit)
 
 
 @router.post("/", response_model=SousTacheResponse)
 def create(payload: SousTacheCreate, db: Session = Depends(get_db)):
+    """Cree une sous-tache via l'ancien endpoint."""
     # Cree une sous-tache rattachee a une tache principale.
     return create_legacy_subtask(db, payload)
 
 
 @router.get("/{subtask_id}", response_model=SousTacheResponse)
 def get_one(subtask_id: str, db: Session = Depends(get_db)):
+    """Retourne une sous-tache par id."""
     # Recupere une sous-tache par son UUID.
     subtask = get_subtask(db, subtask_id)
 
@@ -45,22 +53,26 @@ def get_one(subtask_id: str, db: Session = Depends(get_db)):
 
 @router.put("/{subtask_id}", response_model=SousTacheResponse)
 def update(subtask_id: str, payload: SousTacheUpdate, db: Session = Depends(get_db)):
+    """Met a jour une sous-tache."""
     return update_subtask(db, subtask_id, payload)
 
 
 @router.patch("/{subtask_id}/assigner/{utilisateur_id}", response_model=SousTacheResponse)
 def assign(subtask_id: str, utilisateur_id: str, db: Session = Depends(get_db)):
+    """Affecte une sous-tache a un utilisateur."""
     # Affecte une sous-tache a un utilisateur sans relation directe avec user_service.
     return assigner_subtask(db, subtask_id, utilisateur_id)
 
 
 @router.patch("/{subtask_id}/statut/{statut}", response_model=SousTacheResponse)
 def change_status(subtask_id: str, statut: StatutTache, db: Session = Depends(get_db)):
+    """Change le statut d'une sous-tache."""
     # Change le statut d'une sous-tache avec une valeur de l'enum StatutTache.
     return changer_statut_subtask(db, subtask_id, statut)
 
 
 @router.delete("/{subtask_id}", response_model=MessageResponse)
 def delete(subtask_id: str, db: Session = Depends(get_db)):
+    """Supprime une sous-tache."""
     delete_subtask(db, subtask_id)
     return {"message": "Sous-tache supprimee avec succes."}

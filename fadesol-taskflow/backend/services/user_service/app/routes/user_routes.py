@@ -1,3 +1,5 @@
+"""Routes HTTP du service utilisateur."""
+
 from fastapi import APIRouter, Depends
 from sqlalchemy.orm import Session
 
@@ -21,6 +23,7 @@ router = APIRouter(prefix="/users", tags=["Users"])
 
 @router.post("/", response_model=UserResponse, dependencies=[Depends(require_admin)])
 def create(payload: UserCreate, db: Session = Depends(get_db)):
+    """Cree un utilisateur et son compte auth associe."""
     # Creation d'un utilisateur reservee a l'Admin; le service cree aussi le compte auth associe.
     return create_user(db, payload)
 
@@ -33,6 +36,7 @@ def list_all(
     service_id: str | None = None,
     db: Session = Depends(get_db),
 ):
+    """Liste les utilisateurs avec pagination et filtre optionnel par service."""
     # Liste les utilisateurs avec pagination et filtre optionnel par service.
     # Admin et Manager peuvent consulter, mais les mots de passe ne sont jamais retournes.
     return list_users(db, skip, limit, id_service or service_id)
@@ -40,6 +44,7 @@ def list_all(
 
 @router.get("/me/profile", response_model=UserResponse)
 def get_my_profile(claims: dict = Depends(get_current_claims), db: Session = Depends(get_db)):
+    """Retourne le profil de l'utilisateur connecte."""
     # Le profil courant est retrouve a partir du user_id transporte dans le JWT.
     user_id = claims.get("user_id")
 
@@ -56,6 +61,7 @@ def get_my_profile(claims: dict = Depends(get_current_claims), db: Session = Dep
 
 @router.get("/{user_id}", response_model=UserResponse, dependencies=[Depends(require_admin_or_manager)])
 def get_one(user_id: int, db: Session = Depends(get_db)):
+    """Retourne un utilisateur par son id interne."""
     # Consultation d'un utilisateur precis, autorisee aux roles de supervision.
     user = get_user_by_id(db, user_id)
 
@@ -67,12 +73,14 @@ def get_one(user_id: int, db: Session = Depends(get_db)):
 
 @router.put("/{user_id}", response_model=UserResponse, dependencies=[Depends(require_admin)])
 def update(user_id: int, payload: UserUpdate, db: Session = Depends(get_db)):
+    """Met a jour un utilisateur existant."""
     # Modification du profil utilisateur; les changements sensibles sont synchronises avec auth_service.
     return update_user(db, user_id, payload)
 
 
 @router.delete("/{user_id}", response_model=MessageResponse, dependencies=[Depends(require_admin)])
 def delete(user_id: int, db: Session = Depends(get_db)):
+    """Supprime un utilisateur et son compte auth."""
     # Suppression admin : elle retire le profil puis le compte d'authentification associe.
     delete_user(db, user_id)
     return {"message": "Utilisateur supprime avec succes."}
@@ -80,11 +88,13 @@ def delete(user_id: int, db: Session = Depends(get_db)):
 
 @router.patch("/{user_id}/activate", response_model=UserResponse, dependencies=[Depends(require_admin)])
 def activate(user_id: int, db: Session = Depends(get_db)):
+    """Active un utilisateur."""
     # Reactive un utilisateur dans le service utilisateur.
     return set_user_active_state(db, user_id, True)
 
 
 @router.patch("/{user_id}/deactivate", response_model=UserResponse, dependencies=[Depends(require_admin)])
 def deactivate(user_id: int, db: Session = Depends(get_db)):
+    """Desactive un utilisateur."""
     # Desactive le profil utilisateur sans supprimer son historique.
     return set_user_active_state(db, user_id, False)

@@ -6,6 +6,7 @@ import {
   createSubtask,
   createTask,
   getSubtasksByTask,
+  getTaskProgress,
   getTasks,
   updateTaskStatus,
 } from "../services/taskService";
@@ -103,6 +104,7 @@ function Tasks() {
   const [assigningTaskId, setAssigningTaskId] = useState("");
   const [updatingStatusTaskId, setUpdatingStatusTaskId] = useState("");
   const [expandedTaskId, setExpandedTaskId] = useState("");
+  const [progressByTask, setProgressByTask] = useState({});
   const [subtasksByTask, setSubtasksByTask] = useState({});
   const [subtaskForms, setSubtaskForms] = useState({});
   const [subtaskAssignForms, setSubtaskAssignForms] = useState({});
@@ -165,6 +167,37 @@ function Tasks() {
 
   const recentTasks = useMemo(() => tasks.slice(0, 8), [tasks]);
 
+  useEffect(() => {
+    let isMounted = true;
+
+    async function loadTaskProgressions() {
+      if (recentTasks.length === 0) {
+        return;
+      }
+
+      try {
+        const progressEntries = await Promise.all(
+          recentTasks.map(async (task) => [task.id, await getTaskProgress(task.id)])
+        );
+
+        if (isMounted) {
+          setProgressByTask((current) => ({
+            ...current,
+            ...Object.fromEntries(progressEntries),
+          }));
+        }
+      } catch (err) {
+        console.error("Load task progress error:", err);
+      }
+    }
+
+    loadTaskProgressions();
+
+    return () => {
+      isMounted = false;
+    };
+  }, [recentTasks]);
+
   const serviceOptions = useMemo(() => {
     const loadedServices = services
       .map((service) => ({
@@ -198,6 +231,14 @@ function Tasks() {
     const user = users.find((candidate) => candidate.uuid === userUuid);
 
     return user ? getUserDisplayName(user) : userUuid;
+  }
+
+  function getProgress(taskId) {
+    return progressByTask[taskId] || {
+      total_subtasks: 0,
+      completed_subtasks: 0,
+      progression: 0,
+    };
   }
 
   function getSubtaskAssignForm(subtask) {
@@ -354,9 +395,14 @@ function Tasks() {
     try {
       const form = subtaskForms[taskId] || emptySubtaskForm;
       const createdSubtask = await createSubtask(taskId, normalizeSubtaskPayload(form));
+      const progress = await getTaskProgress(taskId);
       setSubtasksByTask((current) => ({
         ...current,
         [taskId]: [...(current[taskId] || []), createdSubtask],
+      }));
+      setProgressByTask((current) => ({
+        ...current,
+        [taskId]: progress,
       }));
       setSubtaskAssignForms((current) => ({
         ...current,
@@ -540,7 +586,7 @@ function Tasks() {
               <span>Titre</span>
               <span>Statut</span>
               <span>Priorité</span>
-              <span>Affectee a</span>
+              <span>Progression</span>
               <span>Échéance</span>
               <span>Affecter a</span>
             </div>
@@ -564,7 +610,15 @@ function Tasks() {
                     </select>
                   </span>
                   <span>{getOptionLabel(priorityOptions, task.priority)}</span>
-                  <span>{task.assigned_to ? getAssignedUserName(task.assigned_to) : "Non affectee"}</span>
+                  <span className="task-progress-cell">
+                    <strong>{getProgress(task.id).progression}%</strong>
+                    <small>
+                      {getProgress(task.id).completed_subtasks} / {getProgress(task.id).total_subtasks} sous-taches terminees
+                    </small>
+                    <i>
+                      <b style={{ width: `${getProgress(task.id).progression}%` }} />
+                    </i>
+                  </span>
                   <span>{task.due_date || "Aucune"}</span>
                   <span className="task-actions-cell">
                     <select

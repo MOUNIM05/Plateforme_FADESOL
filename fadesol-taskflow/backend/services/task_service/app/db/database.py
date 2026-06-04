@@ -1,3 +1,5 @@
+"""Connexion SQLAlchemy du service taches."""
+
 from sqlalchemy import create_engine
 from sqlalchemy.orm import declarative_base, sessionmaker
 
@@ -15,6 +17,7 @@ Base = declarative_base()
 
 
 def get_db():
+    """Fournit une session SQLAlchemy aux routes FastAPI."""
     # Dependency FastAPI : ouvre la session, la fournit a la route, puis la ferme proprement.
     db = SessionLocal()
 

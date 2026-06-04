@@ -1,3 +1,8 @@
+"""Fonctions de securite du service auth.
+
+Ce module gere le hash des mots de passe et les tokens JWT.
+"""
+
 from datetime import datetime, timedelta, timezone
 from typing import Any
 
@@ -13,16 +18,19 @@ pwd_context = CryptContext(schemes=["bcrypt"], deprecated="auto")
 
 
 def hash_password(password: str) -> str:
+    """Hash le mot de passe avant sauvegarde en base."""
     # Transforme un mot de passe en hash non reversible avant enregistrement.
     return pwd_context.hash(password)
 
 
 def verify_password(plain_password: str, hashed_password: str) -> bool:
+    """Verifie qu'un mot de passe saisi correspond au hash stocke."""
     # Compare le mot de passe saisi avec le hash stocke sans exposer le mot de passe.
     return pwd_context.verify(plain_password, hashed_password)
 
 
 def create_access_token(subject: str | Any, claims: dict[str, Any] | None = None) -> str:
+    """Cree un token JWT signe pour un compte authentifie."""
     # Le token contient le sujet (sub), une expiration, puis des claims utiles au frontend/gateway.
     expire = datetime.now(timezone.utc) + timedelta(minutes=settings.JWT_EXPIRE_MINUTES)
     payload = {"sub": str(subject), "exp": expire}
@@ -38,6 +46,7 @@ def create_access_token(subject: str | Any, claims: dict[str, Any] | None = None
 
 
 def decode_access_token(token: str) -> dict | None:
+    """Decode un token JWT et retourne son payload s'il est valide."""
     # Decode et valide la signature JWT; None indique un token invalide ou expire.
     try:
         return jwt.decode(

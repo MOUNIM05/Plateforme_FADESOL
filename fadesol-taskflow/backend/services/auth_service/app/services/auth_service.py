@@ -1,3 +1,9 @@
+"""Logique metier du service d'authentification.
+
+Ce module contient les operations de lecture, creation, synchronisation,
+suppression et connexion des comptes auth.
+"""
+
 from datetime import datetime, timezone
 
 from sqlalchemy.orm import Session
@@ -9,19 +15,23 @@ from shared.exceptions import bad_request, forbidden, unauthorized
 
 
 def get_account_by_email(db: Session, email: str) -> AuthAccount | None:
+    """Retourne un compte auth a partir de son email."""
     # Recherche par email, utilisee pour empecher les doublons et verifier le login.
     return db.query(AuthAccount).filter(AuthAccount.email == email).first()
 
 
 def get_account_by_id(db: Session, account_id: int) -> AuthAccount | None:
+    """Retourne un compte auth par identifiant interne."""
     return db.query(AuthAccount).filter(AuthAccount.id == account_id).first()
 
 
 def get_account_by_user_id(db: Session, user_id: int) -> AuthAccount | None:
+    """Retourne le compte auth lie a l'id utilisateur metier."""
     return db.query(AuthAccount).filter(AuthAccount.user_id == user_id).first()
 
 
 def register_account(db: Session, payload: RegisterRequest) -> AuthAccount:
+    """Cree un compte auth avec mot de passe hashe."""
     # Le service refuse deux comptes avec le meme email afin de garder un identifiant unique.
     if get_account_by_email(db, payload.email):
         raise bad_request("Un compte avec cet email existe deja.")
@@ -43,6 +53,7 @@ def register_account(db: Session, payload: RegisterRequest) -> AuthAccount:
 
 
 def sync_account_by_user_id(db: Session, user_id: int, payload: AuthAccountSyncRequest) -> AuthAccount:
+    """Met a jour un compte auth a partir des donnees de user_service."""
     # Synchronisation interne appelee apres modification d'un utilisateur dans user_service.
     account = get_account_by_user_id(db, user_id)
 
@@ -71,6 +82,7 @@ def sync_account_by_user_id(db: Session, user_id: int, payload: AuthAccountSyncR
 
 
 def delete_account_by_user_id(db: Session, user_id: int) -> None:
+    """Supprime un compte auth si un utilisateur metier disparait."""
     account = get_account_by_user_id(db, user_id)
 
     if not account:
@@ -81,6 +93,7 @@ def delete_account_by_user_id(db: Session, user_id: int) -> None:
 
 
 def login(db: Session, payload: LoginRequest) -> dict:
+    """Verifie les identifiants et retourne un token d'acces."""
     # Etape 1 : retrouver le compte par email, car l'email est l'identifiant de connexion.
     account = get_account_by_email(db, payload.email)
 

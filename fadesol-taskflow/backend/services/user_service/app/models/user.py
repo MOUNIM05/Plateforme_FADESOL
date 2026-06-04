@@ -1,3 +1,8 @@
+"""Modele ORM du profil utilisateur.
+
+Le compte de connexion est gere par auth_service; ce modele garde les donnees metier.
+"""
+
 from uuid import uuid4
 
 from sqlalchemy import Boolean, Column, DateTime, Integer, String
@@ -7,6 +12,7 @@ from app.db.database import Base
 
 
 class User(Base):
+    """Profil utilisateur stocke dans user_service."""
     # Modele principal du service utilisateur.
     # Il represente le profil metier, tandis que le mot de passe et le JWT sont geres par auth_service.
     __tablename__ = "users"
@@ -41,16 +47,19 @@ class User(Base):
     date_creation = Column(DateTime(timezone=True), server_default=func.now(), nullable=False)
 
     def seConnecter(self) -> bool:
+        """Indique si le profil utilisateur est actif."""
         # Un utilisateur ne peut se connecter que si les deux indicateurs d'activite sont vrais.
         return bool(self.is_active and self.est_actif)
 
     def modifierProfil(self, **updates) -> None:
+        """Applique des modifications de profil champ par champ."""
         # Methode utilitaire pour appliquer des changements sans exposer directement la logique de mapping.
         for field, value in updates.items():
             if hasattr(self, field):
                 setattr(self, field, value)
 
     def desactiverCompte(self) -> None:
+        """Desactive le compte sans supprimer l'enregistrement."""
         # Desactive le profil utilisateur tout en gardant l'enregistrement en base.
         self.is_active = False
         self.est_actif = False

@@ -1,3 +1,9 @@
+"""Point d'entree FastAPI du microservice task_service.
+
+Ce service gere les taches principales, les sous-taches, leur affectation
+et la progression calculee a partir des sous-taches.
+"""
+
 from fastapi import FastAPI
 from sqlalchemy import text
 
@@ -20,6 +26,7 @@ app.include_router(subtask_router, prefix="/api")
 
 @app.on_event("startup")
 def on_startup():
+    """Prepare les tables task_service et synchronise les colonnes utiles."""
     # Cree les tables du service tache au demarrage si elles sont absentes.
     Base.metadata.create_all(bind=engine)
 
@@ -36,5 +43,6 @@ def on_startup():
 
 @app.get("/health")
 def health_check():
+    """Indique que task_service est disponible."""
     # Endpoint de verification pour Docker, l'API Gateway ou le monitoring.
     return {"status": "ok", "service": "task_service"}

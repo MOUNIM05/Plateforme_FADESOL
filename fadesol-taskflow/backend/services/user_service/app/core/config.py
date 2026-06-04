@@ -1,3 +1,5 @@
+"""Configuration du service utilisateur."""
+
 import os
 
 
@@ -22,3 +24,5 @@ class Settings:
 
 
 settings = Settings()
+
+# Instance de configuration partagee par les routes et services.

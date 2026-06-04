@@ -1,3 +1,5 @@
+"""Connexion SQLAlchemy du service utilisateur."""
+
 from collections.abc import Generator
 
 from sqlalchemy import create_engine
@@ -17,6 +19,7 @@ Base = declarative_base()
 
 
 def get_db() -> Generator[Session, None, None]:
+    """Fournit une session de base a chaque requete FastAPI."""
     # Dependency FastAPI qui garantit la fermeture de la session meme en cas d'erreur.
     db = SessionLocal()
 

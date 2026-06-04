@@ -1,3 +1,8 @@
+"""Connexion SQLAlchemy du service auth.
+
+Chaque microservice possede sa propre connexion et sa propre session de base.
+"""
+
 from collections.abc import Generator
 
 from sqlalchemy import create_engine
@@ -17,6 +22,7 @@ Base = declarative_base()
 
 
 def get_db() -> Generator[Session, None, None]:
+    """Fournit une session SQLAlchemy a une route FastAPI."""
     # Dependency FastAPI : ouvre une session, la fournit a la route, puis la ferme proprement.
     db = SessionLocal()
 

@@ -1,3 +1,8 @@
+"""Routes de proxy de l'API Gateway.
+
+Ces routes recoivent les appels du frontend puis les transmettent au service cible.
+"""
+
 from urllib.error import HTTPError, URLError
 from urllib.request import Request as UrlRequest
 from urllib.request import urlopen
@@ -14,6 +19,7 @@ root_router = APIRouter(tags=["Gateway"])
 
 
 async def proxy_request(request: Request, target_url: str, service_name: str):
+    """Transfere une requete FastAPI vers un microservice cible."""
     # Fonction centrale du gateway : elle transfere la requete entrante vers le microservice cible.
     body = await request.body()
 
@@ -60,6 +66,7 @@ async def proxy_request(request: Request, target_url: str, service_name: str):
 
 
 def build_user_service_url(path: str = "") -> str:
+    """Construit l'URL cible de user_service."""
     # Construit l'URL user_service en gardant la convention /api/users.
     user_base_url = settings.USER_SERVICE_URL.rstrip("/")
 
@@ -70,11 +77,13 @@ def build_user_service_url(path: str = "") -> str:
 
 
 def build_user_health_url() -> str:
+    """Construit l'URL de healthcheck de user_service."""
     # Healthcheck direct de user_service, utile pour diagnostiquer les services derriere le gateway.
     return f"{settings.USER_SERVICE_URL.rstrip('/')}/health"
 
 
 def build_task_service_url(path: str = "") -> str:
+    """Construit l'URL cible de task_service."""
     # Construit l'URL task_service pour que le frontend n'appelle pas directement le port du service.
     task_base_url = settings.TASK_SERVICE_URL.rstrip("/")
 
@@ -85,6 +94,7 @@ def build_task_service_url(path: str = "") -> str:
 
 
 def build_service_fadesol_url(path: str = "") -> str:
+    """Construit l'URL cible de service_fadesol_service."""
     service_base_url = settings.SERVICE_FADESOL_URL.rstrip("/")
 
     if not path:
@@ -94,6 +104,7 @@ def build_service_fadesol_url(path: str = "") -> str:
 
 
 def build_clickup_service_url(path: str = "") -> str:
+    """Construit l'URL cible de clickup_service."""
     # Construit l'URL du service ClickUp pour centraliser les appels externes via le gateway.
     clickup_base_url = settings.CLICKUP_SERVICE_URL.rstrip("/")
 
@@ -105,6 +116,7 @@ def build_clickup_service_url(path: str = "") -> str:
 
 @router.get("/services")
 def list_services():
+    """Retourne les URLs connues par le gateway pour diagnostic."""
     # Expose les URLs configurees afin de verifier rapidement le routage microservices.
     return {
         "auth_service": settings.AUTH_SERVICE_URL,
@@ -120,6 +132,7 @@ def list_services():
 
 @router.api_route("/auth/{path:path}", methods=["GET", "POST", "PUT", "PATCH", "DELETE"])
 async def proxy_auth(path: str, request: Request):
+    """Proxy vers auth_service."""
     # Proxy vers auth_service : login, register, /me et synchronisations internes.
     target_url = f"{settings.AUTH_SERVICE_URL.rstrip('/')}/api/auth/{path}"
     return await proxy_request(request, target_url, "Auth service")
@@ -127,86 +140,102 @@ async def proxy_auth(path: str, request: Request):
 
 @router.api_route("/users", methods=["GET", "POST", "PUT", "PATCH", "DELETE"])
 async def proxy_api_users_root(request: Request):
+    """Proxy vers la racine /api/users."""
     # Proxy racine /api/users vers user_service.
     return await proxy_request(request, build_user_service_url(), "User service")
 
 
 @router.get("/users/health")
 async def proxy_api_users_health(request: Request):
+    """Proxy vers le healthcheck de user_service."""
     return await proxy_request(request, build_user_health_url(), "User service")
 
 
 @router.api_route("/users/{path:path}", methods=["GET", "POST", "PUT", "PATCH", "DELETE"])
 async def proxy_api_users(path: str, request: Request):
+    """Proxy vers les sous-routes /api/users/*."""
     # Proxy des sous-routes utilisateur : detail, update, activate, profile, etc.
     return await proxy_request(request, build_user_service_url(path), "User service")
 
 
 @router.api_route("/tasks", methods=["GET", "POST", "PUT", "PATCH", "DELETE"])
 async def proxy_api_tasks_root(request: Request):
+    """Proxy vers la racine /api/tasks."""
     # Proxy racine /api/tasks vers task_service.
     return await proxy_request(request, build_task_service_url(), "Task service")
 
 
 @router.api_route("/tasks/{path:path}", methods=["GET", "POST", "PUT", "PATCH", "DELETE"])
 async def proxy_api_tasks(path: str, request: Request):
+    """Proxy vers les sous-routes /api/tasks/*."""
     # Proxy des sous-routes taches : consultation, assignation, statut et suppression.
     return await proxy_request(request, build_task_service_url(path), "Task service")
 
 
 @router.api_route("/services-fadesol", methods=["GET", "POST", "PUT", "PATCH", "DELETE"])
 async def proxy_api_services_fadesol_root(request: Request):
+    """Proxy vers la racine /api/services-fadesol."""
     return await proxy_request(request, build_service_fadesol_url(), "Service Fadesol service")
 
 
 @router.api_route("/services-fadesol/{path:path}", methods=["GET", "POST", "PUT", "PATCH", "DELETE"])
 async def proxy_api_services_fadesol(path: str, request: Request):
+    """Proxy vers les sous-routes /api/services-fadesol/*."""
     return await proxy_request(request, build_service_fadesol_url(path), "Service Fadesol service")
 
 
 @router.api_route("/clickup/{path:path}", methods=["GET", "POST", "PUT", "PATCH", "DELETE"])
 async def proxy_api_clickup(path: str, request: Request):
+    """Proxy vers clickup_service."""
     # Proxy vers clickup_service pour isoler l'integration ClickUp du frontend.
     return await proxy_request(request, build_clickup_service_url(path), "ClickUp service")
 
 
 @root_router.api_route("/users", methods=["GET", "POST", "PUT", "PATCH", "DELETE"])
 async def proxy_users_root(request: Request):
+    """Proxy racine sans prefixe /api pour /users."""
     # Routes racines conservees pour les appels frontend qui n'utilisent pas le prefixe /api.
     return await proxy_request(request, build_user_service_url(), "User service")
 
 
 @root_router.get("/users/health")
 async def proxy_users_health(request: Request):
+    """Proxy racine sans prefixe /api pour /users/health."""
     return await proxy_request(request, build_user_health_url(), "User service")
 
 
 @root_router.api_route("/users/{path:path}", methods=["GET", "POST", "PUT", "PATCH", "DELETE"])
 async def proxy_users(path: str, request: Request):
+    """Proxy racine sans prefixe /api pour /users/*."""
     return await proxy_request(request, build_user_service_url(path), "User service")
 
 
 @root_router.api_route("/tasks", methods=["GET", "POST", "PUT", "PATCH", "DELETE"])
 async def proxy_tasks_root(request: Request):
+    """Proxy racine sans prefixe /api pour /tasks."""
     # Compatibilite racine pour /tasks.
     return await proxy_request(request, build_task_service_url(), "Task service")
 
 
 @root_router.api_route("/tasks/{path:path}", methods=["GET", "POST", "PUT", "PATCH", "DELETE"])
 async def proxy_tasks(path: str, request: Request):
+    """Proxy racine sans prefixe /api pour /tasks/*."""
     return await proxy_request(request, build_task_service_url(path), "Task service")
 
 
 @root_router.api_route("/services-fadesol", methods=["GET", "POST", "PUT", "PATCH", "DELETE"])
 async def proxy_services_fadesol_root(request: Request):
+    """Proxy racine sans prefixe /api pour /services-fadesol."""
     return await proxy_request(request, build_service_fadesol_url(), "Service Fadesol service")
 
 
 @root_router.api_route("/services-fadesol/{path:path}", methods=["GET", "POST", "PUT", "PATCH", "DELETE"])
 async def proxy_services_fadesol(path: str, request: Request):
+    """Proxy racine sans prefixe /api pour /services-fadesol/*."""
     return await proxy_request(request, build_service_fadesol_url(path), "Service Fadesol service")
 
 
 @root_router.api_route("/clickup/{path:path}", methods=["GET", "POST", "PUT", "PATCH", "DELETE"])
 async def proxy_clickup(path: str, request: Request):
+    """Proxy racine sans prefixe /api pour /clickup/*."""
     return await proxy_request(request, build_clickup_service_url(path), "ClickUp service")

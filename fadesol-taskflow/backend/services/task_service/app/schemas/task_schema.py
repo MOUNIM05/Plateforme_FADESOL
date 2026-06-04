@@ -1,3 +1,5 @@
+"""Schemas Pydantic des taches principales."""
+
 from datetime import date, datetime
 from uuid import UUID
 
@@ -7,6 +9,7 @@ from shared.enums import Priorite, StatutTache
 
 
 class TaskBase(BaseModel):
+    """Champs communs d'une tache principale."""
     # Champs communs d'une tache.
     # Les alias acceptent les noms anglais et francais pour garder la compatibilite des appels API.
     model_config = ConfigDict(populate_by_name=True, from_attributes=True)
@@ -22,11 +25,13 @@ class TaskBase(BaseModel):
 
 
 class TaskCreate(TaskBase):
+    """Payload de creation d'une tache."""
     # Schema de creation : il reprend les champs metier obligatoires ou optionnels de TaskBase.
     pass
 
 
 class TaskUpdate(BaseModel):
+    """Payload de mise a jour partielle d'une tache."""
     # Schema de mise a jour partielle : seuls les champs envoyes seront modifies.
     model_config = ConfigDict(populate_by_name=True)
 
@@ -41,6 +46,7 @@ class TaskUpdate(BaseModel):
 
 
 class TaskAssign(BaseModel):
+    """Payload d'affectation d'une tache a un utilisateur."""
     # Payload dedie a l'affectation d'une tache a un utilisateur.
     model_config = ConfigDict(populate_by_name=True)
 
@@ -48,6 +54,7 @@ class TaskAssign(BaseModel):
 
 
 class TaskStatusUpdate(BaseModel):
+    """Payload de mise a jour du statut d'une tache."""
     # Payload dedie au changement de statut, separe pour simplifier l'endpoint PATCH /status.
     model_config = ConfigDict(populate_by_name=True)
 
@@ -56,6 +63,7 @@ class TaskStatusUpdate(BaseModel):
     @field_validator("status", mode="before")
     @classmethod
     def normalize_status(cls, value):
+        """Normalise les libelles de statut avant validation."""
         # Accepte plusieurs libelles venant du frontend ou d'anciennes donnees avant validation enum.
         status_map = {
             "A faire": StatutTache.A_FAIRE.value,
@@ -76,12 +84,14 @@ class TaskStatusUpdate(BaseModel):
 
 
 class TaskImportFromClickUp(TaskBase):
+    """Payload d'import ou synchronisation depuis ClickUp."""
     # Schema utilise lorsqu'une tache vient de ClickUp au lieu d'etre creee localement.
     clickup_task_id: str
     source: str = "clickup"
 
 
 class TaskResponse(TaskBase):
+    """Representation API complete d'une tache."""
     # Reponse API complete incluant les metadonnees et les champs de synchronisation ClickUp.
     id: str
     created_at: datetime
@@ -92,9 +102,19 @@ class TaskResponse(TaskBase):
     date_synchronisation: datetime | None = None
 
 
+class TaskProgressResponse(BaseModel):
+    """Representation API de la progression calculee d'une tache."""
+    # Reponse dediee au suivi d'avancement calcule a partir des sous-taches.
+    task_id: str
+    total_subtasks: int
+    completed_subtasks: int
+    progression: int
+
+
 # Alias francais conserves pour compatibilite avec le vocabulaire Tache.
 TacheCreate = TaskCreate
 TacheUpdate = TaskUpdate
 TacheResponse = TaskResponse
 TacheAssign = TaskAssign
 TacheStatusUpdate = TaskStatusUpdate
+TacheProgressResponse = TaskProgressResponse

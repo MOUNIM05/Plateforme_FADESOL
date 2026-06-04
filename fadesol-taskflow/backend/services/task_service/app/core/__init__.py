@@ -1,1 +1,2 @@
 
+"""Configuration du service taches."""

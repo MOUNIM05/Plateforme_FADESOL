@@ -1,3 +1,8 @@
+"""Modele ORM du compte d'authentification.
+
+Il stocke uniquement les informations necessaires a la connexion.
+"""
+
 from sqlalchemy import Boolean, Column, DateTime, Integer, String
 from sqlalchemy.sql import func
 
@@ -5,6 +10,7 @@ from app.db.database import Base
 
 
 class AuthAccount(Base):
+    """Compte de connexion associe a un utilisateur metier."""
     # Table locale qui stocke uniquement les donnees necessaires a la connexion.
     # Les informations de profil restent dans user_service pour respecter la separation microservices.
     __tablename__ = "auth_accounts"

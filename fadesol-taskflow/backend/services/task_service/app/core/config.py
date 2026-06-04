@@ -1,3 +1,5 @@
+"""Configuration du service taches."""
+
 import os
 
 
@@ -18,3 +20,5 @@ class Settings:
 
 
 settings = Settings()
+
+# Instance de configuration importee par la base, les routes et les services.

@@ -1,3 +1,9 @@
+"""Configuration du service d'authentification.
+
+Les valeurs sont lues depuis l'environnement afin d'eviter de coder les secrets
+ou les URLs directement dans l'application.
+"""
+
 import os
 
 
@@ -26,3 +32,5 @@ class Settings:
 
 
 settings = Settings()
+
+# Instance unique importee dans le reste du service.

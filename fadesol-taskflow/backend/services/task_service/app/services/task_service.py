@@ -1,3 +1,5 @@
+"""Logique metier des taches principales."""
+
 import json
 from datetime import datetime, timezone
 from urllib.error import HTTPError, URLError
@@ -15,11 +17,13 @@ from shared.exceptions import not_found
 
 
 def _enum_value(value):
+    """Retourne la valeur brute d'un enum ou la valeur initiale."""
     # Convertit les enums Pydantic en valeurs stockables par SQLAlchemy.
     return value.value if hasattr(value, "value") else value
 
 
 def _payload_data(payload, exclude_unset: bool = False) -> dict:
+    """Convertit un schema Pydantic en dictionnaire pret pour SQLAlchemy."""
     # Prepare les donnees des schemas avant creation ou mise a jour en base.
     data = payload.model_dump(exclude_unset=exclude_unset)
 
@@ -40,6 +44,7 @@ def get_tasks(
     priority: str | None = None,
     assigned_to: str | None = None,
 ) -> list[Task]:
+    """Liste les taches avec pagination et filtres."""
     # Requete principale de consultation avec filtres par statut, priorite et utilisateur assigne.
     query = db.query(Task)
 
@@ -56,11 +61,13 @@ def get_tasks(
 
 
 def get_my_tasks(db: Session, current_user_uuid: str, skip: int = 0, limit: int = 100) -> list[Task]:
+    """Liste les taches affectees a un utilisateur."""
     # Raccourci pour recuperer les taches affectees a l'utilisateur courant.
     return get_tasks(db, skip=skip, limit=limit, assigned_to=current_user_uuid)
 
 
 def resolve_current_user_uuid(authorization_header: str | None) -> str:
+    """Demande a user_service le UUID de l'utilisateur connecte."""
     # task_service ne lit pas directement la base user_service : il appelle son API pour obtenir le UUID.
     if not authorization_header:
         raise HTTPException(status_code=status.HTTP_401_UNAUTHORIZED, detail="Authentification requise.")
@@ -92,14 +99,17 @@ def resolve_current_user_uuid(authorization_header: str | None) -> str:
 
 
 def get_task_by_id(db: Session, task_id: str) -> Task | None:
+    """Retourne une tache par UUID."""
     return db.query(Task).filter(Task.id == task_id).first()
 
 
 def get_task_by_clickup_id(db: Session, clickup_task_id: str) -> Task | None:
+    """Retourne une tache a partir de son identifiant ClickUp."""
     return db.query(Task).filter(Task.clickup_task_id == clickup_task_id).first()
 
 
 def create_task(db: Session, payload: TaskCreate) -> Task:
+    """Cree une tache locale."""
     # Creation d'une tache locale, par opposition aux taches importees depuis ClickUp.
     task = Task(**_payload_data(payload), source="local")
     db.add(task)
@@ -110,6 +120,7 @@ def create_task(db: Session, payload: TaskCreate) -> Task:
 
 
 def update_task(db: Session, task_id: str, payload: TaskUpdate) -> Task:
+    """Met a jour une tache existante."""
     # Mise a jour partielle d'une tache existante.
     task = get_task_by_id(db, task_id)
 
@@ -126,6 +137,7 @@ def update_task(db: Session, task_id: str, payload: TaskUpdate) -> Task:
 
 
 def delete_task(db: Session, task_id: str) -> None:
+    """Supprime une tache."""
     # Suppression definitive de la tache dans la base du service.
     task = get_task_by_id(db, task_id)
 
@@ -137,6 +149,7 @@ def delete_task(db: Session, task_id: str) -> None:
 
 
 def upsert_task_from_clickup(db: Session, payload: TaskImportFromClickUp) -> Task:
+    """Cree ou met a jour une tache importee depuis ClickUp."""
     # Upsert ClickUp : met a jour la tache existante si l'id ClickUp est connu, sinon la cree.
     task = get_task_by_clickup_id(db, payload.clickup_task_id)
     data = _payload_data(payload)
@@ -158,6 +171,7 @@ def upsert_task_from_clickup(db: Session, payload: TaskImportFromClickUp) -> Tas
 
 
 def assigner_task(db: Session, task_id: str, utilisateur_id: str) -> Task:
+    """Affecte une tache via l'ancienne route en francais."""
     # Ancienne API d'affectation en francais, conservee pour compatibilite.
     task = get_task_by_id(db, task_id)
 
@@ -172,6 +186,7 @@ def assigner_task(db: Session, task_id: str, utilisateur_id: str) -> Task:
 
 
 def assign_task(db: Session, task_id: str, payload: TaskAssign) -> Task:
+    """Affecte une tache via la route moderne."""
     # Nouvelle API d'affectation : le payload porte l'UUID utilisateur.
     task = get_task_by_id(db, task_id)
 
@@ -187,6 +202,7 @@ def assign_task(db: Session, task_id: str, payload: TaskAssign) -> Task:
 
 
 def update_task_status(db: Session, task_id: str, payload: TaskStatusUpdate) -> Task:
+    """Met a jour uniquement le statut d'une tache."""
     # Change le statut et met a jour la date de modification pour le suivi.
     task = get_task_by_id(db, task_id)
 
@@ -202,6 +218,7 @@ def update_task_status(db: Session, task_id: str, payload: TaskStatusUpdate) -> 
 
 
 def changer_statut_task(db: Session, task_id: str, statut: StatutTache) -> Task:
+    """Change le statut via l'ancienne route en francais."""
     # Variante historique du changement de statut, basee sur l'enum passe dans l'URL.
     task = get_task_by_id(db, task_id)
 
@@ -216,6 +233,7 @@ def changer_statut_task(db: Session, task_id: str, statut: StatutTache) -> Task:
 
 
 def synchroniser_clickup(db: Session, task_id: str, clickup_task_id: str | None = None) -> Task:
+    """Marque une tache comme synchronisee avec ClickUp."""
     # Marque une tache comme synchronisee avec ClickUp et renseigne la date de synchronisation.
     task = get_task_by_id(db, task_id)
 
@@ -232,3 +250,5 @@ def synchroniser_clickup(db: Session, task_id: str, clickup_task_id: str | None 
 
 list_tasks = get_tasks
 get_task = get_task_by_id
+
+# Alias conserves pour compatibilite avec d'anciens imports.

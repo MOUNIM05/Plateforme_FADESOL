@@ -1,3 +1,5 @@
+"""Modele ORM des taches principales."""
+
 from datetime import date
 from uuid import uuid4
 
@@ -10,6 +12,7 @@ from shared.enums import StatutTache
 
 
 class Task(Base):
+    """Tache principale stockee dans la table taches."""
     # Modele ORM d'une tache principale.
     # La table physique s'appelle "taches" pour rester proche du vocabulaire PFE/metier.
     __tablename__ = "taches"
@@ -54,20 +57,24 @@ class Task(Base):
     date_modification = synonym("updated_at")
 
     def assigner(self, utilisateurId: str) -> None:
+        """Affecte la tache a un utilisateur."""
         # Affecte la tache a l'UUID d'un utilisateur, sans relation directe vers user_service.
         self.assigned_to = utilisateurId
 
     def changerStatut(self, statut: StatutTache) -> None:
+        """Change le statut de la tache."""
         # Centralise le changement de statut pour accepter un enum ou une valeur simple.
         self.status = statut.value if hasattr(statut, "value") else str(statut)
 
     def estEnRetard(self) -> bool:
+        """Verifie si la tache est en retard."""
         # Une tache est en retard si sa date limite est passee et qu'elle n'est pas terminee.
         if not self.due_date:
             return False
         return self.due_date < date.today() and self.status != StatutTache.TERMINE.value
 
     def synchroniserAvecClickUp(self, clickup_task_id: str | None = None) -> None:
+        """Marque la tache comme synchronisee avec ClickUp."""
         # Marque la tache comme synchronisee avec ClickUp et conserve l'id distant si fourni.
         self.source = "clickup"
         self.est_synchronisee_clickup = True
@@ -76,3 +83,5 @@ class Task(Base):
 
 
 Tache = Task
+
+# Alias francais conserve pour le vocabulaire PFE.

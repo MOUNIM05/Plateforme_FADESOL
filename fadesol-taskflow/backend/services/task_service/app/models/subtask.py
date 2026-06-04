@@ -1,3 +1,5 @@
+"""Modele ORM des sous-taches."""
+
 from datetime import date
 from uuid import uuid4
 
@@ -10,6 +12,7 @@ from shared.enums import StatutTache
 
 
 class SubTask(Base):
+    """Sous-tache rattachee a une tache principale."""
     # Une sous-tache depend logiquement d'une tache principale via task_id/tache_id.
     # Elle a son propre cycle de statut, priorite et affectation.
     __tablename__ = "sous_taches"
@@ -44,18 +47,22 @@ class SubTask(Base):
     date_modification = synonym("updated_at")
 
     def assigner(self, utilisateurId: str) -> None:
+        """Affecte la sous-tache a un utilisateur."""
         # Affecte la sous-tache a un utilisateur via son UUID.
         self.assigned_to = utilisateurId
 
     def changerStatut(self, statut: StatutTache) -> None:
+        """Change le statut de la sous-tache."""
         # Applique un nouveau statut en acceptant un enum ou une valeur brute.
         self.status = statut.value if hasattr(statut, "value") else str(statut)
 
     def estTerminee(self) -> bool:
+        """Indique si la sous-tache est terminee."""
         # Verifie si la sous-tache est terminee.
         return self.status == StatutTache.TERMINE.value
 
     def estEnRetard(self) -> bool:
+        """Verifie si la sous-tache est en retard."""
         # Une sous-tache en retard a une date limite passee et n'est pas terminee.
         if not self.due_date:
             return False
@@ -63,3 +70,5 @@ class SubTask(Base):
 
 
 SousTache = SubTask
+
+# Alias francais conserve pour le vocabulaire PFE.

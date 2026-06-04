@@ -1,3 +1,9 @@
+"""Point d'entree FastAPI de l'API Gateway.
+
+Le gateway est le seul point d'entree HTTP utilise par le frontend.
+Il redirige ensuite vers les microservices internes.
+"""
+
 from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
 
@@ -28,5 +34,6 @@ app.include_router(gateway_root_router)
 
 @app.get("/health")
 def health_check():
+    """Indique que l'API Gateway est disponible."""
     # Permet de verifier que le gateway repond, independamment des services cibles.
     return {"status": "ok", "service": "api_gateway"}
