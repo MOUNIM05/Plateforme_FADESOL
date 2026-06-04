@@ -6,7 +6,7 @@ from app.schemas.subtask_schema import SousTacheCreate, SousTacheResponse, SousT
 from app.services.subtask_service import (
     assigner_subtask,
     changer_statut_subtask,
-    create_subtask,
+    create_legacy_subtask,
     delete_subtask,
     get_subtask,
     list_subtasks,
@@ -29,7 +29,7 @@ def list_all(skip: int = 0, limit: int = 100, db: Session = Depends(get_db)):
 @router.post("/", response_model=SousTacheResponse)
 def create(payload: SousTacheCreate, db: Session = Depends(get_db)):
     # Cree une sous-tache rattachee a une tache principale.
-    return create_subtask(db, payload)
+    return create_legacy_subtask(db, payload)
 
 
 @router.get("/{subtask_id}", response_model=SousTacheResponse)

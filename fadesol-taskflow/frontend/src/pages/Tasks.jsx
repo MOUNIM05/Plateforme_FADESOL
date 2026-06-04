@@ -1,6 +1,15 @@
-import { useEffect, useMemo, useState } from "react";
-import { ClipboardList, RefreshCw } from "lucide-react";
-import { assignTask, createTask, getTasks, updateTaskStatus } from "../services/taskService";
+import { Fragment, useEffect, useMemo, useState } from "react";
+import { ClipboardList, GitBranch, PlusCircle, RefreshCw } from "lucide-react";
+import {
+  assignTask,
+  assignSubtask,
+  createSubtask,
+  createTask,
+  getSubtasksByTask,
+  getTasks,
+  updateTaskStatus,
+} from "../services/taskService";
+import { getFadesolServices } from "../services/serviceFadesolService";
 import { getUsers } from "../services/userService";
 
 const emptyTaskForm = {
@@ -9,6 +18,14 @@ const emptyTaskForm = {
   project_id: "",
   assigned_to: "",
   service_id: "",
+  status: "Nouveau",
+  priority: "Normale",
+  due_date: "",
+};
+
+const emptySubtaskForm = {
+  title: "",
+  description: "",
   status: "Nouveau",
   priority: "Normale",
   due_date: "",
@@ -32,6 +49,15 @@ const priorityOptions = [
   { label: "Faible", value: "Faible" },
 ];
 
+const fallbackServiceOptions = [
+  { label: "Commercial", value: "Commercial" },
+  { label: "Technique", value: "Technique" },
+  { label: "Achat", value: "Achat" },
+  { label: "Magasin Stock", value: "MagasinStock" },
+  { label: "Comptabilite Management", value: "ComptabiliteManagement" },
+  { label: "Direction RH Administration", value: "DirectionRHAdministration" },
+];
+
 function normalizeTaskPayload(formData) {
   return {
     title: formData.title.trim(),
@@ -39,6 +65,16 @@ function normalizeTaskPayload(formData) {
     project_id: formData.project_id.trim() || null,
     assigned_to: formData.assigned_to.trim() || null,
     service_id: formData.service_id.trim() || null,
+    status: formData.status,
+    priority: formData.priority,
+    due_date: formData.due_date || null,
+  };
+}
+
+function normalizeSubtaskPayload(formData) {
+  return {
+    title: formData.title.trim(),
+    description: formData.description.trim() || null,
     status: formData.status,
     priority: formData.priority,
     due_date: formData.due_date || null,
@@ -58,12 +94,22 @@ function getUserDisplayName(user) {
 function Tasks() {
   const [tasks, setTasks] = useState([]);
   const [users, setUsers] = useState([]);
+  const [services, setServices] = useState([]);
   const [formData, setFormData] = useState(emptyTaskForm);
   const [loading, setLoading] = useState(true);
   const [usersLoading, setUsersLoading] = useState(true);
+  const [servicesLoading, setServicesLoading] = useState(true);
   const [saving, setSaving] = useState(false);
   const [assigningTaskId, setAssigningTaskId] = useState("");
   const [updatingStatusTaskId, setUpdatingStatusTaskId] = useState("");
+  const [expandedTaskId, setExpandedTaskId] = useState("");
+  const [subtasksByTask, setSubtasksByTask] = useState({});
+  const [subtaskForms, setSubtaskForms] = useState({});
+  const [subtaskAssignForms, setSubtaskAssignForms] = useState({});
+  const [subtaskMembersByService, setSubtaskMembersByService] = useState({});
+  const [loadingSubtasksTaskId, setLoadingSubtasksTaskId] = useState("");
+  const [savingSubtaskTaskId, setSavingSubtaskTaskId] = useState("");
+  const [assigningSubtaskId, setAssigningSubtaskId] = useState("");
   const [message, setMessage] = useState("");
   const [error, setError] = useState("");
   const [clickupMessage, setClickupMessage] = useState("");
@@ -97,12 +143,38 @@ function Tasks() {
     }
   }
 
+  async function loadServices() {
+    setServicesLoading(true);
+
+    try {
+      const data = await getFadesolServices();
+      setServices(data);
+    } catch (err) {
+      console.error("Load services error:", err);
+      setError("Impossible de charger les services.");
+    } finally {
+      setServicesLoading(false);
+    }
+  }
+
   useEffect(() => {
     loadTasks();
     loadUsers();
+    loadServices();
   }, []);
 
   const recentTasks = useMemo(() => tasks.slice(0, 8), [tasks]);
+
+  const serviceOptions = useMemo(() => {
+    const loadedServices = services
+      .map((service) => ({
+        label: service.nom || service.name || service.id,
+        value: service.nom || service.name || service.id,
+      }))
+      .filter((service) => service.value);
+
+    return loadedServices.length ? loadedServices : fallbackServiceOptions;
+  }, [services]);
 
   const formAssignableUsers = useMemo(() => {
     const serviceId = formData.service_id.trim();
@@ -126,6 +198,23 @@ function Tasks() {
     const user = users.find((candidate) => candidate.uuid === userUuid);
 
     return user ? getUserDisplayName(user) : userUuid;
+  }
+
+  function getSubtaskAssignForm(subtask) {
+    return subtaskAssignForms[subtask.id] || {
+      service_id: subtask.service_id || "",
+      assigned_to: subtask.assigned_to || "",
+    };
+  }
+
+  function getUsersForService(serviceId) {
+    if (!serviceId) {
+      return users;
+    }
+
+    return subtaskMembersByService[serviceId] || users.filter(
+      (user) => (user.id_service || user.service_id || user.service) === serviceId
+    );
   }
 
   function handleChange(event) {
@@ -192,6 +281,167 @@ function Tasks() {
       setError(err.response?.data?.detail || "Erreur pendant la mise a jour du statut.");
     } finally {
       setUpdatingStatusTaskId("");
+    }
+  }
+
+  function handleSubtaskChange(taskId, event) {
+    const { name, value } = event.target;
+
+    setSubtaskForms((current) => ({
+      ...current,
+      [taskId]: {
+        ...(current[taskId] || emptySubtaskForm),
+        [name]: value,
+      },
+    }));
+  }
+
+  async function loadSubtasks(taskId) {
+    setLoadingSubtasksTaskId(taskId);
+
+    try {
+      const data = await getSubtasksByTask(taskId);
+      setSubtasksByTask((current) => ({
+        ...current,
+        [taskId]: data,
+      }));
+      setSubtaskAssignForms((current) => {
+        const next = { ...current };
+
+        data.forEach((subtask) => {
+          next[subtask.id] = next[subtask.id] || {
+            service_id: subtask.service_id || "",
+            assigned_to: subtask.assigned_to || "",
+          };
+        });
+
+        return next;
+      });
+    } catch (err) {
+      console.error("Load subtasks error:", err);
+      setError(err.response?.data?.detail || "Impossible de charger les sous-taches.");
+    } finally {
+      setLoadingSubtasksTaskId("");
+    }
+  }
+
+  async function handleToggleSubtasks(taskId) {
+    setError("");
+    setMessage("");
+
+    if (expandedTaskId === taskId) {
+      setExpandedTaskId("");
+      return;
+    }
+
+    setExpandedTaskId(taskId);
+    setSubtaskForms((current) => ({
+      ...current,
+      [taskId]: current[taskId] || emptySubtaskForm,
+    }));
+
+    if (!subtasksByTask[taskId]) {
+      await loadSubtasks(taskId);
+    }
+  }
+
+  async function handleCreateSubtask(event, taskId) {
+    event.preventDefault();
+    setError("");
+    setMessage("");
+    setSavingSubtaskTaskId(taskId);
+
+    try {
+      const form = subtaskForms[taskId] || emptySubtaskForm;
+      const createdSubtask = await createSubtask(taskId, normalizeSubtaskPayload(form));
+      setSubtasksByTask((current) => ({
+        ...current,
+        [taskId]: [...(current[taskId] || []), createdSubtask],
+      }));
+      setSubtaskAssignForms((current) => ({
+        ...current,
+        [createdSubtask.id]: {
+          service_id: createdSubtask.service_id || "",
+          assigned_to: createdSubtask.assigned_to || "",
+        },
+      }));
+      setSubtaskForms((current) => ({
+        ...current,
+        [taskId]: emptySubtaskForm,
+      }));
+      setMessage("Sous-tache creee avec succes.");
+    } catch (err) {
+      console.error("Create subtask error:", err);
+      setError(err.response?.data?.detail || "Erreur pendant la creation de la sous-tache.");
+    } finally {
+      setSavingSubtaskTaskId("");
+    }
+  }
+
+  async function loadMembersForService(serviceId) {
+    if (!serviceId || subtaskMembersByService[serviceId]) {
+      return;
+    }
+
+    try {
+      const data = await getUsers(serviceId);
+      setSubtaskMembersByService((current) => ({
+        ...current,
+        [serviceId]: data,
+      }));
+    } catch (err) {
+      console.error("Load service members error:", err);
+      setError("Impossible de charger les membres du service.");
+    }
+  }
+
+  async function handleSubtaskAssignChange(subtask, event) {
+    const { name, value } = event.target;
+
+    setSubtaskAssignForms((current) => ({
+      ...current,
+      [subtask.id]: {
+        ...getSubtaskAssignForm(subtask),
+        [name]: value,
+        ...(name === "service_id" ? { assigned_to: "" } : {}),
+      },
+    }));
+
+    if (name === "service_id") {
+      await loadMembersForService(value);
+    }
+  }
+
+  async function handleAssignSubtask(taskId, subtask) {
+    const form = getSubtaskAssignForm(subtask);
+    setError("");
+    setMessage("");
+    setAssigningSubtaskId(subtask.id);
+
+    try {
+      const updatedSubtask = await assignSubtask(taskId, subtask.id, {
+        service_id: form.service_id || null,
+        assigned_to: form.assigned_to || null,
+      });
+      setSubtasksByTask((current) => ({
+        ...current,
+        [taskId]: (current[taskId] || []).map((candidate) =>
+          candidate.id === updatedSubtask.id ? updatedSubtask : candidate
+        ),
+      }));
+      setSubtaskAssignForms((current) => ({
+        ...current,
+        [updatedSubtask.id]: {
+          service_id: updatedSubtask.service_id || "",
+          assigned_to: updatedSubtask.assigned_to || "",
+        },
+      }));
+      setMessage("Sous-tache affectee avec succes.");
+    } catch (err) {
+      console.error("Assign subtask error:", err);
+      setError(err.response?.data?.detail || "Erreur pendant l'affectation de la sous-tache.");
+    } finally {
+      setAssigningSubtaskId("");
     }
   }
 
@@ -296,41 +546,178 @@ function Tasks() {
             </div>
 
             {recentTasks.map((task) => (
-              <div className="table-row" key={task.id}>
-                <span>{task.title}</span>
-                <span>
-                  <select
-                    className="assignment-select status-select"
-                    value={task.status || ""}
-                    onChange={(event) => handleStatusChange(task.id, event.target.value)}
-                    disabled={updatingStatusTaskId === task.id}
-                  >
-                    {statusOptions.map((status) => (
-                      <option key={status.value} value={status.value}>
-                        {status.label}
-                      </option>
-                    ))}
-                  </select>
-                </span>
-                <span>{getOptionLabel(priorityOptions, task.priority)}</span>
-                <span>{task.assigned_to ? getAssignedUserName(task.assigned_to) : "Non affectee"}</span>
-                <span>{task.due_date || "Aucune"}</span>
-                <span>
-                  <select
-                    className="assignment-select"
-                    value={task.assigned_to || ""}
-                    onChange={(event) => handleAssignTask(task.id, event.target.value)}
-                    disabled={assigningTaskId === task.id || usersLoading}
-                  >
-                    <option value="">Choisir</option>
-                    {getTaskAssignableUsers(task).map((user) => (
-                      <option key={user.uuid} value={user.uuid}>
-                        {getUserDisplayName(user)}
-                      </option>
-                    ))}
-                  </select>
-                </span>
-              </div>
+              <Fragment key={task.id}>
+                <div className="table-row">
+                  <span>{task.title}</span>
+                  <span>
+                    <select
+                      className="assignment-select status-select"
+                      value={task.status || ""}
+                      onChange={(event) => handleStatusChange(task.id, event.target.value)}
+                      disabled={updatingStatusTaskId === task.id}
+                    >
+                      {statusOptions.map((status) => (
+                        <option key={status.value} value={status.value}>
+                          {status.label}
+                        </option>
+                      ))}
+                    </select>
+                  </span>
+                  <span>{getOptionLabel(priorityOptions, task.priority)}</span>
+                  <span>{task.assigned_to ? getAssignedUserName(task.assigned_to) : "Non affectee"}</span>
+                  <span>{task.due_date || "Aucune"}</span>
+                  <span className="task-actions-cell">
+                    <select
+                      className="assignment-select"
+                      value={task.assigned_to || ""}
+                      onChange={(event) => handleAssignTask(task.id, event.target.value)}
+                      disabled={assigningTaskId === task.id || usersLoading}
+                    >
+                      <option value="">Choisir</option>
+                      {getTaskAssignableUsers(task).map((user) => (
+                        <option key={user.uuid} value={user.uuid}>
+                          {getUserDisplayName(user)}
+                        </option>
+                      ))}
+                    </select>
+                    <button className="secondary-action compact-action" type="button" onClick={() => handleToggleSubtasks(task.id)}>
+                      <PlusCircle size={15} />
+                      Sous-tache
+                    </button>
+                  </span>
+                </div>
+
+                {expandedTaskId === task.id && (
+                  <div className="subtask-row">
+                    <div className="subtask-panel">
+                      <div className="subtask-list">
+                        <div className="subtask-panel-title">
+                          <div>
+                            <h4>Sous-taches</h4>
+                            <span>{(subtasksByTask[task.id] || []).length} element(s)</span>
+                          </div>
+                          {loadingSubtasksTaskId === task.id && <small>Chargement...</small>}
+                        </div>
+
+                        {(subtasksByTask[task.id] || []).map((subtask) => (
+                          <article className="subtask-item" key={subtask.id}>
+                            <GitBranch size={16} />
+                            <div>
+                              <strong>{subtask.title}</strong>
+                              <span>
+                                {getOptionLabel(statusOptions, subtask.status)} - {getOptionLabel(priorityOptions, subtask.priority)}
+                                {subtask.due_date ? ` - ${subtask.due_date}` : ""}
+                              </span>
+                              <div className="subtask-assignment-controls">
+                                <label>
+                                  Service
+                                  <select
+                                    value={getSubtaskAssignForm(subtask).service_id}
+                                    name="service_id"
+                                    onChange={(event) => handleSubtaskAssignChange(subtask, event)}
+                                    disabled={servicesLoading}
+                                  >
+                                    <option value="">Aucun service</option>
+                                    {serviceOptions.map((service) => (
+                                      <option key={service.value} value={service.value}>
+                                        {service.label}
+                                      </option>
+                                    ))}
+                                  </select>
+                                </label>
+                                <label>
+                                  Affecter a
+                                  <select
+                                    value={getSubtaskAssignForm(subtask).assigned_to}
+                                    name="assigned_to"
+                                    onChange={(event) => handleSubtaskAssignChange(subtask, event)}
+                                  >
+                                    <option value="">Non affectee</option>
+                                    {getUsersForService(getSubtaskAssignForm(subtask).service_id).map((user) => (
+                                      <option key={user.uuid} value={user.uuid}>
+                                        {getUserDisplayName(user)}
+                                      </option>
+                                    ))}
+                                  </select>
+                                </label>
+                                <button
+                                  className="secondary-action compact-action"
+                                  type="button"
+                                  onClick={() => handleAssignSubtask(task.id, subtask)}
+                                  disabled={assigningSubtaskId === subtask.id}
+                                >
+                                  {assigningSubtaskId === subtask.id ? "Affectation..." : "Affecter"}
+                                </button>
+                              </div>
+                            </div>
+                          </article>
+                        ))}
+
+                        {!loadingSubtasksTaskId && (subtasksByTask[task.id] || []).length === 0 && (
+                          <p className="subtask-empty">Aucune sous-tache pour cette tache.</p>
+                        )}
+                      </div>
+
+                      <form className="subtask-form" onSubmit={(event) => handleCreateSubtask(event, task.id)}>
+                        <label>
+                          Titre
+                          <input
+                            name="title"
+                            value={(subtaskForms[task.id] || emptySubtaskForm).title}
+                            onChange={(event) => handleSubtaskChange(task.id, event)}
+                            required
+                          />
+                        </label>
+                        <label>
+                          Statut
+                          <select
+                            name="status"
+                            value={(subtaskForms[task.id] || emptySubtaskForm).status}
+                            onChange={(event) => handleSubtaskChange(task.id, event)}
+                          >
+                            {statusOptions.map((status) => (
+                              <option key={status.value} value={status.value}>{status.label}</option>
+                            ))}
+                          </select>
+                        </label>
+                        <label>
+                          Priorite
+                          <select
+                            name="priority"
+                            value={(subtaskForms[task.id] || emptySubtaskForm).priority}
+                            onChange={(event) => handleSubtaskChange(task.id, event)}
+                          >
+                            {priorityOptions.map((priority) => (
+                              <option key={priority.value} value={priority.value}>{priority.label}</option>
+                            ))}
+                          </select>
+                        </label>
+                        <label>
+                          Date limite
+                          <input
+                            name="due_date"
+                            type="date"
+                            value={(subtaskForms[task.id] || emptySubtaskForm).due_date}
+                            onChange={(event) => handleSubtaskChange(task.id, event)}
+                          />
+                        </label>
+                        <label className="subtask-description-field">
+                          Description
+                          <textarea
+                            name="description"
+                            value={(subtaskForms[task.id] || emptySubtaskForm).description}
+                            onChange={(event) => handleSubtaskChange(task.id, event)}
+                            rows={3}
+                          />
+                        </label>
+                        <button className="primary-action" type="submit" disabled={savingSubtaskTaskId === task.id}>
+                          {savingSubtaskTaskId === task.id ? "Creation..." : "Ajouter la sous-tache"}
+                        </button>
+                      </form>
+                    </div>
+                  </div>
+                )}
+              </Fragment>
             ))}
 
             {!loading && recentTasks.length === 0 && (

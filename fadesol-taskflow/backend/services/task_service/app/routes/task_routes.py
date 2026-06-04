@@ -2,7 +2,9 @@ from fastapi import APIRouter, Depends, Request
 from sqlalchemy.orm import Session
 
 from app.db.database import get_db
+from app.schemas.subtask_schema import SubTaskAssign, SubTaskCreate, SubTaskResponse
 from app.schemas.task_schema import TaskAssign, TaskCreate, TaskImportFromClickUp, TaskResponse, TaskStatusUpdate, TaskUpdate
+from app.services.subtask_service import assign_subtask, create_subtask, get_subtask_by_id, get_subtasks_by_task
 from app.services.task_service import (
     assign_task,
     assigner_task,
@@ -56,6 +58,34 @@ def create(payload: TaskCreate, db: Session = Depends(get_db)):
 def import_clickup(payload: TaskImportFromClickUp, db: Session = Depends(get_db)):
     # Cree ou met a jour une tache provenant de ClickUp grace a son identifiant distant.
     return upsert_task_from_clickup(db, payload)
+
+
+@router.get("/{task_id}/subtasks", response_model=list[SubTaskResponse])
+def list_task_subtasks(task_id: str, db: Session = Depends(get_db)):
+    # Liste les sous-taches rattachees a une tache principale.
+    task = get_task_by_id(db, task_id)
+
+    if not task:
+        raise not_found("Tache principale introuvable.")
+
+    return get_subtasks_by_task(db, task_id)
+
+
+@router.post("/{task_id}/subtasks", response_model=SubTaskResponse)
+def create_task_subtask(task_id: str, payload: SubTaskCreate, db: Session = Depends(get_db)):
+    # Cree une sous-tache en utilisant le task_id de l'URL pour garantir le lien avec la tache principale.
+    return create_subtask(db, task_id, payload)
+
+
+@router.patch("/{task_id}/subtasks/{subtask_id}/assign", response_model=SubTaskResponse)
+def assign_task_subtask(task_id: str, subtask_id: str, payload: SubTaskAssign, db: Session = Depends(get_db)):
+    # Affecte une sous-tache a un service et/ou un membre, en conservant le contexte de la tache principale.
+    subtask = get_subtask_by_id(db, subtask_id)
+
+    if not subtask or subtask.task_id != task_id:
+        raise not_found("Sous-tache introuvable pour cette tache.")
+
+    return assign_subtask(db, subtask_id, payload)
 
 
 @router.get("/{task_id}", response_model=TaskResponse)

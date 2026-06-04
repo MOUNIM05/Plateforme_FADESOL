@@ -30,3 +30,21 @@ export async function updateTaskStatus(taskId, status) {
 
   return response.data;
 }
+
+export async function getSubtasksByTask(taskId) {
+  const response = await api.get(`/tasks/${taskId}/subtasks`);
+
+  return response.data;
+}
+
+export async function createSubtask(taskId, subtaskData) {
+  const response = await api.post(`/tasks/${taskId}/subtasks`, subtaskData);
+
+  return response.data;
+}
+
+export async function assignSubtask(taskId, subtaskId, assignmentData) {
+  const response = await api.patch(`/tasks/${taskId}/subtasks/${subtaskId}/assign`, assignmentData);
+
+  return response.data;
+}

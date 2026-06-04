@@ -84,6 +84,15 @@ def build_task_service_url(path: str = "") -> str:
     return f"{task_base_url}/api/tasks/{path}"
 
 
+def build_service_fadesol_url(path: str = "") -> str:
+    service_base_url = settings.SERVICE_FADESOL_URL.rstrip("/")
+
+    if not path:
+        return f"{service_base_url}/api/services-fadesol/"
+
+    return f"{service_base_url}/api/services-fadesol/{path}"
+
+
 def build_clickup_service_url(path: str = "") -> str:
     # Construit l'URL du service ClickUp pour centraliser les appels externes via le gateway.
     clickup_base_url = settings.CLICKUP_SERVICE_URL.rstrip("/")
@@ -145,6 +154,16 @@ async def proxy_api_tasks(path: str, request: Request):
     return await proxy_request(request, build_task_service_url(path), "Task service")
 
 
+@router.api_route("/services-fadesol", methods=["GET", "POST", "PUT", "PATCH", "DELETE"])
+async def proxy_api_services_fadesol_root(request: Request):
+    return await proxy_request(request, build_service_fadesol_url(), "Service Fadesol service")
+
+
+@router.api_route("/services-fadesol/{path:path}", methods=["GET", "POST", "PUT", "PATCH", "DELETE"])
+async def proxy_api_services_fadesol(path: str, request: Request):
+    return await proxy_request(request, build_service_fadesol_url(path), "Service Fadesol service")
+
+
 @router.api_route("/clickup/{path:path}", methods=["GET", "POST", "PUT", "PATCH", "DELETE"])
 async def proxy_api_clickup(path: str, request: Request):
     # Proxy vers clickup_service pour isoler l'integration ClickUp du frontend.
@@ -176,6 +195,16 @@ async def proxy_tasks_root(request: Request):
 @root_router.api_route("/tasks/{path:path}", methods=["GET", "POST", "PUT", "PATCH", "DELETE"])
 async def proxy_tasks(path: str, request: Request):
     return await proxy_request(request, build_task_service_url(path), "Task service")
+
+
+@root_router.api_route("/services-fadesol", methods=["GET", "POST", "PUT", "PATCH", "DELETE"])
+async def proxy_services_fadesol_root(request: Request):
+    return await proxy_request(request, build_service_fadesol_url(), "Service Fadesol service")
+
+
+@root_router.api_route("/services-fadesol/{path:path}", methods=["GET", "POST", "PUT", "PATCH", "DELETE"])
+async def proxy_services_fadesol(path: str, request: Request):
+    return await proxy_request(request, build_service_fadesol_url(path), "Service Fadesol service")
 
 
 @root_router.api_route("/clickup/{path:path}", methods=["GET", "POST", "PUT", "PATCH", "DELETE"])

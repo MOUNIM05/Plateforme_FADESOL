@@ -1309,6 +1309,172 @@
   grid-template-columns: 1.2fr 0.9fr 0.8fr 1.3fr 0.9fr 1.4fr;
 }
 
+.task-actions-cell {
+  display: grid;
+  grid-template-columns: minmax(120px, 1fr) auto;
+  gap: 8px;
+  align-items: center;
+}
+
+.compact-action {
+  min-height: 38px;
+  white-space: nowrap;
+}
+
+.subtask-row {
+  min-width: 980px;
+  padding: 0 8px 14px;
+  border-bottom: 1px solid #eef2f1;
+}
+
+.subtask-panel {
+  display: grid;
+  grid-template-columns: minmax(240px, 0.9fr) minmax(320px, 1.1fr);
+  gap: 16px;
+  padding: 16px;
+  border: 1px solid #e5e7eb;
+  border-radius: 8px;
+  background: #f8fafc;
+}
+
+.subtask-panel-title {
+  display: flex;
+  justify-content: space-between;
+  gap: 12px;
+  margin-bottom: 12px;
+}
+
+.subtask-panel-title h4 {
+  margin: 0 0 4px;
+  color: #0f172a;
+  font-size: 15px;
+  font-weight: 800;
+}
+
+.subtask-panel-title span,
+.subtask-panel-title small,
+.subtask-empty {
+  color: #64748b;
+  font-size: 12px;
+  font-weight: 700;
+}
+
+.subtask-list {
+  min-width: 0;
+}
+
+.subtask-item {
+  display: grid;
+  grid-template-columns: 24px minmax(0, 1fr);
+  gap: 9px;
+  align-items: start;
+  padding: 10px 0;
+  border-top: 1px solid #e5e7eb;
+}
+
+.subtask-item:first-of-type {
+  border-top: 0;
+}
+
+.subtask-item svg {
+  color: #16a34a;
+}
+
+.subtask-item strong,
+.subtask-item span {
+  display: block;
+  overflow-wrap: anywhere;
+}
+
+.subtask-item strong {
+  color: #0f172a;
+  font-size: 13px;
+}
+
+.subtask-item span {
+  margin-top: 4px;
+  color: #64748b;
+  font-size: 12px;
+  font-weight: 700;
+}
+
+.subtask-assignment-controls {
+  display: grid;
+  grid-template-columns: minmax(130px, 1fr) minmax(160px, 1.2fr) auto;
+  gap: 8px;
+  align-items: end;
+  margin-top: 10px;
+}
+
+.subtask-assignment-controls label {
+  display: grid;
+  gap: 6px;
+  color: #334155;
+  font-size: 11px;
+  font-weight: 800;
+}
+
+.subtask-assignment-controls select {
+  width: 100%;
+  min-height: 36px;
+  border: 1px solid #e5e7eb;
+  border-radius: 10px;
+  padding: 0 10px;
+  color: #0f172a;
+  background: #ffffff;
+  outline: 0;
+}
+
+.subtask-assignment-controls select:focus {
+  border-color: #16a34a;
+  box-shadow: 0 0 0 3px rgba(22, 163, 74, 0.12);
+}
+
+.subtask-form {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 12px;
+}
+
+.subtask-form label {
+  display: grid;
+  gap: 7px;
+  color: #334155;
+  font-size: 12px;
+  font-weight: 800;
+}
+
+.subtask-form input,
+.subtask-form select,
+.subtask-form textarea {
+  width: 100%;
+  min-height: 40px;
+  border: 1px solid #e5e7eb;
+  border-radius: 10px;
+  padding: 0 10px;
+  color: #0f172a;
+  background: #ffffff;
+  outline: 0;
+}
+
+.subtask-form textarea {
+  min-height: 84px;
+  padding: 10px;
+  resize: vertical;
+}
+
+.subtask-form input:focus,
+.subtask-form select:focus,
+.subtask-form textarea:focus {
+  border-color: #16a34a;
+  box-shadow: 0 0 0 3px rgba(22, 163, 74, 0.12);
+}
+
+.subtask-description-field,
+.subtask-form .primary-action {
+  grid-column: 1 / -1;
+}
+
 .assignment-select {
   width: 100%;
   min-height: 38px;

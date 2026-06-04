@@ -2,6 +2,7 @@ from app.schemas.subtask_schema import (
     SousTacheCreate,
     SousTacheResponse,
     SousTacheUpdate,
+    SubTaskAssign,
     SubTaskCreate,
     SubTaskResponse,
     SubTaskUpdate,

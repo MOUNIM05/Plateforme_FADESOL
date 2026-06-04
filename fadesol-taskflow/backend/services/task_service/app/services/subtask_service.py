@@ -1,7 +1,10 @@
+from datetime import datetime, timezone
+
 from sqlalchemy.orm import Session
 
 from app.models.subtask import SubTask
-from app.schemas.subtask_schema import SubTaskCreate, SubTaskUpdate
+from app.models.task import Task
+from app.schemas.subtask_schema import SubTaskAssign, SubTaskCreate, SubTaskCreateLegacy, SubTaskUpdate
 from shared.enums import StatutTache
 from shared.exceptions import not_found
 
@@ -29,13 +32,26 @@ def list_subtasks(db: Session, skip: int = 0, limit: int = 100) -> list[SubTask]
     return db.query(SubTask).offset(skip).limit(limit).all()
 
 
-def get_subtask(db: Session, subtask_id: str) -> SubTask | None:
+def get_subtasks_by_task(db: Session, task_id: str) -> list[SubTask]:
+    # Retourne uniquement les sous-taches rattachees a la tache principale demandee.
+    return db.query(SubTask).filter(SubTask.task_id == task_id).all()
+
+
+def get_subtask_by_id(db: Session, subtask_id: str) -> SubTask | None:
     return db.query(SubTask).filter(SubTask.id == subtask_id).first()
 
 
-def create_subtask(db: Session, payload: SubTaskCreate) -> SubTask:
-    # Cree une sous-tache en base a partir du schema valide par Pydantic.
-    subtask = SubTask(**_payload_data(payload))
+def create_subtask(db: Session, task_id: str, subtask_data: SubTaskCreate) -> SubTask:
+    # Verifie que la tache principale existe avant de rattacher une sous-tache.
+    task = db.query(Task).filter(Task.id == task_id).first()
+
+    if not task:
+        raise not_found("Tache principale introuvable.")
+
+    data = _payload_data(subtask_data)
+    data.pop("task_id", None)
+
+    subtask = SubTask(task_id=task_id, **data)
     db.add(subtask)
     db.commit()
     db.refresh(subtask)
@@ -43,9 +59,14 @@ def create_subtask(db: Session, payload: SubTaskCreate) -> SubTask:
     return subtask
 
 
+def create_legacy_subtask(db: Session, payload: SubTaskCreateLegacy) -> SubTask:
+    # Conserve l'ancien endpoint /sous-taches en reutilisant la creation imbriquee.
+    return create_subtask(db, payload.task_id, payload)
+
+
 def update_subtask(db: Session, subtask_id: str, payload: SubTaskUpdate) -> SubTask:
     # Applique uniquement les champs fournis dans la requete de mise a jour.
-    subtask = get_subtask(db, subtask_id)
+    subtask = get_subtask_by_id(db, subtask_id)
 
     if not subtask:
         raise not_found("Sous-tache introuvable.")
@@ -61,7 +82,7 @@ def update_subtask(db: Session, subtask_id: str, payload: SubTaskUpdate) -> SubT
 
 def delete_subtask(db: Session, subtask_id: str) -> None:
     # Supprime une sous-tache apres verification de son existence.
-    subtask = get_subtask(db, subtask_id)
+    subtask = get_subtask_by_id(db, subtask_id)
 
     if not subtask:
         raise not_found("Sous-tache introuvable.")
@@ -72,7 +93,7 @@ def delete_subtask(db: Session, subtask_id: str) -> None:
 
 def assigner_subtask(db: Session, subtask_id: str, utilisateur_id: str) -> SubTask:
     # Affecte la sous-tache a un utilisateur reference par UUID.
-    subtask = get_subtask(db, subtask_id)
+    subtask = get_subtask_by_id(db, subtask_id)
 
     if not subtask:
         raise not_found("Sous-tache introuvable.")
@@ -84,9 +105,31 @@ def assigner_subtask(db: Session, subtask_id: str, utilisateur_id: str) -> SubTa
     return subtask
 
 
+def assign_subtask(db: Session, subtask_id: str, payload: SubTaskAssign) -> SubTask:
+    # Affecte une sous-tache a un service et/ou a un membre sans relation SQL vers les autres services.
+    subtask = get_subtask_by_id(db, subtask_id)
+
+    if not subtask:
+        raise not_found("Sous-tache introuvable.")
+
+    data = payload.model_dump(exclude_unset=True)
+
+    if "service_id" in data:
+        subtask.service_id = data["service_id"]
+
+    if "assigned_to" in data:
+        subtask.assigned_to = data["assigned_to"]
+
+    subtask.updated_at = datetime.now(timezone.utc)
+    db.commit()
+    db.refresh(subtask)
+
+    return subtask
+
+
 def changer_statut_subtask(db: Session, subtask_id: str, statut: StatutTache) -> SubTask:
     # Change le statut de la sous-tache puis persiste la modification.
-    subtask = get_subtask(db, subtask_id)
+    subtask = get_subtask_by_id(db, subtask_id)
 
     if not subtask:
         raise not_found("Sous-tache introuvable.")
@@ -96,3 +139,6 @@ def changer_statut_subtask(db: Session, subtask_id: str, statut: StatutTache) ->
     db.refresh(subtask)
 
     return subtask
+
+
+get_subtask = get_subtask_by_id

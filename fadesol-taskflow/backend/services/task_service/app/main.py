@@ -1,4 +1,5 @@
 from fastapi import FastAPI
+from sqlalchemy import text
 
 from app import models  # noqa: F401
 from app.db.database import Base, engine
@@ -21,6 +22,16 @@ app.include_router(subtask_router, prefix="/api")
 def on_startup():
     # Cree les tables du service tache au demarrage si elles sont absentes.
     Base.metadata.create_all(bind=engine)
+
+    # create_all ne modifie pas une table deja existante.
+    # Ces ALTER preservent la table sous_taches tout en ajoutant les colonnes necessaires a l'affectation US18.
+    with engine.begin() as connection:
+        connection.execute(text("ALTER TABLE sous_taches ADD COLUMN IF NOT EXISTS service_id VARCHAR(36)"))
+        connection.execute(text("ALTER TABLE sous_taches ADD COLUMN IF NOT EXISTS assignee_a VARCHAR(36)"))
+        connection.execute(text("ALTER TABLE sous_taches ALTER COLUMN service_id DROP NOT NULL"))
+        connection.execute(text("ALTER TABLE sous_taches ALTER COLUMN assignee_a DROP NOT NULL"))
+        connection.execute(text("CREATE INDEX IF NOT EXISTS ix_sous_taches_service_id ON sous_taches (service_id)"))
+        connection.execute(text("CREATE INDEX IF NOT EXISTS ix_sous_taches_assignee_a ON sous_taches (assignee_a)"))
 
 
 @app.get("/health")
