@@ -32,3 +32,23 @@ class MessageResponse(MessageBase):
 
     class Config:
         from_attributes = True
+
+
+class ConversationSummary(BaseModel):
+    conversation_id: str
+    type: str
+    title: str
+    total_messages: int = 0
+    unread_count: int = 0
+    last_message: str
+    last_message_at: datetime
+    expediteur_id: str | None = None
+    destinataire_id: str | None = None
+    service_id: str | None = None
+    tache_id: str | None = None
+    projet_id: str | None = None
+
+
+class ConversationDetail(BaseModel):
+    conversation: ConversationSummary
+    messages: list[MessageResponse]

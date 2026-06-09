@@ -46,7 +46,9 @@ function DashboardLayout() {
         onLogout={logout}
       />
       <main className="dashboard-main">
-        <Outlet />
+        <div className="dashboard-content">
+          <Outlet />
+        </div>
       </main>
     </div>
   );

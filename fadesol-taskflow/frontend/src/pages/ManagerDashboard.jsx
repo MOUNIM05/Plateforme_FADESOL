@@ -1,46 +1,65 @@
 import {
-  AlertCircle,
+  Building2,
   CheckCircle2,
-  ClipboardCheck,
   Clock3,
   FolderKanban,
   UsersRound,
   Workflow,
 } from "lucide-react";
+import { useEffect, useMemo, useState } from "react";
 import KpiCard from "../components/dashboard/KpiCard";
+import MembersWorkload from "../components/dashboard/MembersWorkload";
+import ServicesOverview from "../components/dashboard/ServicesOverview";
+import { getDashboardStatistics } from "../services/dashboardService";
 
-const serviceKpis = [
+const fallbackStatistics = {
+  total_projects: 18,
+  tasks_in_progress: 36,
+  tasks_completed: 87,
+  tasks_late: 9,
+  active_services: 6,
+};
+
+const serviceKpiDefinitions = [
   {
-    label: "Tâches service",
-    value: "42",
+    label: "Total Projets",
+    statKey: "total_projects",
     trend: "+6 cette semaine",
-    icon: Workflow,
+    icon: FolderKanban,
     tone: "green",
     sparkline: [30, 36, 42, 40, 48, 52, 58],
   },
   {
-    label: "En validation",
-    value: "7",
-    trend: "À traiter",
-    icon: ClipboardCheck,
-    tone: "orange",
+    label: "Tâches Actives",
+    statKey: "tasks_in_progress",
+    trend: "+8% ce mois",
+    icon: Workflow,
+    tone: "blue",
     sparkline: [18, 20, 16, 25, 22, 28, 26],
   },
   {
-    label: "Charge équipe",
-    value: "68%",
-    trend: "Équilibrée",
-    icon: UsersRound,
-    tone: "blue",
+    label: "Tâches Terminées",
+    statKey: "tasks_completed",
+    trend: "+15% ce mois",
+    icon: CheckCircle2,
+    tone: "purple",
     sparkline: [46, 52, 48, 58, 62, 60, 68],
   },
   {
-    label: "Urgences",
-    value: "4",
-    trend: "Priorité haute",
-    icon: AlertCircle,
+    label: "Tâches en Retard",
+    statKey: "tasks_late",
+    trend: "-3% ce mois",
+    icon: Clock3,
     tone: "red",
     sparkline: [40, 36, 32, 34, 28, 26, 22],
+  },
+  {
+    label: "Services Actifs",
+    statKey: "active_services",
+    trend: "Stable",
+    icon: Building2,
+    tone: "orange",
+    sparkline: [44, 44, 46, 44, 46, 44, 46],
   },
 ];
 
@@ -53,6 +72,46 @@ const urgentTasks = [
 
 function ManagerDashboard({ currentUser }) {
   const displayName = currentUser?.first_name || currentUser?.prenom || currentUser?.email || "Manager";
+  const [statistics, setStatistics] = useState(fallbackStatistics);
+  const [statisticsLoading, setStatisticsLoading] = useState(true);
+  const [statisticsWarning, setStatisticsWarning] = useState("");
+
+  useEffect(() => {
+    let isMounted = true;
+
+    setStatisticsLoading(true);
+    setStatisticsWarning("");
+
+    getDashboardStatistics()
+      .then((data) => {
+        if (isMounted) {
+          setStatistics({ ...fallbackStatistics, ...data });
+        }
+      })
+      .catch((error) => {
+        console.error("Dashboard statistics error:", error);
+        if (isMounted) {
+          setStatistics(fallbackStatistics);
+          setStatisticsWarning("Statistiques temporairement indisponibles.");
+        }
+      })
+      .finally(() => {
+        if (isMounted) {
+          setStatisticsLoading(false);
+        }
+      });
+
+    return () => {
+      isMounted = false;
+    };
+  }, []);
+
+  const serviceKpis = useMemo(() => {
+    return serviceKpiDefinitions.map((kpi) => ({
+      ...kpi,
+      value: statisticsLoading ? "..." : String(statistics[kpi.statKey] ?? 0),
+    }));
+  }, [statistics, statisticsLoading]);
 
   return (
     <div className="dashboard-page">
@@ -69,11 +128,16 @@ function ManagerDashboard({ currentUser }) {
         </div>
       </header>
 
+      {statisticsWarning && <p className="notice warning">{statisticsWarning}</p>}
+
       <section className="kpi-grid manager-kpis" aria-label="Indicateurs manager">
         {serviceKpis.map((kpi) => (
           <KpiCard key={kpi.label} {...kpi} />
         ))}
       </section>
+
+      <ServicesOverview />
+      <MembersWorkload />
 
       <section className="role-dashboard-grid">
         <article className="dashboard-card">

@@ -28,8 +28,14 @@ projects_router = APIRouter(
 
 
 @router.get("/", response_model=list[ProjetResponse])
-def list_all(skip: int = 0, limit: int = 100, db: Session = Depends(get_db)):
-    return list_projects(db, skip, limit)
+def list_all(
+    skip: int = 0,
+    limit: int = 100,
+    service_id: str | None = None,
+    status: str | None = None,
+    db: Session = Depends(get_db),
+):
+    return list_projects(db, skip, limit, service_id, status)
 
 
 @router.post("/", response_model=ProjetResponse)
@@ -74,8 +80,14 @@ def delete(project_id: str, db: Session = Depends(get_db)):
 
 
 @projects_router.get("/", response_model=list[ProjetResponse])
-def list_projects_en(skip: int = 0, limit: int = 100, db: Session = Depends(get_db)):
-    return list_projects(db, skip, limit)
+def list_projects_en(
+    skip: int = 0,
+    limit: int = 100,
+    service_id: str | None = None,
+    status: str | None = None,
+    db: Session = Depends(get_db),
+):
+    return list_projects(db, skip, limit, service_id, status)
 
 
 @projects_router.post("/", response_model=ProjetResponse)
@@ -96,3 +108,9 @@ def get_project_en(project_id: str, db: Session = Depends(get_db)):
 @projects_router.put("/{project_id}", response_model=ProjetResponse)
 def update_project_en(project_id: str, payload: ProjetUpdate, db: Session = Depends(get_db)):
     return update_project(db, project_id, payload)
+
+
+@projects_router.delete("/{project_id}", response_model=MessageResponse)
+def delete_project_en(project_id: str, db: Session = Depends(get_db)):
+    delete_project(db, project_id)
+    return {"message": "Projet supprime avec succes."}

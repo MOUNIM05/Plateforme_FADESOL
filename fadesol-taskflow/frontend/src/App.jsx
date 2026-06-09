@@ -4,6 +4,7 @@ import DashboardLayout from "./layouts/DashboardLayout";
 import AccessDenied from "./pages/AccessDenied";
 import Dashboard from "./pages/Dashboard";
 import Login from "./pages/Login";
+import Messages from "./pages/Messages";
 import ModulePage from "./pages/ModulePage";
 import Profile from "./pages/Profile";
 import Projects from "./pages/Projects";
@@ -88,7 +89,7 @@ function AppRoutes() {
           />
           <Route
             path="/messages"
-            element={<ModulePage type="messages" title="Messagerie" description="Communication interne Fadesol TaskFlow." cards={moduleCards.messages} />}
+            element={<Messages />}
           />
           <Route element={<RoleRoute allowedRoles={[ROLES.ADMIN]} />}>
             <Route

@@ -1,16 +1,42 @@
+import json
 from urllib.error import HTTPError, URLError
 from urllib.request import Request as UrlRequest
 from urllib.request import urlopen
 
-from fastapi import APIRouter
+from fastapi import APIRouter, WebSocket, WebSocketDisconnect
 from fastapi import Request, Response
 from fastapi.responses import JSONResponse
 
 from app.core.config import settings
+from app.websocket_manager import gateway_ws_manager
 
 
 router = APIRouter(tags=["Gateway"])
 root_router = APIRouter(tags=["Gateway"])
+
+
+async def websocket_endpoint(websocket: WebSocket):
+    await gateway_ws_manager.connect(websocket)
+
+    try:
+        await websocket.send_json({"type": "connected", "message": "Messagerie temps réel connectée."})
+
+        while True:
+            await websocket.receive_text()
+    except WebSocketDisconnect:
+        gateway_ws_manager.disconnect(websocket)
+
+
+async def broadcast_proxied_message(response: Response, event_type: str) -> None:
+    if response.status_code < 200 or response.status_code >= 300:
+        return
+
+    try:
+        payload = json.loads(response.body.decode("utf-8"))
+    except (AttributeError, json.JSONDecodeError, UnicodeDecodeError):
+        return
+
+    await gateway_ws_manager.broadcast({"type": event_type, "message": payload})
 
 
 async def proxy_request(request: Request, target_url: str, service_name: str):
@@ -90,6 +116,32 @@ def build_project_health_url() -> str:
     return f"{settings.PROJECT_SERVICE_URL.rstrip('/')}/health"
 
 
+def build_dashboard_service_url(path: str = "") -> str:
+    dashboard_base_url = settings.DASHBOARD_SERVICE_URL.rstrip("/")
+
+    if not path:
+        return f"{dashboard_base_url}/api/dashboard/"
+
+    return f"{dashboard_base_url}/api/dashboard/{path}"
+
+
+def build_dashboard_health_url() -> str:
+    return f"{settings.DASHBOARD_SERVICE_URL.rstrip('/')}/health"
+
+
+def build_message_service_url(path: str = "") -> str:
+    message_base_url = settings.MESSAGE_SERVICE_URL.rstrip("/")
+
+    if not path:
+        return f"{message_base_url}/api/messages/"
+
+    return f"{message_base_url}/api/messages/{path}"
+
+
+def build_message_health_url() -> str:
+    return f"{settings.MESSAGE_SERVICE_URL.rstrip('/')}/health"
+
+
 @router.get("/gateway/services")
 def list_services():
     return {
@@ -155,6 +207,54 @@ async def proxy_api_projects(path: str, request: Request):
     return await proxy_request(request, build_project_service_url(path), "Project service")
 
 
+@router.api_route("/dashboard", methods=["GET", "POST", "PUT", "PATCH", "DELETE"])
+async def proxy_api_dashboard_root(request: Request):
+    return await proxy_request(request, build_dashboard_service_url(), "Dashboard service")
+
+
+@router.get("/dashboard/health")
+async def proxy_api_dashboard_health(request: Request):
+    return await proxy_request(request, build_dashboard_health_url(), "Dashboard service")
+
+
+@router.api_route("/dashboard/{path:path}", methods=["GET", "POST", "PUT", "PATCH", "DELETE"])
+async def proxy_api_dashboard(path: str, request: Request):
+    return await proxy_request(request, build_dashboard_service_url(path), "Dashboard service")
+
+
+@router.api_route("/messages", methods=["GET", "POST", "PUT", "PATCH", "DELETE"])
+async def proxy_api_messages_root(request: Request):
+    response = await proxy_request(request, build_message_service_url(), "Message service")
+
+    if request.method == "POST":
+        await broadcast_proxied_message(response, "message_created")
+
+    return response
+
+
+@router.get("/messages/health")
+async def proxy_api_messages_health(request: Request):
+    return await proxy_request(request, build_message_health_url(), "Message service")
+
+
+@router.api_route("/messages/{path:path}", methods=["GET", "POST", "PUT", "PATCH", "DELETE"])
+async def proxy_api_messages(path: str, request: Request):
+    response = await proxy_request(request, build_message_service_url(path), "Message service")
+
+    if request.method == "POST":
+        await broadcast_proxied_message(response, "message_created")
+
+    if request.method == "PATCH" and path.endswith("/lu"):
+        await broadcast_proxied_message(response, "message_read")
+
+    return response
+
+
+@router.websocket("/ws/messages")
+async def proxy_api_messages_websocket(websocket: WebSocket):
+    await websocket_endpoint(websocket)
+
+
 @root_router.api_route("/users", methods=["GET", "POST", "PUT", "PATCH", "DELETE"])
 async def proxy_users_root(request: Request):
     return await proxy_request(request, build_user_service_url(), "User service")
@@ -198,3 +298,51 @@ async def proxy_projects_health(request: Request):
 @root_router.api_route("/projects/{path:path}", methods=["GET", "POST", "PUT", "PATCH", "DELETE"])
 async def proxy_projects(path: str, request: Request):
     return await proxy_request(request, build_project_service_url(path), "Project service")
+
+
+@root_router.api_route("/dashboard", methods=["GET", "POST", "PUT", "PATCH", "DELETE"])
+async def proxy_dashboard_root(request: Request):
+    return await proxy_request(request, build_dashboard_service_url(), "Dashboard service")
+
+
+@root_router.get("/dashboard/health")
+async def proxy_dashboard_health(request: Request):
+    return await proxy_request(request, build_dashboard_health_url(), "Dashboard service")
+
+
+@root_router.api_route("/dashboard/{path:path}", methods=["GET", "POST", "PUT", "PATCH", "DELETE"])
+async def proxy_dashboard(path: str, request: Request):
+    return await proxy_request(request, build_dashboard_service_url(path), "Dashboard service")
+
+
+@root_router.api_route("/messages", methods=["GET", "POST", "PUT", "PATCH", "DELETE"])
+async def proxy_messages_root(request: Request):
+    response = await proxy_request(request, build_message_service_url(), "Message service")
+
+    if request.method == "POST":
+        await broadcast_proxied_message(response, "message_created")
+
+    return response
+
+
+@root_router.get("/messages/health")
+async def proxy_messages_health(request: Request):
+    return await proxy_request(request, build_message_health_url(), "Message service")
+
+
+@root_router.api_route("/messages/{path:path}", methods=["GET", "POST", "PUT", "PATCH", "DELETE"])
+async def proxy_messages(path: str, request: Request):
+    response = await proxy_request(request, build_message_service_url(path), "Message service")
+
+    if request.method == "POST":
+        await broadcast_proxied_message(response, "message_created")
+
+    if request.method == "PATCH" and path.endswith("/lu"):
+        await broadcast_proxied_message(response, "message_read")
+
+    return response
+
+
+@root_router.websocket("/ws/messages")
+async def proxy_messages_websocket(websocket: WebSocket):
+    await websocket_endpoint(websocket)
