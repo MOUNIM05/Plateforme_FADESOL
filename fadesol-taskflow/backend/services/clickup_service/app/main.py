@@ -7,6 +7,7 @@ from app.routes.clickup_routes import router as clickup_router
 
 
 app = FastAPI(title="ClickUp Service - Fadesol TaskFlow")
+app.include_router(clickup_placeholder_router)
 app.include_router(clickup_placeholder_router, prefix="/api")
 app.include_router(clickup_router, prefix="/api")
 

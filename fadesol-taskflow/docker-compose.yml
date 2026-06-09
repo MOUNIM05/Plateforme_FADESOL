@@ -226,6 +226,12 @@ services:
     environment:
       DATABASE_URL: postgresql://postgres:${POSTGRES_PASSWORD}@postgres_db:5432/clickup_db
       CLICKUP_DATABASE_URL: postgresql://postgres:${POSTGRES_PASSWORD}@postgres_db:5432/clickup_db
+      CLICKUP_TOKEN: ${CLICKUP_TOKEN}
+      CLICKUP_API_BASE_URL: ${CLICKUP_API_BASE_URL}
+      CLICKUP_WORKSPACE_ID: ${CLICKUP_WORKSPACE_ID}
+      CLICKUP_SPACE_ID: ${CLICKUP_SPACE_ID}
+      CLICKUP_FOLDER_ID: ${CLICKUP_FOLDER_ID}
+      CLICKUP_LIST_ID: ${CLICKUP_LIST_ID}
     depends_on:
       postgres_db:
         condition: service_healthy

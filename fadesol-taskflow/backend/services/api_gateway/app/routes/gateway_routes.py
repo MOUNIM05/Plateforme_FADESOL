@@ -184,6 +184,12 @@ async def proxy_api_services_fadesol(path: str, request: Request):
     return await proxy_request(request, build_service_fadesol_url(path), "Service Fadesol service")
 
 
+@router.api_route("/clickup", methods=["GET", "POST", "PUT", "PATCH", "DELETE"])
+async def proxy_api_clickup_root(request: Request):
+    """Proxy vers la racine /api/clickup."""
+    return await proxy_request(request, build_clickup_service_url(), "ClickUp service")
+
+
 @router.api_route("/clickup/{path:path}", methods=["GET", "POST", "PUT", "PATCH", "DELETE"])
 async def proxy_api_clickup(path: str, request: Request):
     """Proxy vers clickup_service."""
@@ -233,6 +239,12 @@ async def proxy_services_fadesol_root(request: Request):
 async def proxy_services_fadesol(path: str, request: Request):
     """Proxy racine sans prefixe /api pour /services-fadesol/*."""
     return await proxy_request(request, build_service_fadesol_url(path), "Service Fadesol service")
+
+
+@root_router.api_route("/clickup", methods=["GET", "POST", "PUT", "PATCH", "DELETE"])
+async def proxy_clickup_root(request: Request):
+    """Proxy racine sans prefixe /api pour /clickup."""
+    return await proxy_request(request, build_clickup_service_url(), "ClickUp service")
 
 
 @root_router.api_route("/clickup/{path:path}", methods=["GET", "POST", "PUT", "PATCH", "DELETE"])

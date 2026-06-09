@@ -1,1 +1,2 @@
+from app.schemas.clickup_schema import ClickUpApiResponse, ClickUpConnectionResponse
 from app.schemas.clickup_sync_schema import ClickUpSyncCreate, ClickUpSyncResponse, ClickUpSyncUpdate
