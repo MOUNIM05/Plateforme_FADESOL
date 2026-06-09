@@ -7,6 +7,7 @@ from app.db.database import get_db
 from app.schemas.subtask_schema import SubTaskAssign, SubTaskCreate, SubTaskResponse
 from app.schemas.task_schema import (
     TaskAssign,
+    TaskClickUpSync,
     TaskCreate,
     TaskImportFromClickUp,
     TaskProgressResponse,
@@ -29,6 +30,7 @@ from app.services.task_service import (
     delete_task,
     get_task_by_id,
     get_tasks,
+    mark_task_clickup_sync,
     resolve_current_user_uuid,
     synchroniser_clickup,
     update_task,
@@ -148,6 +150,13 @@ def update_status(task_id: str, payload: TaskStatusUpdate, db: Session = Depends
     """Met a jour uniquement le statut d'une tache."""
     # Endpoint specialise pour changer uniquement le statut d'une tache.
     return update_task_status(db, task_id, payload)
+
+
+@router.patch("/{task_id}/clickup-sync", response_model=TaskResponse)
+def mark_clickup_sync(task_id: str, payload: TaskClickUpSync, db: Session = Depends(get_db)):
+    """Enregistre l'identifiant ClickUp d'une tache synchronisee."""
+    # Endpoint interne appele par clickup_service apres creation de la tache dans ClickUp.
+    return mark_task_clickup_sync(db, task_id, payload)
 
 
 @router.delete("/{task_id}", response_model=MessageResponse)

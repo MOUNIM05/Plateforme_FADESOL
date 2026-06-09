@@ -11,7 +11,14 @@ from sqlalchemy.orm import Session
 
 from app.core.config import settings
 from app.models.task import Task
-from app.schemas.task_schema import TaskAssign, TaskCreate, TaskImportFromClickUp, TaskStatusUpdate, TaskUpdate
+from app.schemas.task_schema import (
+    TaskAssign,
+    TaskClickUpSync,
+    TaskCreate,
+    TaskImportFromClickUp,
+    TaskStatusUpdate,
+    TaskUpdate,
+)
 from shared.enums import StatutTache
 from shared.exceptions import not_found
 
@@ -242,6 +249,25 @@ def synchroniser_clickup(db: Session, task_id: str, clickup_task_id: str | None 
 
     task.synchroniserAvecClickUp(clickup_task_id)
     task.date_synchronisation = datetime.now(timezone.utc)
+    db.commit()
+    db.refresh(task)
+
+    return task
+
+
+def mark_task_clickup_sync(db: Session, task_id: str, payload: TaskClickUpSync) -> Task:
+    """Sauvegarde l'identifiant ClickUp apres une synchronisation sortante."""
+    # Route appelee par clickup_service apres creation de la tache dans ClickUp.
+    task = get_task_by_id(db, task_id)
+
+    if not task:
+        raise not_found("Tache introuvable.")
+
+    task.clickup_task_id = payload.clickup_task_id
+    task.est_synchronisee_clickup = payload.est_synchronisee_clickup
+    task.source = "clickup"
+    task.date_synchronisation = datetime.now(timezone.utc)
+    task.updated_at = datetime.now(timezone.utc)
     db.commit()
     db.refresh(task)
 

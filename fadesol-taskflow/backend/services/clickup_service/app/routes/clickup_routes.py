@@ -1,11 +1,20 @@
-from fastapi import APIRouter, Depends
+from fastapi import APIRouter, Depends, Query
 from sqlalchemy.orm import Session
 
 from app.db.database import get_db
-from app.schemas.clickup_schema import ClickUpApiResponse, ClickUpConnectionResponse
+from app.schemas.clickup_schema import (
+    ClickUpApiResponse,
+    ClickUpConnectionResponse,
+    ClickUpFolderResponse,
+    ClickUpListResponse,
+    ClickUpSpaceResponse,
+    ClickUpStructureResponse,
+    ClickUpSyncTaskResponse,
+)
 from app.schemas.clickup_sync_schema import ClickUpSyncCreate, ClickUpSyncResponse, ClickUpSyncUpdate
 from app.services.clickup_service import (
     create_sync_log,
+    get_clickup_structure,
     get_clickup_folders,
     get_clickup_lists,
     get_clickup_spaces,
@@ -14,6 +23,7 @@ from app.services.clickup_service import (
     list_sync_logs,
     mark_failed,
     mark_success,
+    sync_task_to_clickup,
     sync_tasks_placeholder,
     test_clickup_connection,
     update_sync_log,
@@ -39,6 +49,11 @@ def sync_tasks():
     return sync_tasks_placeholder()
 
 
+@placeholder_router.post("/sync-task/{task_id}", response_model=ClickUpSyncTaskResponse)
+def sync_task(task_id: str):
+    return sync_task_to_clickup(task_id)
+
+
 @placeholder_router.get("/test-connection", response_model=ClickUpConnectionResponse)
 def test_connection():
     return test_clickup_connection()
@@ -49,19 +64,24 @@ def workspaces():
     return get_clickup_workspaces()
 
 
-@placeholder_router.get("/spaces", response_model=ClickUpApiResponse)
+@placeholder_router.get("/spaces", response_model=list[ClickUpSpaceResponse])
 def spaces():
     return get_clickup_spaces()
 
 
-@placeholder_router.get("/folders", response_model=ClickUpApiResponse)
-def folders():
-    return get_clickup_folders()
+@placeholder_router.get("/folders", response_model=list[ClickUpFolderResponse])
+def folders(space_id: str | None = Query(default=None)):
+    return get_clickup_folders(space_id)
 
 
-@placeholder_router.get("/lists", response_model=ClickUpApiResponse)
-def lists():
-    return get_clickup_lists()
+@placeholder_router.get("/lists", response_model=list[ClickUpListResponse])
+def lists(folder_id: str | None = Query(default=None), space_id: str | None = Query(default=None)):
+    return get_clickup_lists(folder_id=folder_id, space_id=space_id)
+
+
+@placeholder_router.get("/structure", response_model=ClickUpStructureResponse)
+def structure():
+    return get_clickup_structure()
 
 
 @router.get("/", response_model=list[ClickUpSyncResponse])

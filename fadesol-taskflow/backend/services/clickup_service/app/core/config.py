@@ -16,6 +16,7 @@ class Settings:
     CLICKUP_SPACE_ID: str = os.getenv("CLICKUP_SPACE_ID", "")
     CLICKUP_FOLDER_ID: str = os.getenv("CLICKUP_FOLDER_ID", "")
     CLICKUP_LIST_ID: str = os.getenv("CLICKUP_LIST_ID", "")
+    TASK_SERVICE_URL: str = os.getenv("TASK_SERVICE_URL", "http://localhost:8005")
 
 
 settings = Settings()

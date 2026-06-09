@@ -232,6 +232,7 @@ services:
       CLICKUP_SPACE_ID: ${CLICKUP_SPACE_ID}
       CLICKUP_FOLDER_ID: ${CLICKUP_FOLDER_ID}
       CLICKUP_LIST_ID: ${CLICKUP_LIST_ID}
+      TASK_SERVICE_URL: ${TASK_SERVICE_URL}
     depends_on:
       postgres_db:
         condition: service_healthy

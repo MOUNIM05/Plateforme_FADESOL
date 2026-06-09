@@ -83,6 +83,18 @@ class TaskStatusUpdate(BaseModel):
         return status_map.get(value, value)
 
 
+class TaskClickUpSync(BaseModel):
+    """Payload utilise par clickup_service pour enregistrer l'id distant."""
+    # Ce schema est volontairement petit : clickup_service envoie seulement les informations de synchronisation.
+    model_config = ConfigDict(populate_by_name=True)
+
+    clickup_task_id: str
+    est_synchronisee_clickup: bool = Field(
+        default=True,
+        validation_alias=AliasChoices("est_synchronisee_clickup", "is_synced_clickup"),
+    )
+
+
 class TaskImportFromClickUp(TaskBase):
     """Payload d'import ou synchronisation depuis ClickUp."""
     # Schema utilise lorsqu'une tache vient de ClickUp au lieu d'etre creee localement.
@@ -118,3 +130,4 @@ TacheResponse = TaskResponse
 TacheAssign = TaskAssign
 TacheStatusUpdate = TaskStatusUpdate
 TacheProgressResponse = TaskProgressResponse
+TacheClickUpSync = TaskClickUpSync

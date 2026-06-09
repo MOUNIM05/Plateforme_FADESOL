@@ -1820,6 +1820,114 @@
   border-radius: 24px;
 }
 
+.clickup-page {
+  display: grid;
+  gap: 18px;
+}
+
+.clickup-controls,
+.clickup-grid {
+  display: grid;
+  gap: 16px;
+}
+
+.clickup-controls {
+  grid-template-columns: repeat(2, minmax(220px, 1fr)) auto;
+  align-items: end;
+}
+
+.clickup-controls label {
+  display: grid;
+  gap: 8px;
+}
+
+.clickup-controls span {
+  color: #64748b;
+  font-size: 13px;
+  font-weight: 800;
+}
+
+.clickup-controls select {
+  width: 100%;
+  min-height: 44px;
+  padding: 0 12px;
+  border: 1px solid #e5e7eb;
+  border-radius: 12px;
+  color: #0f172a;
+  background: #ffffff;
+  font: inherit;
+  font-weight: 700;
+}
+
+.clickup-grid {
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+}
+
+.clickup-list {
+  display: grid;
+  gap: 10px;
+}
+
+.clickup-list button,
+.clickup-row {
+  min-height: 44px;
+  display: grid;
+  grid-template-columns: 20px minmax(0, 1fr);
+  align-items: center;
+  gap: 10px;
+  padding: 10px 12px;
+  border: 1px solid #eef2f1;
+  border-radius: 12px;
+  color: #0f172a;
+  background: #f8fafc;
+  font: inherit;
+  font-weight: 800;
+  text-align: left;
+}
+
+.clickup-list button {
+  cursor: pointer;
+}
+
+.clickup-list button:hover,
+.clickup-list button.is-selected {
+  border-color: #bbf7d0;
+  color: #15803d;
+  background: #e8f7ef;
+}
+
+.clickup-list svg,
+.clickup-row svg {
+  color: #16a34a;
+}
+
+.clickup-list span,
+.clickup-row span {
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.clickup-empty {
+  margin: 0;
+  color: #64748b;
+  font-size: 13px;
+  font-weight: 700;
+}
+
+.clickup-structure pre {
+  max-height: 420px;
+  margin: 0;
+  overflow: auto;
+  padding: 14px;
+  border-radius: 12px;
+  color: #0f172a;
+  background: #f8fafc;
+  font-size: 12px;
+  line-height: 1.5;
+}
+
 @media (max-width: 1400px) {
   .kpi-grid {
     grid-template-columns: repeat(3, minmax(180px, 1fr));
@@ -1856,6 +1964,11 @@
   .profile-grid,
   .manager-kpis,
   .users-stats-grid {
+    grid-template-columns: 1fr;
+  }
+
+  .clickup-controls,
+  .clickup-grid {
     grid-template-columns: 1fr;
   }
 

@@ -39,6 +39,11 @@ def on_startup():
         connection.execute(text("ALTER TABLE sous_taches ALTER COLUMN assignee_a DROP NOT NULL"))
         connection.execute(text("CREATE INDEX IF NOT EXISTS ix_sous_taches_service_id ON sous_taches (service_id)"))
         connection.execute(text("CREATE INDEX IF NOT EXISTS ix_sous_taches_assignee_a ON sous_taches (assignee_a)"))
+        connection.execute(text("ALTER TABLE taches ADD COLUMN IF NOT EXISTS clickup_task_id VARCHAR(120)"))
+        connection.execute(text("ALTER TABLE taches ADD COLUMN IF NOT EXISTS source VARCHAR(40) DEFAULT 'local' NOT NULL"))
+        connection.execute(text("ALTER TABLE taches ADD COLUMN IF NOT EXISTS est_synchronisee_clickup BOOLEAN DEFAULT FALSE NOT NULL"))
+        connection.execute(text("ALTER TABLE taches ADD COLUMN IF NOT EXISTS date_synchronisation TIMESTAMP WITH TIME ZONE"))
+        connection.execute(text("CREATE UNIQUE INDEX IF NOT EXISTS ix_taches_clickup_task_id ON taches (clickup_task_id)"))
 
 
 @app.get("/health")

@@ -2,6 +2,7 @@ import { BrowserRouter, Navigate, Route, Routes } from "react-router-dom";
 import { AuthProvider, ROLES, useAuth } from "./context/AuthContext";
 import DashboardLayout from "./layouts/DashboardLayout";
 import AccessDenied from "./pages/AccessDenied";
+import ClickUpIntegration from "./pages/ClickUpIntegration";
 import Dashboard from "./pages/Dashboard";
 import Login from "./pages/LoginPage";
 import ModulePage from "./pages/ModulePage";
@@ -92,7 +93,7 @@ function AppRoutes() {
           <Route element={<RoleRoute allowedRoles={[ROLES.ADMIN]} />}>
             <Route
               path="/clickup"
-              element={<ModulePage type="clickup" title="ClickUp Sync" description="Configuration et supervision de la synchronisation ClickUp." cards={moduleCards.clickup} />}
+              element={<ClickUpIntegration />}
             />
             <Route
               path="/settings"

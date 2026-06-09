@@ -43,7 +43,7 @@ async def proxy_request(request: Request, target_url: str, service_name: str):
     )
 
     try:
-        with urlopen(proxied_request, timeout=10) as proxied_response:
+        with urlopen(proxied_request, timeout=30) as proxied_response:
             # La reponse du microservice est renvoyee telle quelle au frontend.
             return Response(
                 content=proxied_response.read(),
