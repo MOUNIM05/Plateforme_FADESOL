@@ -8,6 +8,8 @@ class Settings:
         "PROJECT_DATABASE_URL",
         "postgresql+psycopg2://postgres:mounim@localhost:5432/fadesol_projects",
     )
+    JWT_SECRET_KEY: str = os.getenv("SECRET_KEY") or os.getenv("JWT_SECRET_KEY", "change_this_long_random_secret")
+    JWT_ALGORITHM: str = os.getenv("ALGORITHM") or os.getenv("JWT_ALGORITHM", "HS256")
 
 
 settings = Settings()

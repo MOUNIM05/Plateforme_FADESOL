@@ -5,9 +5,11 @@ import AccessDenied from "./pages/AccessDenied";
 import ClickUpIntegration from "./pages/ClickUpIntegration";
 import Dashboard from "./pages/Dashboard";
 import Login from "./pages/LoginPage";
+import Messages from "./pages/Messages";
 import ModulePage from "./pages/ModulePage";
 import MyTasks from "./pages/MyTasks";
 import Profile from "./pages/Profile";
+import Projects from "./pages/Projects";
 import Tasks from "./pages/Tasks";
 import Users from "./pages/Users";
 import ProtectedRoute from "./routes/ProtectedRoute";
@@ -77,7 +79,7 @@ function AppRoutes() {
             />
             <Route
               path="/projects"
-              element={<ModulePage type="projects" title="Projets" description="Suivi des projets internes et clients." cards={moduleCards.projects} />}
+              element={<Projects />}
             />
             <Route
               path="/reporting"
@@ -88,7 +90,7 @@ function AppRoutes() {
           <Route path="/tasks" element={<Tasks />} />
           <Route
             path="/messages"
-            element={<ModulePage type="messages" title="Messagerie" description="Communication interne Fadesol TaskFlow." cards={moduleCards.messages} />}
+            element={<Messages />}
           />
           <Route element={<RoleRoute allowedRoles={[ROLES.ADMIN]} />}>
             <Route

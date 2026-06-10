@@ -1,6 +1,7 @@
 from fastapi import APIRouter, Depends
 from sqlalchemy.orm import Session
 
+from app.core.security import require_admin_or_manager
 from app.db.database import get_db
 from app.schemas.project_schema import ProjetCreate, ProjetResponse, ProjetUpdate
 from app.services.project_service import (
@@ -19,11 +20,22 @@ from shared.responses import MessageResponse
 
 
 router = APIRouter(prefix="/projets", tags=["Projets"])
+projects_router = APIRouter(
+    prefix="/projects",
+    tags=["Projects"],
+    dependencies=[Depends(require_admin_or_manager)],
+)
 
 
 @router.get("/", response_model=list[ProjetResponse])
-def list_all(skip: int = 0, limit: int = 100, db: Session = Depends(get_db)):
-    return list_projects(db, skip, limit)
+def list_all(
+    skip: int = 0,
+    limit: int = 100,
+    service_id: str | None = None,
+    status: str | None = None,
+    db: Session = Depends(get_db),
+):
+    return list_projects(db, skip, limit, service_id, status)
 
 
 @router.post("/", response_model=ProjetResponse)
@@ -63,5 +75,42 @@ def archive(project_id: str, db: Session = Depends(get_db)):
 
 @router.delete("/{project_id}", response_model=MessageResponse)
 def delete(project_id: str, db: Session = Depends(get_db)):
+    delete_project(db, project_id)
+    return {"message": "Projet supprime avec succes."}
+
+
+@projects_router.get("/", response_model=list[ProjetResponse])
+def list_projects_en(
+    skip: int = 0,
+    limit: int = 100,
+    service_id: str | None = None,
+    status: str | None = None,
+    db: Session = Depends(get_db),
+):
+    return list_projects(db, skip, limit, service_id, status)
+
+
+@projects_router.post("/", response_model=ProjetResponse)
+def create_project_en(payload: ProjetCreate, db: Session = Depends(get_db)):
+    return create_project(db, payload)
+
+
+@projects_router.get("/{project_id}", response_model=ProjetResponse)
+def get_project_en(project_id: str, db: Session = Depends(get_db)):
+    project = get_project(db, project_id)
+
+    if not project:
+        raise not_found("Projet introuvable.")
+
+    return project
+
+
+@projects_router.put("/{project_id}", response_model=ProjetResponse)
+def update_project_en(project_id: str, payload: ProjetUpdate, db: Session = Depends(get_db)):
+    return update_project(db, project_id, payload)
+
+
+@projects_router.delete("/{project_id}", response_model=MessageResponse)
+def delete_project_en(project_id: str, db: Session = Depends(get_db)):
     delete_project(db, project_id)
     return {"message": "Projet supprime avec succes."}

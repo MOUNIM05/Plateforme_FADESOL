@@ -9,22 +9,34 @@ import {
   UsersRound,
   Workflow,
 } from "lucide-react";
+import { useEffect, useMemo, useState } from "react";
 import ClickUpIntegrationCard from "../components/dashboard/ClickUpIntegrationCard";
 import EventCalendar from "../components/dashboard/EventCalendar";
 import KpiCard from "../components/dashboard/KpiCard";
+import MembersWorkload from "../components/dashboard/MembersWorkload";
 import PriorityDistribution from "../components/dashboard/PriorityDistribution";
 import RealtimeActivity from "../components/dashboard/RealtimeActivity";
 import ServiceActivity from "../components/dashboard/ServiceActivity";
 import ServiceDistribution from "../components/dashboard/ServiceDistribution";
+import ServicesOverview from "../components/dashboard/ServicesOverview";
 import TaskEvolutionChart from "../components/dashboard/TaskEvolutionChart";
 import UrgentTasks from "../components/dashboard/UrgentTasks";
 import WorkloadCard from "../components/dashboard/WorkloadCard";
 import { getInitials } from "../context/AuthContext";
+import { getDashboardStatistics } from "../services/dashboardService";
 
-const kpis = [
+const fallbackStatistics = {
+  total_projects: 18,
+  tasks_in_progress: 124,
+  tasks_completed: 87,
+  tasks_late: 9,
+  active_services: 6,
+};
+
+const kpiDefinitions = [
   {
     label: "Total Projets",
-    value: "18",
+    statKey: "total_projects",
     trend: "+12% ce mois",
     icon: FolderKanban,
     tone: "green",
@@ -32,7 +44,7 @@ const kpis = [
   },
   {
     label: "Tâches Actives",
-    value: "124",
+    statKey: "tasks_in_progress",
     trend: "+8% ce mois",
     icon: Workflow,
     tone: "blue",
@@ -40,7 +52,7 @@ const kpis = [
   },
   {
     label: "Tâches Terminées",
-    value: "87",
+    statKey: "tasks_completed",
     trend: "+15% ce mois",
     icon: CheckCircle2,
     tone: "purple",
@@ -48,7 +60,7 @@ const kpis = [
   },
   {
     label: "Tâches en Retard",
-    value: "9",
+    statKey: "tasks_late",
     trend: "-3% ce mois",
     icon: Clock3,
     tone: "red",
@@ -56,7 +68,7 @@ const kpis = [
   },
   {
     label: "Services Actifs",
-    value: "6",
+    statKey: "active_services",
     trend: "Stable",
     icon: Building2,
     tone: "orange",
@@ -66,6 +78,46 @@ const kpis = [
 
 function AdminDashboard({ currentUser }) {
   const displayName = currentUser?.prenom || currentUser?.first_name || currentUser?.email || "Admin";
+  const [statistics, setStatistics] = useState(fallbackStatistics);
+  const [statisticsLoading, setStatisticsLoading] = useState(true);
+  const [statisticsWarning, setStatisticsWarning] = useState("");
+
+  useEffect(() => {
+    let isMounted = true;
+
+    setStatisticsLoading(true);
+    setStatisticsWarning("");
+
+    getDashboardStatistics()
+      .then((data) => {
+        if (isMounted) {
+          setStatistics({ ...fallbackStatistics, ...data });
+        }
+      })
+      .catch((error) => {
+        console.error("Dashboard statistics error:", error);
+        if (isMounted) {
+          setStatistics(fallbackStatistics);
+          setStatisticsWarning("Statistiques temporairement indisponibles.");
+        }
+      })
+      .finally(() => {
+        if (isMounted) {
+          setStatisticsLoading(false);
+        }
+      });
+
+    return () => {
+      isMounted = false;
+    };
+  }, []);
+
+  const kpis = useMemo(() => {
+    return kpiDefinitions.map((kpi) => ({
+      ...kpi,
+      value: statisticsLoading ? "..." : String(statistics[kpi.statKey] ?? 0),
+    }));
+  }, [statistics, statisticsLoading]);
 
   return (
     <div className="dashboard-page">
@@ -94,11 +146,16 @@ function AdminDashboard({ currentUser }) {
         </div>
       </header>
 
+      {statisticsWarning && <p className="notice warning">{statisticsWarning}</p>}
+
       <section className="kpi-grid" aria-label="Indicateurs clés">
         {kpis.map((kpi) => (
           <KpiCard key={kpi.label} {...kpi} />
         ))}
       </section>
+
+      <ServicesOverview />
+      <MembersWorkload />
 
       <section className="dashboard-grid" aria-label="Tableau de bord analytique">
         <TaskEvolutionChart />

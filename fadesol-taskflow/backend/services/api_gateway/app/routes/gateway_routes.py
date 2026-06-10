@@ -1,21 +1,49 @@
 """Routes de proxy de l'API Gateway.
 
 Ces routes recoivent les appels du frontend puis les transmettent au service cible.
+Le gateway reste le point d'entree unique afin que le frontend ne connaisse pas les ports internes.
 """
 
+import json
 from urllib.error import HTTPError, URLError
 from urllib.request import Request as UrlRequest
 from urllib.request import urlopen
 
-from fastapi import APIRouter
-from fastapi import Request, Response
+from fastapi import APIRouter, Request, Response, WebSocket, WebSocketDisconnect
 from fastapi.responses import JSONResponse
 
 from app.core.config import settings
+from app.websocket_manager import gateway_ws_manager
 
 
 router = APIRouter(tags=["Gateway"])
 root_router = APIRouter(tags=["Gateway"])
+
+
+async def websocket_endpoint(websocket: WebSocket):
+    """Maintient une connexion WebSocket cote gateway pour la messagerie."""
+    await gateway_ws_manager.connect(websocket)
+
+    try:
+        await websocket.send_json({"type": "connected", "message": "Messagerie temps reel connectee."})
+
+        while True:
+            await websocket.receive_text()
+    except WebSocketDisconnect:
+        gateway_ws_manager.disconnect(websocket)
+
+
+async def broadcast_proxied_message(response: Response, event_type: str) -> None:
+    """Diffuse aux clients WebSocket les messages crees ou lus via le proxy HTTP."""
+    if response.status_code < 200 or response.status_code >= 300:
+        return
+
+    try:
+        payload = json.loads(response.body.decode("utf-8"))
+    except (AttributeError, json.JSONDecodeError, UnicodeDecodeError):
+        return
+
+    await gateway_ws_manager.broadcast({"type": event_type, "message": payload})
 
 
 async def proxy_request(request: Request, target_url: str, service_name: str):
@@ -94,13 +122,73 @@ def build_task_service_url(path: str = "") -> str:
 
 
 def build_service_fadesol_url(path: str = "") -> str:
-    """Construit l'URL cible de service_fadesol_service."""
+    """Construit l'URL cible de service_fadesol_service pour les routes /services-fadesol."""
     service_base_url = settings.SERVICE_FADESOL_URL.rstrip("/")
 
     if not path:
         return f"{service_base_url}/api/services-fadesol/"
 
     return f"{service_base_url}/api/services-fadesol/{path}"
+
+
+def build_fadesol_service_url(path: str = "") -> str:
+    """Construit l'URL cible de service_fadesol_service pour les routes /services."""
+    service_base_url = settings.SERVICE_FADESOL_URL.rstrip("/")
+
+    if not path:
+        return f"{service_base_url}/api/services/"
+
+    return f"{service_base_url}/api/services/{path}"
+
+
+def build_fadesol_service_health_url() -> str:
+    """Construit l'URL de healthcheck de service_fadesol_service."""
+    return f"{settings.SERVICE_FADESOL_URL.rstrip('/')}/health"
+
+
+def build_project_service_url(path: str = "") -> str:
+    """Construit l'URL cible de project_service."""
+    project_base_url = settings.PROJECT_SERVICE_URL.rstrip("/")
+
+    if not path:
+        return f"{project_base_url}/api/projects/"
+
+    return f"{project_base_url}/api/projects/{path}"
+
+
+def build_project_health_url() -> str:
+    """Construit l'URL de healthcheck de project_service."""
+    return f"{settings.PROJECT_SERVICE_URL.rstrip('/')}/health"
+
+
+def build_dashboard_service_url(path: str = "") -> str:
+    """Construit l'URL cible de dashboard_service."""
+    dashboard_base_url = settings.DASHBOARD_SERVICE_URL.rstrip("/")
+
+    if not path:
+        return f"{dashboard_base_url}/api/dashboard/"
+
+    return f"{dashboard_base_url}/api/dashboard/{path}"
+
+
+def build_dashboard_health_url() -> str:
+    """Construit l'URL de healthcheck de dashboard_service."""
+    return f"{settings.DASHBOARD_SERVICE_URL.rstrip('/')}/health"
+
+
+def build_message_service_url(path: str = "") -> str:
+    """Construit l'URL cible de message_service."""
+    message_base_url = settings.MESSAGE_SERVICE_URL.rstrip("/")
+
+    if not path:
+        return f"{message_base_url}/api/messages/"
+
+    return f"{message_base_url}/api/messages/{path}"
+
+
+def build_message_health_url() -> str:
+    """Construit l'URL de healthcheck de message_service."""
+    return f"{settings.MESSAGE_SERVICE_URL.rstrip('/')}/health"
 
 
 def build_clickup_service_url(path: str = "") -> str:
@@ -114,7 +202,7 @@ def build_clickup_service_url(path: str = "") -> str:
     return f"{clickup_base_url}/api/clickup/{path}"
 
 
-@router.get("/services")
+@router.get("/gateway/services")
 def list_services():
     """Retourne les URLs connues par le gateway pour diagnostic."""
     # Expose les URLs configurees afin de verifier rapidement le routage microservices.
@@ -184,6 +272,97 @@ async def proxy_api_services_fadesol(path: str, request: Request):
     return await proxy_request(request, build_service_fadesol_url(path), "Service Fadesol service")
 
 
+@router.api_route("/services", methods=["GET", "POST", "PUT", "PATCH", "DELETE"])
+async def proxy_api_services_root(request: Request):
+    """Proxy vers la racine /api/services."""
+    return await proxy_request(request, build_fadesol_service_url(), "Service Fadesol service")
+
+
+@router.get("/services/health")
+async def proxy_api_services_health(request: Request):
+    """Proxy vers le healthcheck de service_fadesol_service."""
+    return await proxy_request(request, build_fadesol_service_health_url(), "Service Fadesol service")
+
+
+@router.api_route("/services/{path:path}", methods=["GET", "POST", "PUT", "PATCH", "DELETE"])
+async def proxy_api_services(path: str, request: Request):
+    """Proxy vers les sous-routes /api/services/*."""
+    return await proxy_request(request, build_fadesol_service_url(path), "Service Fadesol service")
+
+
+@router.api_route("/projects", methods=["GET", "POST", "PUT", "PATCH", "DELETE"])
+async def proxy_api_projects_root(request: Request):
+    """Proxy vers la racine /api/projects."""
+    return await proxy_request(request, build_project_service_url(), "Project service")
+
+
+@router.get("/projects/health")
+async def proxy_api_projects_health(request: Request):
+    """Proxy vers le healthcheck de project_service."""
+    return await proxy_request(request, build_project_health_url(), "Project service")
+
+
+@router.api_route("/projects/{path:path}", methods=["GET", "POST", "PUT", "PATCH", "DELETE"])
+async def proxy_api_projects(path: str, request: Request):
+    """Proxy vers les sous-routes /api/projects/*."""
+    return await proxy_request(request, build_project_service_url(path), "Project service")
+
+
+@router.api_route("/dashboard", methods=["GET", "POST", "PUT", "PATCH", "DELETE"])
+async def proxy_api_dashboard_root(request: Request):
+    """Proxy vers la racine /api/dashboard."""
+    return await proxy_request(request, build_dashboard_service_url(), "Dashboard service")
+
+
+@router.get("/dashboard/health")
+async def proxy_api_dashboard_health(request: Request):
+    """Proxy vers le healthcheck de dashboard_service."""
+    return await proxy_request(request, build_dashboard_health_url(), "Dashboard service")
+
+
+@router.api_route("/dashboard/{path:path}", methods=["GET", "POST", "PUT", "PATCH", "DELETE"])
+async def proxy_api_dashboard(path: str, request: Request):
+    """Proxy vers les sous-routes /api/dashboard/*."""
+    return await proxy_request(request, build_dashboard_service_url(path), "Dashboard service")
+
+
+@router.api_route("/messages", methods=["GET", "POST", "PUT", "PATCH", "DELETE"])
+async def proxy_api_messages_root(request: Request):
+    """Proxy vers la racine /api/messages avec diffusion WebSocket apres creation."""
+    response = await proxy_request(request, build_message_service_url(), "Message service")
+
+    if request.method == "POST":
+        await broadcast_proxied_message(response, "message_created")
+
+    return response
+
+
+@router.get("/messages/health")
+async def proxy_api_messages_health(request: Request):
+    """Proxy vers le healthcheck de message_service."""
+    return await proxy_request(request, build_message_health_url(), "Message service")
+
+
+@router.api_route("/messages/{path:path}", methods=["GET", "POST", "PUT", "PATCH", "DELETE"])
+async def proxy_api_messages(path: str, request: Request):
+    """Proxy vers les sous-routes /api/messages/* avec evenements temps reel."""
+    response = await proxy_request(request, build_message_service_url(path), "Message service")
+
+    if request.method == "POST":
+        await broadcast_proxied_message(response, "message_created")
+
+    if request.method == "PATCH" and path.endswith("/lu"):
+        await broadcast_proxied_message(response, "message_read")
+
+    return response
+
+
+@router.websocket("/ws/messages")
+async def proxy_api_messages_websocket(websocket: WebSocket):
+    """WebSocket expose sous /api/ws/messages."""
+    await websocket_endpoint(websocket)
+
+
 @router.api_route("/clickup", methods=["GET", "POST", "PUT", "PATCH", "DELETE"])
 async def proxy_api_clickup_root(request: Request):
     """Proxy vers la racine /api/clickup."""
@@ -239,6 +418,97 @@ async def proxy_services_fadesol_root(request: Request):
 async def proxy_services_fadesol(path: str, request: Request):
     """Proxy racine sans prefixe /api pour /services-fadesol/*."""
     return await proxy_request(request, build_service_fadesol_url(path), "Service Fadesol service")
+
+
+@root_router.api_route("/services", methods=["GET", "POST", "PUT", "PATCH", "DELETE"])
+async def proxy_services_root(request: Request):
+    """Proxy racine sans prefixe /api pour /services."""
+    return await proxy_request(request, build_fadesol_service_url(), "Service Fadesol service")
+
+
+@root_router.get("/services/health")
+async def proxy_services_health(request: Request):
+    """Proxy racine sans prefixe /api pour /services/health."""
+    return await proxy_request(request, build_fadesol_service_health_url(), "Service Fadesol service")
+
+
+@root_router.api_route("/services/{path:path}", methods=["GET", "POST", "PUT", "PATCH", "DELETE"])
+async def proxy_services(path: str, request: Request):
+    """Proxy racine sans prefixe /api pour /services/*."""
+    return await proxy_request(request, build_fadesol_service_url(path), "Service Fadesol service")
+
+
+@root_router.api_route("/projects", methods=["GET", "POST", "PUT", "PATCH", "DELETE"])
+async def proxy_projects_root(request: Request):
+    """Proxy racine sans prefixe /api pour /projects."""
+    return await proxy_request(request, build_project_service_url(), "Project service")
+
+
+@root_router.get("/projects/health")
+async def proxy_projects_health(request: Request):
+    """Proxy racine sans prefixe /api pour /projects/health."""
+    return await proxy_request(request, build_project_health_url(), "Project service")
+
+
+@root_router.api_route("/projects/{path:path}", methods=["GET", "POST", "PUT", "PATCH", "DELETE"])
+async def proxy_projects(path: str, request: Request):
+    """Proxy racine sans prefixe /api pour /projects/*."""
+    return await proxy_request(request, build_project_service_url(path), "Project service")
+
+
+@root_router.api_route("/dashboard", methods=["GET", "POST", "PUT", "PATCH", "DELETE"])
+async def proxy_dashboard_root(request: Request):
+    """Proxy racine sans prefixe /api pour /dashboard."""
+    return await proxy_request(request, build_dashboard_service_url(), "Dashboard service")
+
+
+@root_router.get("/dashboard/health")
+async def proxy_dashboard_health(request: Request):
+    """Proxy racine sans prefixe /api pour /dashboard/health."""
+    return await proxy_request(request, build_dashboard_health_url(), "Dashboard service")
+
+
+@root_router.api_route("/dashboard/{path:path}", methods=["GET", "POST", "PUT", "PATCH", "DELETE"])
+async def proxy_dashboard(path: str, request: Request):
+    """Proxy racine sans prefixe /api pour /dashboard/*."""
+    return await proxy_request(request, build_dashboard_service_url(path), "Dashboard service")
+
+
+@root_router.api_route("/messages", methods=["GET", "POST", "PUT", "PATCH", "DELETE"])
+async def proxy_messages_root(request: Request):
+    """Proxy racine sans prefixe /api pour /messages."""
+    response = await proxy_request(request, build_message_service_url(), "Message service")
+
+    if request.method == "POST":
+        await broadcast_proxied_message(response, "message_created")
+
+    return response
+
+
+@root_router.get("/messages/health")
+async def proxy_messages_health(request: Request):
+    """Proxy racine sans prefixe /api pour /messages/health."""
+    return await proxy_request(request, build_message_health_url(), "Message service")
+
+
+@root_router.api_route("/messages/{path:path}", methods=["GET", "POST", "PUT", "PATCH", "DELETE"])
+async def proxy_messages(path: str, request: Request):
+    """Proxy racine sans prefixe /api pour /messages/*."""
+    response = await proxy_request(request, build_message_service_url(path), "Message service")
+
+    if request.method == "POST":
+        await broadcast_proxied_message(response, "message_created")
+
+    if request.method == "PATCH" and path.endswith("/lu"):
+        await broadcast_proxied_message(response, "message_read")
+
+    return response
+
+
+@root_router.websocket("/ws/messages")
+async def proxy_messages_websocket(websocket: WebSocket):
+    """WebSocket expose sous /ws/messages."""
+    await websocket_endpoint(websocket)
 
 
 @root_router.api_route("/clickup", methods=["GET", "POST", "PUT", "PATCH", "DELETE"])
