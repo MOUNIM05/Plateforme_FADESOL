@@ -1,31 +1,61 @@
-import { useCallback, useEffect, useMemo, useState } from "react";
+import { useEffect, useMemo, useState } from "react";
+import {
+  CheckCircle2,
+  Edit3,
+  Eye,
+  Plus,
+  Search,
+  ShieldCheck,
+  Trash2,
+  UsersRound,
+  X,
+} from "lucide-react";
+import { ROLES, getInitials, getRoleLabel, normalizeRole, useAuth } from "../context/AuthContext";
 import {
   createUser,
   deleteUser,
+  getUserById,
+  getUserPermissions,
   getUsers,
   updateUser,
 } from "../services/userService";
+import { DATA_EVENTS, dispatchDataChanged } from "../utils/dataEvents";
 
 const emptyForm = {
-  first_name: "",
-  last_name: "",
+  prenom: "",
+  nom: "",
   email: "",
   password: "",
-  role: "Employé",
-  service_id: "",
-  is_active: true,
+  role: ROLES.EMPLOYEE,
+  id_service: "",
+  est_actif: true,
 };
 
-const roles = ["Administrateur", "Manager", "Employé"];
+const roleOptions = [
+  { label: "Administrateur", value: ROLES.ADMIN },
+  { label: "Manager", value: ROLES.MANAGER },
+  { label: "Employé", value: ROLES.EMPLOYEE },
+];
+
+const serviceOptions = [
+  { label: "Aucun service", value: "" },
+  { label: "Commercial", value: "Commercial" },
+  { label: "Technique", value: "Technique" },
+  { label: "Achat", value: "Achat" },
+  { label: "Magasin Stock", value: "MagasinStock" },
+  { label: "Comptabilité Management", value: "ComptabiliteManagement" },
+  { label: "Direction RH Administration", value: "DirectionRHAdministration" },
+];
 
 function normalizePayload(formData, includePassword = true) {
   const payload = {
-    first_name: formData.first_name.trim(),
-    last_name: formData.last_name.trim(),
+    prenom: formData.prenom.trim(),
+    nom: formData.nom.trim(),
     email: formData.email.trim(),
     role: formData.role,
-    service_id: formData.service_id === "" ? null : Number(formData.service_id),
-    is_active: formData.is_active,
+    id_service: formData.id_service === "" ? null : formData.id_service,
+    service: formData.id_service === "" ? null : formData.id_service,
+    est_actif: formData.est_actif,
   };
 
   if (includePassword) {
@@ -35,24 +65,78 @@ function normalizePayload(formData, includePassword = true) {
   return payload;
 }
 
-function Users({ currentUser, onLogout }) {
+function getUserFullName(user) {
+  const name = `${user?.prenom || user?.first_name || ""} ${user?.nom || user?.last_name || ""}`.trim();
+
+  return name || user?.email || "Utilisateur";
+}
+
+function getUserService(user) {
+  return user?.service_name || user?.service || user?.id_service || user?.service_id || "Non renseigné";
+}
+
+function getUserStatus(user) {
+  return user?.est_actif ?? user?.is_active ? "Actif" : "Désactivé";
+}
+
+function formatUserDate(value) {
+  if (!value) {
+    return "Non renseigné";
+  }
+
+  const date = new Date(value);
+
+  if (Number.isNaN(date.getTime())) {
+    return "Non renseigné";
+  }
+
+  return date.toLocaleDateString("fr-FR", {
+    day: "2-digit",
+    month: "short",
+    year: "numeric",
+  });
+}
+
+function getFieldValue(...values) {
+  const value = values.find((item) => item !== undefined && item !== null && item !== "");
+
+  return value ?? "Non renseigné";
+}
+
+function Users() {
+  const { currentUser, hasPermission, logout } = useAuth();
   const [users, setUsers] = useState([]);
   const [formData, setFormData] = useState(emptyForm);
   const [editingUserId, setEditingUserId] = useState(null);
   const [roleFilter, setRoleFilter] = useState("");
   const [serviceFilter, setServiceFilter] = useState("");
+  const [searchQuery, setSearchQuery] = useState("");
+  const [selectedUser, setSelectedUser] = useState(null);
+  const [detailsOpen, setDetailsOpen] = useState(false);
+  const [detailsUser, setDetailsUser] = useState(null);
+  const [detailsPermissions, setDetailsPermissions] = useState({});
+  const [detailsLoading, setDetailsLoading] = useState(false);
+  const [detailsError, setDetailsError] = useState("");
   const [message, setMessage] = useState("");
   const [error, setError] = useState("");
-  const [loading, setLoading] = useState(false);
+  const [loading, setLoading] = useState(true);
+  const canCreateUsers = hasPermission("users.create");
+  const canUpdateUsers = hasPermission("users.update");
+  const canDeleteUsers = hasPermission("users.delete");
+  const canViewUserPermissions = hasPermission("settings.permissions.manage");
+  const canManageUsers = canCreateUsers || canUpdateUsers || canDeleteUsers;
 
-  const loadUsers = useCallback(async function loadUsers() {
+  async function loadUsers({ showLoading = true } = {}) {
     setError("");
     setMessage("");
-    setLoading(true);
+    if (showLoading) {
+      setLoading(true);
+    }
 
     try {
       const data = await getUsers();
       setUsers(data);
+      setSelectedUser((current) => current || data[0] || null);
     } catch (err) {
       console.error("Load users error:", err);
 
@@ -66,24 +150,66 @@ function Users({ currentUser, onLogout }) {
     } finally {
       setLoading(false);
     }
-  }, []);
+  }
 
   useEffect(() => {
-    // Users are fetched once when the page is opened from the premium sidebar.
-    // eslint-disable-next-line react-hooks/set-state-in-effect
-    loadUsers();
-  }, [loadUsers]);
+    let isMounted = true;
+
+    getUsers()
+      .then((data) => {
+        if (isMounted) {
+          setUsers(data);
+          setSelectedUser(data[0] || null);
+        }
+      })
+      .catch((err) => {
+        console.error("Load users error:", err);
+
+        if (!isMounted) {
+          return;
+        }
+
+        if (err.response?.status === 403) {
+          setError("Accès refusé : votre rôle ne permet pas de consulter les utilisateurs.");
+        } else if (err.response?.status === 401) {
+          setError("Non authentifié : veuillez vous connecter.");
+        } else {
+          setError("Impossible de charger les utilisateurs.");
+        }
+      })
+      .finally(() => {
+        if (isMounted) {
+          setLoading(false);
+        }
+      });
+
+    return () => {
+      isMounted = false;
+    };
+  }, []);
 
   const filteredUsers = useMemo(() => {
     return users.filter((user) => {
-      const matchesRole = roleFilter === "" || user.role === roleFilter;
+      const fullName = `${user.prenom || user.first_name || ""} ${user.nom || user.last_name || ""}`;
+      const searchable = `${fullName} ${user.email || ""}`.toLowerCase();
+      const matchesSearch = searchable.includes(searchQuery.trim().toLowerCase());
+      const matchesRole = roleFilter === "" || normalizeRole(user.role) === roleFilter;
       const matchesService =
         serviceFilter === "" ||
-        String(user.service_id ?? "") === String(serviceFilter);
+        String(user.id_service ?? user.service_id ?? "") === String(serviceFilter);
 
-      return matchesRole && matchesService;
+      return matchesSearch && matchesRole && matchesService;
     });
-  }, [users, roleFilter, serviceFilter]);
+  }, [users, roleFilter, serviceFilter, searchQuery]);
+
+  const userStats = useMemo(() => {
+    return {
+      total: users.length,
+      admins: users.filter((user) => normalizeRole(user.role) === ROLES.ADMIN).length,
+      managers: users.filter((user) => normalizeRole(user.role) === ROLES.MANAGER).length,
+      employees: users.filter((user) => normalizeRole(user.role) === ROLES.EMPLOYEE).length,
+    };
+  }, [users]);
 
   function handleChange(event) {
     const { name, value, type, checked } = event.target;
@@ -95,17 +221,18 @@ function Users({ currentUser, onLogout }) {
   }
 
   function startEdit(user) {
+    setSelectedUser(user);
     setEditingUserId(user.id);
     setMessage("");
     setError("");
     setFormData({
-      first_name: user.first_name,
-      last_name: user.last_name,
+      prenom: user.prenom || user.first_name || "",
+      nom: user.nom || user.last_name || "",
       email: user.email,
       password: "",
       role: user.role,
-      service_id: user.service_id ?? "",
-      is_active: user.is_active,
+      id_service: user.service || user.id_service || user.service_id || "",
+      est_actif: user.est_actif ?? user.is_active ?? true,
     });
   }
 
@@ -114,22 +241,88 @@ function Users({ currentUser, onLogout }) {
     setFormData(emptyForm);
   }
 
+  async function openUserDetails(user) {
+    setSelectedUser(user);
+    setDetailsUser(user);
+    setDetailsPermissions({});
+    setDetailsError("");
+    setDetailsOpen(true);
+    setDetailsLoading(true);
+
+    const requests = [
+      getUserById(user.id),
+      canViewUserPermissions ? getUserPermissions(user.id) : Promise.resolve({ permissions: {} }),
+    ];
+
+    const [userResult, permissionsResult] = await Promise.allSettled(requests);
+
+    if (userResult.status === "fulfilled") {
+      setDetailsUser(userResult.value);
+    } else {
+      setDetailsUser(user);
+      setDetailsError("Impossible de charger les détails de l’utilisateur.");
+    }
+
+    if (permissionsResult.status === "fulfilled") {
+      setDetailsPermissions(permissionsResult.value?.permissions || {});
+    } else {
+      setDetailsPermissions({});
+    }
+
+    setDetailsLoading(false);
+  }
+
+  function closeUserDetails() {
+    setDetailsOpen(false);
+    setDetailsError("");
+  }
+
+  function editDetailsUser() {
+    if (!detailsUser || !canUpdateUsers) {
+      return;
+    }
+
+    startEdit(detailsUser);
+    closeUserDetails();
+  }
+
+  async function deleteDetailsUser() {
+    if (!detailsUser || !canDeleteUsers) {
+      return;
+    }
+
+    const deleted = await handleDelete(detailsUser.id);
+
+    if (deleted) {
+      closeUserDetails();
+    }
+  }
+
   async function handleSubmit(event) {
     event.preventDefault();
+
+    if ((editingUserId && !canUpdateUsers) || (!editingUserId && !canCreateUsers)) {
+      setError("Accès refusé : vous n'avez pas l'autorisation de modifier les utilisateurs.");
+      return;
+    }
+
     setError("");
     setMessage("");
 
     try {
       if (editingUserId) {
-        await updateUser(editingUserId, normalizePayload(formData, false));
+        const updatedUser = await updateUser(editingUserId, normalizePayload(formData, false));
+        setSelectedUser(updatedUser);
         setMessage("Utilisateur modifié avec succès.");
       } else {
-        await createUser(normalizePayload(formData, true));
+        const createdUser = await createUser(normalizePayload(formData, true));
+        setSelectedUser(createdUser);
         setMessage("Utilisateur créé avec succès.");
       }
 
       resetForm();
       await loadUsers();
+      dispatchDataChanged(DATA_EVENTS.USERS_CHANGED);
     } catch (err) {
       console.error("Save user error:", err);
 
@@ -142,12 +335,17 @@ function Users({ currentUser, onLogout }) {
   }
 
   async function handleDelete(userId) {
+    if (!canDeleteUsers) {
+      setError("Accès refusé : vous n'avez pas l'autorisation de supprimer un utilisateur.");
+      return false;
+    }
+
     const confirmed = window.confirm(
       "Confirmer la suppression de cet utilisateur ? Ne supprimez pas le compte Admin principal."
     );
 
     if (!confirmed) {
-      return;
+      return false;
     }
 
     setError("");
@@ -155,8 +353,11 @@ function Users({ currentUser, onLogout }) {
 
     try {
       await deleteUser(userId);
+      setSelectedUser((current) => (current?.id === userId ? null : current));
       setMessage("Utilisateur supprimé avec succès.");
       await loadUsers();
+      dispatchDataChanged(DATA_EVENTS.USERS_CHANGED);
+      return true;
     } catch (err) {
       console.error("Delete user error:", err);
 
@@ -167,8 +368,13 @@ function Users({ currentUser, onLogout }) {
       } else {
         setError("Erreur pendant la suppression.");
       }
+
+      return false;
     }
   }
+
+  const permissionEntries = Object.entries(detailsPermissions);
+  const allowedPermissionsCount = permissionEntries.filter(([, allowed]) => allowed).length;
 
   return (
     <div className="users-view">
@@ -177,7 +383,7 @@ function Users({ currentUser, onLogout }) {
           <h2>Gestion des utilisateurs</h2>
           <p>
             {currentUser
-              ? `Connecté : ${currentUser.email}`
+              ? `${getRoleLabel(currentUser.role)} connecté : ${currentUser.email}`
               : "Gestion des comptes internes"}
           </p>
         </div>
@@ -185,7 +391,7 @@ function Users({ currentUser, onLogout }) {
           <button onClick={loadUsers} className="secondary-action" type="button">
             Actualiser
           </button>
-          <button onClick={onLogout} className="logout-action" type="button">
+          <button onClick={logout} className="logout-action" type="button">
             Déconnexion
           </button>
         </div>
@@ -193,22 +399,52 @@ function Users({ currentUser, onLogout }) {
 
       {message && <p className="notice success">{message}</p>}
       {error && <p className="notice error">{error}</p>}
+      {!canManageUsers && (
+        <p className="notice warning">
+          Mode lecture seule : vous pouvez consulter les utilisateurs, mais pas les modifier.
+        </p>
+      )}
+
+      <section className="users-stats-grid" aria-label="Résumé utilisateurs">
+        <article className="workspace-panel user-stat-card">
+          <UsersRound size={20} />
+          <span>Total utilisateurs</span>
+          <strong>{userStats.total}</strong>
+        </article>
+        <article className="workspace-panel user-stat-card">
+          <ShieldCheck size={20} />
+          <span>Admins</span>
+          <strong>{userStats.admins}</strong>
+        </article>
+        <article className="workspace-panel user-stat-card">
+          <Edit3 size={20} />
+          <span>Managers</span>
+          <strong>{userStats.managers}</strong>
+        </article>
+        <article className="workspace-panel user-stat-card">
+          <CheckCircle2 size={20} />
+          <span>Employés</span>
+          <strong>{userStats.employees}</strong>
+        </article>
+      </section>
 
       <section className="management-grid">
+        <div className="user-side-stack">
+        {(canCreateUsers || (editingUserId && canUpdateUsers)) && (
         <form onSubmit={handleSubmit} className="workspace-panel user-form">
           <div className="panel-title">
-            <h3>{editingUserId ? "Modifier utilisateur" : "Créer utilisateur"}</h3>
+            <h3>{editingUserId ? "Modifier le profil" : "Ajouter utilisateur"}</h3>
             {editingUserId && <button type="button" onClick={resetForm}>Annuler</button>}
           </div>
 
           <div className="form-grid">
             <label>
               Prénom
-              <input name="first_name" value={formData.first_name} onChange={handleChange} required />
+              <input name="prenom" value={formData.prenom} onChange={handleChange} required />
             </label>
             <label>
               Nom
-              <input name="last_name" value={formData.last_name} onChange={handleChange} required />
+              <input name="nom" value={formData.nom} onChange={handleChange} required />
             </label>
             <label>
               Email
@@ -217,37 +453,102 @@ function Users({ currentUser, onLogout }) {
             {!editingUserId && (
               <label>
                 Mot de passe
-                <input name="password" type="password" value={formData.password} onChange={handleChange} required />
+                <input
+                  name="password"
+                  type="password"
+                  minLength={6}
+                  value={formData.password}
+                  onChange={handleChange}
+                  placeholder="Minimum 6 caractères"
+                  required
+                />
               </label>
             )}
             <label>
               Rôle
               <select name="role" value={formData.role} onChange={handleChange}>
-                {roles.map((role) => (
-                  <option key={role} value={role}>{role}</option>
+                {roleOptions.map((role) => (
+                  <option key={role.value} value={role.value}>{role.label}</option>
                 ))}
               </select>
             </label>
             <label>
               Service
-              <select name="service_id" value={formData.service_id} onChange={handleChange}>
-                <option value="">Aucun service</option>
-                <option value="1">Service 1</option>
-                <option value="2">Service 2</option>
-                <option value="3">Service 3</option>
+              <select name="id_service" value={formData.id_service} onChange={handleChange}>
+                {serviceOptions.map((service) => (
+                  <option key={service.value || "none"} value={service.value}>
+                    {service.label}
+                  </option>
+                ))}
               </select>
             </label>
           </div>
 
           <label className="toggle-line">
-            <input name="is_active" type="checkbox" checked={formData.is_active} onChange={handleChange} />
+            <input name="est_actif" type="checkbox" checked={formData.est_actif} onChange={handleChange} />
             Compte actif
           </label>
 
           <button type="submit" className="primary-action">
-            {editingUserId ? "Modifier" : "Créer"}
+            {editingUserId ? <Edit3 size={17} /> : <Plus size={17} />}
+            {editingUserId ? "Modifier profil" : "Créer utilisateur"}
           </button>
         </form>
+        )}
+
+        <section className="workspace-panel selected-profile-card">
+          <div className="panel-title">
+            <h3>Profil sélectionné</h3>
+            {selectedUser && <span>ID #{selectedUser.id}</span>}
+          </div>
+
+          {selectedUser ? (
+            <>
+              <div className="selected-profile-card__head">
+                <div className="profile-avatar-large">{getInitials(selectedUser)}</div>
+                <div>
+                  <h4>{selectedUser.prenom || selectedUser.first_name} {selectedUser.nom || selectedUser.last_name}</h4>
+                  <p>{selectedUser.email}</p>
+                </div>
+              </div>
+
+              <dl className="details-list compact">
+                <div>
+                  <dt>Rôle</dt>
+                  <dd>{getRoleLabel(selectedUser.role)}</dd>
+                </div>
+                <div>
+                  <dt>Service</dt>
+                  <dd>{selectedUser.service || selectedUser.id_service || selectedUser.service_id || "Non affecté"}</dd>
+                </div>
+                <div>
+                  <dt>Statut</dt>
+                  <dd>{selectedUser.est_actif ?? selectedUser.is_active ? "Actif" : "Désactivé"}</dd>
+                </div>
+              </dl>
+
+              {canManageUsers && (
+                <div className="profile-card-actions">
+                  {canUpdateUsers && (
+                    <button type="button" className="secondary-action" onClick={() => startEdit(selectedUser)}>
+                      <Edit3 size={16} />
+                      Modifier
+                    </button>
+                  )}
+                  {canDeleteUsers && (
+                    <button type="button" className="logout-action" onClick={() => handleDelete(selectedUser.id)}>
+                      <Trash2 size={16} />
+                      Supprimer
+                    </button>
+                  )}
+                </div>
+              )}
+            </>
+          ) : (
+            <p className="helper-text">Sélectionnez un utilisateur pour voir son profil ici.</p>
+          )}
+        </section>
+        </div>
 
         <section className="workspace-panel user-list-panel">
           <div className="panel-title">
@@ -256,17 +557,30 @@ function Users({ currentUser, onLogout }) {
           </div>
 
           <div className="filters-row">
+            <label className="search-filter">
+              <Search size={17} />
+              <input
+                type="search"
+                value={searchQuery}
+                onChange={(event) => setSearchQuery(event.target.value)}
+                placeholder="Rechercher nom ou email"
+              />
+            </label>
             <select value={roleFilter} onChange={(event) => setRoleFilter(event.target.value)}>
               <option value="">Tous les rôles</option>
-              {roles.map((role) => (
-                <option key={role} value={role}>{role}</option>
+              {roleOptions.map((role) => (
+                <option key={role.value} value={role.value}>{role.label}</option>
               ))}
             </select>
             <select value={serviceFilter} onChange={(event) => setServiceFilter(event.target.value)}>
               <option value="">Tous les services</option>
-              <option value="1">Service 1</option>
-              <option value="2">Service 2</option>
-              <option value="3">Service 3</option>
+              {serviceOptions
+                .filter((service) => service.value)
+                .map((service) => (
+                  <option key={service.value} value={service.value}>
+                    {service.label}
+                  </option>
+                ))}
             </select>
           </div>
 
@@ -281,13 +595,27 @@ function Users({ currentUser, onLogout }) {
 
             {filteredUsers.map((user) => (
               <div className="table-row" key={user.id}>
-                <span>{user.first_name} {user.last_name}</span>
+                <span>{user.prenom || user.first_name} {user.nom || user.last_name}</span>
                 <span>{user.email}</span>
-                <span><mark>{user.role}</mark></span>
-                <span>{user.service_id ?? "Aucun"}</span>
+                <span><mark>{getRoleLabel(user.role)}</mark></span>
+                <span>{user.service || user.id_service || user.service_id || "Aucun"}</span>
                 <span className="row-actions">
-                  <button type="button" onClick={() => startEdit(user)}>Modifier</button>
-                  <button type="button" onClick={() => handleDelete(user.id)}>Supprimer</button>
+                  <button type="button" onClick={() => openUserDetails(user)}>
+                    <Eye size={15} />
+                    Voir
+                  </button>
+                  {canUpdateUsers && (
+                    <button type="button" onClick={() => startEdit(user)}>
+                      <Edit3 size={15} />
+                      Modifier
+                    </button>
+                  )}
+                  {canDeleteUsers && (
+                    <button type="button" onClick={() => handleDelete(user.id)}>
+                      <Trash2 size={15} />
+                      Supprimer
+                    </button>
+                  )}
                 </span>
               </div>
             ))}
@@ -299,7 +627,7 @@ function Users({ currentUser, onLogout }) {
                   <span />
                   <span />
                 </div>
-                <strong>Aucun utilisateur</strong>
+                <strong>This Folder is empty</strong>
                 <p>Aucun utilisateur trouvé pour ces filtres.</p>
               </div>
             )}
@@ -308,6 +636,141 @@ function Users({ currentUser, onLogout }) {
           </div>
         </section>
       </section>
+
+      {detailsOpen && (
+        <div
+          className="user-details-modal-backdrop"
+          onMouseDown={(event) => {
+            if (event.target === event.currentTarget) {
+              closeUserDetails();
+            }
+          }}
+        >
+          <article className="user-details-modal" role="dialog" aria-modal="true">
+            <header className="user-details-modal__header">
+              <div className="user-details-modal__identity">
+                <div className="profile-avatar-large">
+                  {detailsUser ? getInitials(detailsUser) : "?"}
+                </div>
+                <div>
+                  <p>Détails utilisateur</p>
+                  <h3>{detailsUser ? getUserFullName(detailsUser) : "Utilisateur"}</h3>
+                  <span>{detailsUser?.email || "Non renseigné"}</span>
+                </div>
+              </div>
+              <button
+                type="button"
+                className="user-details-modal__close"
+                aria-label="Fermer"
+                onClick={closeUserDetails}
+              >
+                <X size={18} />
+              </button>
+            </header>
+
+            {detailsLoading ? (
+              <p className="loading-line">Chargement des détails utilisateur...</p>
+            ) : (
+              <>
+                {detailsError && <p className="notice error">{detailsError}</p>}
+
+                <section className="user-details-modal__section">
+                  <h4>Informations principales</h4>
+                  <dl className="user-details-grid">
+                    <div>
+                      <dt>Nom complet</dt>
+                      <dd>{getUserFullName(detailsUser)}</dd>
+                    </div>
+                    <div>
+                      <dt>Email</dt>
+                      <dd>{getFieldValue(detailsUser?.email)}</dd>
+                    </div>
+                    <div>
+                      <dt>Rôle</dt>
+                      <dd>{detailsUser ? getRoleLabel(detailsUser.role) : "Non renseigné"}</dd>
+                    </div>
+                    <div>
+                      <dt>Service</dt>
+                      <dd>{getUserService(detailsUser)}</dd>
+                    </div>
+                    <div>
+                      <dt>Statut</dt>
+                      <dd>{detailsUser ? getUserStatus(detailsUser) : "Non renseigné"}</dd>
+                    </div>
+                    <div>
+                      <dt>Téléphone</dt>
+                      <dd>{getFieldValue(detailsUser?.phone, detailsUser?.telephone, detailsUser?.tel)}</dd>
+                    </div>
+                    <div>
+                      <dt>Créé le</dt>
+                      <dd>{formatUserDate(detailsUser?.created_at || detailsUser?.date_creation)}</dd>
+                    </div>
+                    <div>
+                      <dt>Mis à jour le</dt>
+                      <dd>{formatUserDate(detailsUser?.updated_at || detailsUser?.date_modification)}</dd>
+                    </div>
+                  </dl>
+                </section>
+
+                <section className="user-details-modal__section">
+                  <h4>Informations complémentaires</h4>
+                  <dl className="user-details-grid">
+                    <div>
+                      <dt>Permissions actives</dt>
+                      <dd>
+                        {permissionEntries.length > 0
+                          ? `${allowedPermissionsCount}/${permissionEntries.length}`
+                          : "Non renseigné"}
+                      </dd>
+                    </div>
+                    <div>
+                      <dt>Projets assignés</dt>
+                      <dd>{getFieldValue(detailsUser?.projects_count, detailsUser?.assigned_projects_count)}</dd>
+                    </div>
+                    <div>
+                      <dt>Tâches assignées</dt>
+                      <dd>{getFieldValue(detailsUser?.tasks_count, detailsUser?.assigned_tasks_count)}</dd>
+                    </div>
+                    <div>
+                      <dt>Dernière activité</dt>
+                      <dd>{formatUserDate(detailsUser?.last_activity_at || detailsUser?.last_login_at)}</dd>
+                    </div>
+                  </dl>
+
+                  {permissionEntries.length > 0 && (
+                    <div className="user-permission-summary">
+                      {permissionEntries
+                        .filter(([, allowed]) => allowed)
+                        .slice(0, 8)
+                        .map(([permission]) => (
+                          <span key={permission}>{permission}</span>
+                        ))}
+                    </div>
+                  )}
+                </section>
+              </>
+            )}
+
+            <footer className="user-details-modal__footer">
+              <button type="button" className="secondary-action" onClick={closeUserDetails}>
+                Fermer
+              </button>
+              {canUpdateUsers && (
+                <button type="button" className="secondary-action" onClick={editDetailsUser}>
+                  <Edit3 size={16} />
+                  Modifier
+                </button>
+              )}
+              {canDeleteUsers && (
+                <button type="button" className="logout-action" onClick={deleteDetailsUser}>
+                  <Trash2 size={16} />
+                  Supprimer
+                </button>
+              )}
+            </footer>
+          </article>
+        </div>
+      )}
     </div>
   );
 }

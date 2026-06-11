@@ -6,8 +6,22 @@ from shared.enums import StatutProjet
 from shared.exceptions import not_found
 
 
-def list_projects(db: Session, skip: int = 0, limit: int = 100) -> list[Projet]:
-    return db.query(Projet).offset(skip).limit(limit).all()
+def list_projects(
+    db: Session,
+    skip: int = 0,
+    limit: int = 100,
+    service_id: str | None = None,
+    status: str | None = None,
+) -> list[Projet]:
+    query = db.query(Projet)
+
+    if service_id:
+        query = query.filter(Projet.service_id == service_id)
+
+    if status:
+        query = query.filter(Projet.statut == status)
+
+    return query.offset(skip).limit(limit).all()
 
 
 def get_project(db: Session, project_id: str) -> Projet | None:

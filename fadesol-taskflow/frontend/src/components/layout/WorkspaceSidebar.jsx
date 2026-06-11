@@ -84,7 +84,6 @@ const moduleSubFunctions = {
 };
 
 function WorkspaceSidebar({
-  services,
   modules,
   selectedModule,
   onSelectModule,

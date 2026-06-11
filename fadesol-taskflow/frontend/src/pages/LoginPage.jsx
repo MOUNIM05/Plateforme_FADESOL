@@ -1,18 +1,27 @@
 import { useState } from "react";
+import { Navigate, useLocation, useNavigate } from "react-router-dom";
 import { Eye, EyeOff, LockKeyhole, Mail } from "lucide-react";
-import { getCurrentUser, loginUser } from "../services/authService";
+import { getDashboardPath, useAuth } from "../context/AuthContext";
 import { API_BASE_URL } from "../services/api";
 import fadesolLogo from "../assets/fadesol-logo.png";
 import loginBackground from "../assets/login-energy-bg.png";
 import "../styles/login.css";
 
-function LoginPage({ onLoginSuccess }) {
+function LoginPage() {
+  const navigate = useNavigate();
+  const location = useLocation();
+  const { isAuthenticated, login } = useAuth();
   const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
   const [rememberMe, setRememberMe] = useState(false);
   const [showPassword, setShowPassword] = useState(false);
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState("");
+  const from = location.state?.from?.pathname || getDashboardPath();
+
+  if (isAuthenticated) {
+    return <Navigate to={getDashboardPath()} replace />;
+  }
 
   async function handleSubmit(event) {
     event.preventDefault();
@@ -20,15 +29,9 @@ function LoginPage({ onLoginSuccess }) {
     setLoading(true);
 
     try {
-      // Connexion réelle au backend FastAPI de Fadesol TaskFlow.
-      const data = await loginUser(email, password);
-
-      // Le JWT est utilisé ensuite par Axios pour les routes protégées.
-      localStorage.setItem("access_token", data.access_token);
-
-      // On vérifie l'identité connectée et le rôle juste après le login.
-      const currentUser = await getCurrentUser();
-      onLoginSuccess(currentUser);
+      // AuthContext stocke le JWT, charge /auth/me, puis expose le rôle aux routes.
+      await login(email, password);
+      navigate(from, { replace: true });
     } catch (err) {
       console.error("Login error:", err);
 

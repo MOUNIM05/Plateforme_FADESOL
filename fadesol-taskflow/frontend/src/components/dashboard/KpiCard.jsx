@@ -3,20 +3,26 @@ function KpiCard({ icon: Icon, label, value, trend, tone = "green", sparkline = 
 
   return (
     <article className="kpi-card">
-      <div className={`kpi-card__icon is-${tone}`}>
-        <Icon size={22} />
-      </div>
-      <div className="kpi-card__copy">
+      <div className="kpi-card__top">
+        <div className={`kpi-card__icon is-${tone}`}>
+          <Icon size={20} />
+        </div>
         <p>{label}</p>
+      </div>
+
+      <div className="kpi-card__middle">
         <strong>{value}</strong>
+      </div>
+
+      <div className="kpi-card__bottom">
         <span className={`kpi-card__trend is-${trend.startsWith("-") ? "red" : tone}`}>
           {trend}
         </span>
-      </div>
-      <div className="kpi-card__sparkline" aria-hidden="true">
-        {points.map((point, index) => (
-          <i key={`${point}-${index}`} style={{ height: `${point}%` }} />
-        ))}
+        <div className="kpi-card__sparkline" aria-hidden="true">
+          {points.map((point, index) => (
+            <i key={`${point}-${index}`} style={{ height: `${point}%` }} />
+          ))}
+        </div>
       </div>
     </article>
   );

@@ -1,16 +1,19 @@
-from fastapi import APIRouter, Depends
+from fastapi import APIRouter, Depends, WebSocket, WebSocketDisconnect
 from sqlalchemy.orm import Session
 
 from app.db.database import get_db
-from app.schemas.message_schema import MessageCreate, MessageResponse, MessageUpdate
+from app.schemas.message_schema import ConversationDetail, ConversationSummary, MessageCreate, MessageResponse, MessageUpdate
 from app.services.message_service import (
     create_message,
+    get_conversation,
     get_message,
+    list_conversations,
     list_by_field,
     list_messages,
     mark_as_read,
     update_message,
 )
+from app.websocket_manager import message_ws_manager
 from shared.exceptions import not_found
 
 
@@ -23,8 +26,28 @@ def list_all(skip: int = 0, limit: int = 100, db: Session = Depends(get_db)):
 
 
 @router.post("/", response_model=MessageResponse)
-def send(payload: MessageCreate, db: Session = Depends(get_db)):
-    return create_message(db, payload)
+async def send(payload: MessageCreate, db: Session = Depends(get_db)):
+    message = create_message(db, payload)
+    response = MessageResponse.model_validate(message)
+
+    await message_ws_manager.broadcast(
+        {
+            "type": "message_created",
+            "message": response.model_dump(mode="json"),
+        }
+    )
+
+    return response
+
+
+@router.get("/conversations", response_model=list[ConversationSummary])
+def conversations(db: Session = Depends(get_db)):
+    return list_conversations(db)
+
+
+@router.get("/conversations/{conversation_id}", response_model=ConversationDetail)
+def conversation_detail(conversation_id: str, db: Session = Depends(get_db)):
+    return get_conversation(db, conversation_id)
 
 
 @router.get("/utilisateur/{utilisateur_id}", response_model=list[MessageResponse])
@@ -63,5 +86,28 @@ def update(message_id: str, payload: MessageUpdate, db: Session = Depends(get_db
 
 
 @router.patch("/{message_id}/lu", response_model=MessageResponse)
-def read(message_id: str, db: Session = Depends(get_db)):
-    return mark_as_read(db, message_id)
+async def read(message_id: str, db: Session = Depends(get_db)):
+    message = mark_as_read(db, message_id)
+    response = MessageResponse.model_validate(message)
+
+    await message_ws_manager.broadcast(
+        {
+            "type": "message_read",
+            "message": response.model_dump(mode="json"),
+        }
+    )
+
+    return response
+
+
+@router.websocket("/ws/messages")
+async def messages_websocket(websocket: WebSocket):
+    await message_ws_manager.connect(websocket)
+
+    try:
+        await websocket.send_json({"type": "connected", "message": "Messagerie temps réel connectée."})
+
+        while True:
+            await websocket.receive_text()
+    except WebSocketDisconnect:
+        message_ws_manager.disconnect(websocket)

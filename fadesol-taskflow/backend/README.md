@@ -80,10 +80,122 @@ Voir les conteneurs:
 docker compose ps
 ```
 
+## Local Development (Sans Docker)
+
+### Prerequisites
+
+- Python 3.10+
+- PostgreSQL running on localhost:5432
+- pip packages installed per service
+
+### Step 1: Start API Gateway (Required - Main Entry Point)
+
+The API Gateway is the single entry point for all requests. Start it first:
+
+```powershell
+cd backend/services/api_gateway
+pip install -r requirements.txt
+uvicorn app.main:app --reload --port 8000
+```
+
+API Gateway Swagger: http://localhost:8000/docs
+API Gateway Health: http://localhost:8000/health
+
+### Step 2: Start Other Microservices (Optional - Only if Needed)
+
+Open **new PowerShell terminals** for each service:
+
+#### Auth Service
+```powershell
+cd backend/services/auth_service
+pip install -r requirements.txt
+uvicorn app.main:app --reload --port 8001
+```
+Swagger: http://localhost:8001/docs
+
+#### User Service
+```powershell
+cd backend/services/user_service
+pip install -r requirements.txt
+uvicorn app.main:app --reload --port 8002
+```
+Swagger: http://localhost:8002/docs
+
+#### Service Fadesol
+```powershell
+cd backend/services/service_fadesol_service
+pip install -r requirements.txt
+uvicorn app.main:app --reload --port 8003
+```
+Swagger: http://localhost:8003/docs
+
+#### Project Service
+```powershell
+cd backend/services/project_service
+pip install -r requirements.txt
+uvicorn app.main:app --reload --port 8004
+```
+Swagger: http://localhost:8004/docs
+
+#### Task Service
+```powershell
+cd backend/services/task_service
+pip install -r requirements.txt
+uvicorn app.main:app --reload --port 8005
+```
+Swagger: http://localhost:8005/docs
+
+#### Message Service
+```powershell
+cd backend/services/message_service
+pip install -r requirements.txt
+uvicorn app.main:app --reload --port 8006
+```
+Swagger: http://localhost:8006/docs
+
+#### ClickUp Service
+```powershell
+cd backend/services/clickup_service
+pip install -r requirements.txt
+uvicorn app.main:app --reload --port 8007
+```
+Swagger: http://localhost:8007/docs
+
+#### Dashboard Service
+```powershell
+cd backend/services/dashboard_service
+pip install -r requirements.txt
+uvicorn app.main:app --reload --port 8008
+```
+Swagger: http://localhost:8008/docs
+
+### Troubleshooting
+
+**Error: "Could not import module 'app.main'"**
+- ❌ Do NOT run `uvicorn app.main:app` from `/backend` root
+- ✅ Always navigate to `/backend/services/{service_name}` first
+- ✅ Verify `app/main.py` exists in the service folder
+
+**Port already in use**
+```powershell
+netstat -ano | findstr "8000"  # Find process on port 8000
+taskkill /PID <PID> /F          # Kill the process
+```
+
+**Module import errors**
+```powershell
+pip install -r requirements.txt  # Reinstall dependencies
+```
+
 ## URLs De Test
 
 ```text
+API Gateway:
 http://localhost:8000/health
+http://localhost:8000/docs
+http://localhost:8000/api/auth/login
+
+Microservices (if running):
 http://localhost:8001/health
 http://localhost:8002/health
 http://localhost:8003/health

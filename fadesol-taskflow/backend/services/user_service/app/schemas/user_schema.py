@@ -1,45 +1,50 @@
+"""Schemas Pydantic du service utilisateur."""
+
 from datetime import datetime
 
-from pydantic import BaseModel
+from pydantic import AliasChoices, BaseModel, ConfigDict, Field
 
 from shared.enums import FadesolService, UserRole
 
 
 class UserBase(BaseModel):
-    first_name: str
-    last_name: str
-    prenom: str | None = None
-    nom: str | None = None
+    """Champs communs pour creer, modifier et retourner un utilisateur."""
+    # Schema commun aux entrees et sorties utilisateur.
+    # AliasChoices accepte les noms francais et les noms techniques pour faciliter l'integration frontend/API.
+    model_config = ConfigDict(populate_by_name=True, from_attributes=True)
+
+    prenom: str = Field(validation_alias=AliasChoices("prenom", "first_name"))
+    nom: str = Field(validation_alias=AliasChoices("nom", "last_name"))
     email: str
     role: UserRole
-    service_id: str | None = None
+    id_service: str | None = Field(default=None, validation_alias=AliasChoices("id_service", "service_id"))
     service: FadesolService | None = None
-    is_active: bool = True
-    est_actif: bool | None = None
+    est_actif: bool = Field(default=True, validation_alias=AliasChoices("est_actif", "is_active"))
 
 
 class UserCreate(UserBase):
-    pass
+    """Payload de creation d'utilisateur."""
+    # Le mot de passe est requis a la creation, puis envoye a auth_service pour le compte de connexion.
+    password: str = Field(min_length=6)
 
 
 class UserUpdate(BaseModel):
-    first_name: str | None = None
-    last_name: str | None = None
-    prenom: str | None = None
-    nom: str | None = None
+    """Payload de mise a jour partielle d'un utilisateur."""
+    # Tous les champs sont optionnels afin de permettre une mise a jour partielle du profil.
+    model_config = ConfigDict(populate_by_name=True)
+
+    prenom: str | None = Field(default=None, validation_alias=AliasChoices("prenom", "first_name"))
+    nom: str | None = Field(default=None, validation_alias=AliasChoices("nom", "last_name"))
     email: str | None = None
     role: UserRole | None = None
-    service_id: str | None = None
+    id_service: str | None = Field(default=None, validation_alias=AliasChoices("id_service", "service_id"))
     service: FadesolService | None = None
-    is_active: bool | None = None
-    est_actif: bool | None = None
+    est_actif: bool | None = Field(default=None, validation_alias=AliasChoices("est_actif", "is_active"))
 
 
 class UserResponse(UserBase):
+    """Representation API d'un utilisateur sans mot de passe."""
+    # Reponse API envoyee au frontend : elle contient l'identite metier, mais jamais le mot de passe ni son hash.
     id: int
     uuid: str
-    created_at: datetime
     date_creation: datetime
-
-    class Config:
-        from_attributes = True

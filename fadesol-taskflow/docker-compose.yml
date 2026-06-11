@@ -88,6 +88,7 @@ services:
       JWT_ALGORITHM: ${JWT_ALGORITHM}
       ACCESS_TOKEN_EXPIRE_MINUTES: ${ACCESS_TOKEN_EXPIRE_MINUTES}
       JWT_EXPIRE_MINUTES: ${JWT_EXPIRE_MINUTES}
+      INTERNAL_SERVICE_SECRET: ${INTERNAL_SERVICE_SECRET:-user-service-sync}
     depends_on:
       postgres_db:
         condition: service_healthy
@@ -114,6 +115,7 @@ services:
       JWT_SECRET_KEY: ${JWT_SECRET_KEY}
       ALGORITHM: ${ALGORITHM}
       JWT_ALGORITHM: ${JWT_ALGORITHM}
+      INTERNAL_SERVICE_SECRET: ${INTERNAL_SERVICE_SECRET:-user-service-sync}
     depends_on:
       postgres_db:
         condition: service_healthy
@@ -224,6 +226,13 @@ services:
     environment:
       DATABASE_URL: postgresql://postgres:${POSTGRES_PASSWORD}@postgres_db:5432/clickup_db
       CLICKUP_DATABASE_URL: postgresql://postgres:${POSTGRES_PASSWORD}@postgres_db:5432/clickup_db
+      CLICKUP_TOKEN: ${CLICKUP_TOKEN}
+      CLICKUP_API_BASE_URL: ${CLICKUP_API_BASE_URL}
+      CLICKUP_WORKSPACE_ID: ${CLICKUP_WORKSPACE_ID}
+      CLICKUP_SPACE_ID: ${CLICKUP_SPACE_ID}
+      CLICKUP_FOLDER_ID: ${CLICKUP_FOLDER_ID}
+      CLICKUP_LIST_ID: ${CLICKUP_LIST_ID}
+      TASK_SERVICE_URL: ${TASK_SERVICE_URL}
     depends_on:
       postgres_db:
         condition: service_healthy

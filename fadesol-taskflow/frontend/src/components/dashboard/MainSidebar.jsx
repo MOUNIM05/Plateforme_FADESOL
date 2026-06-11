@@ -1,13 +1,10 @@
 import {
   BarChart3,
-  Bell,
   Building2,
-  CalendarDays,
   ChevronLeft,
   ChevronRight,
   ClipboardList,
   FolderKanban,
-  History,
   KeyRound,
   LogOut,
   MessageSquareText,
@@ -18,55 +15,66 @@ import {
 } from "lucide-react";
 import fadesolLogo from "../../assets/fadesol-logo.png";
 import energyIcon from "../../assets/fadesol-energy-icon.png";
+import { ROLES, getInitials, getRoleLabel, normalizeRole, useAuth } from "../../context/AuthContext";
 
 const sections = [
   {
     title: "ORGANISATION",
     items: [
-      { label: "Dashboard", icon: BarChart3 },
-      { label: "Services", icon: Building2 },
-      { label: "Utilisateurs", icon: UsersRound },
-      { label: "Rôles & Permissions", icon: KeyRound },
+      { label: "Dashboard", icon: BarChart3, permission: "dashboard.view" },
+      { label: "Services", icon: Building2, permission: "services.view" },
+      { label: "Utilisateurs", icon: UsersRound, permission: "users.view" },
     ],
   },
   {
     title: "PROJETS & TÂCHES",
     items: [
-      { label: "Projets", icon: FolderKanban },
-      { label: "Tâches", icon: ClipboardList },
-      { label: "Sous-tâches", icon: ShieldCheck },
-      { label: "Calendrier", icon: CalendarDays },
+      { label: "Projets", icon: FolderKanban, permission: "projects.view" },
+      { label: "Tâches", icon: ClipboardList, permission: "tasks.view" },
+      { label: "Mes tâches", icon: ShieldCheck, roles: [ROLES.EMPLOYEE] },
     ],
   },
   {
     title: "COMMUNICATION",
     items: [
-      { label: "Messagerie", icon: MessageSquareText, badge: 4 },
-      { label: "Notifications", icon: Bell, badge: 12 },
+      { label: "Messagerie", icon: MessageSquareText, badge: 4, permission: "messages.view" },
     ],
   },
   {
     title: "INTÉGRATION",
     items: [
-      { label: "ClickUp Sync", icon: RefreshCw },
-      { label: "Historique Sync", icon: History },
+      { label: "ClickUp Sync", icon: RefreshCw, roles: [ROLES.ADMIN] },
     ],
   },
   {
     title: "SYSTÈME",
     items: [
-      { label: "Reporting", icon: BarChart3 },
-      { label: "Paramètres", icon: Settings },
+      { label: "Paramètres", icon: Settings, permission: "settings.view" },
+      { label: "Profile", icon: KeyRound, roles: [ROLES.ADMIN, ROLES.MANAGER, ROLES.EMPLOYEE] },
     ],
   },
 ];
 
 function MainSidebar({ activeItem, currentUser, collapsed, onSelect, onToggleCollapse, onLogout }) {
+  const { hasPermission } = useAuth();
   const fullName =
-    currentUser?.first_name && currentUser?.last_name
-      ? `${currentUser.first_name} ${currentUser.last_name}`
-      : "Abdelmounim Maani";
-  const role = currentUser?.role || "Administrateur";
+    currentUser?.prenom && currentUser?.nom
+      ? `${currentUser.prenom} ${currentUser.nom}`
+      : currentUser?.email || "Utilisateur Fadesol";
+  const role = normalizeRole(currentUser?.role);
+  const initials = getInitials(currentUser);
+  const visibleSections = sections
+    .map((section) => ({
+      ...section,
+      items: section.items.filter((item) => {
+        if (item.permission) {
+          return hasPermission(item.permission);
+        }
+
+        return item.roles.includes(role);
+      }),
+    }))
+    .filter((section) => section.items.length > 0);
 
   return (
     <aside className="main-sidebar">
@@ -97,7 +105,7 @@ function MainSidebar({ activeItem, currentUser, collapsed, onSelect, onToggleCol
       </header>
 
       <nav className="sidebar-nav" aria-label="Navigation principale">
-        {sections.map((section) => (
+        {visibleSections.map((section) => (
           <section key={section.title} className="sidebar-section">
             <h3>{section.title}</h3>
             <div className="sidebar-section__items">
@@ -125,10 +133,10 @@ function MainSidebar({ activeItem, currentUser, collapsed, onSelect, onToggleCol
       </nav>
 
       <footer className="sidebar-profile">
-        <div className="sidebar-avatar">AM</div>
+        <div className="sidebar-avatar">{initials}</div>
         <div className="sidebar-profile__copy">
           <strong>{fullName}</strong>
-          <span>{role}</span>
+          <span>{getRoleLabel(role)}</span>
         </div>
         <button type="button" onClick={onLogout} title="Se déconnecter" aria-label="Se déconnecter">
           <LogOut size={18} />

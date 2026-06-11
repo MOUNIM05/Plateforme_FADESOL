@@ -1,70 +1,26 @@
-import { useEffect, useState } from "react";
+import { BrowserRouter, Navigate, Route, Routes } from "react-router-dom";
+import { AuthProvider, ROLES, useAuth } from "./context/AuthContext";
 import DashboardLayout from "./layouts/DashboardLayout";
+import AccessDenied from "./pages/AccessDenied";
+import ClickUpIntegration from "./pages/ClickUpIntegration";
 import Dashboard from "./pages/Dashboard";
-import LoginPage from "./pages/LoginPage";
-import { getCurrentUser } from "./services/authService";
+import Login from "./pages/LoginPage";
+import Messages from "./pages/Messages";
+import MyTasks from "./pages/MyTasks";
+import Notifications from "./pages/Notifications";
+import Profile from "./pages/Profile";
+import Projects from "./pages/Projects";
+import Services from "./pages/Services";
+import Settings from "./pages/Settings";
+import Tasks from "./pages/Tasks";
+import Users from "./pages/Users";
+import ProtectedRoute from "./routes/ProtectedRoute";
+import RoleRoute from "./routes/RoleRoute";
 
-function App() {
-  const [hasToken, setHasToken] = useState(Boolean(localStorage.getItem("access_token")));
-  const [currentUser, setCurrentUser] = useState(null);
-  const [checkingSession, setCheckingSession] = useState(
-    Boolean(localStorage.getItem("access_token"))
-  );
+function AuthRedirect() {
+  const { isAuthenticated, loading } = useAuth();
 
-  useEffect(() => {
-    let isMounted = true;
-
-    async function loadCurrentUser() {
-      if (!localStorage.getItem("access_token")) {
-        if (isMounted) {
-          setCurrentUser(null);
-          setCheckingSession(false);
-        }
-        return;
-      }
-
-      try {
-        const user = await getCurrentUser();
-        if (isMounted) {
-          setCurrentUser(user);
-        }
-      } catch (error) {
-        console.error("Current user load error:", error);
-        localStorage.removeItem("access_token");
-        if (isMounted) {
-          setHasToken(false);
-          setCurrentUser(null);
-        }
-      } finally {
-        if (isMounted) {
-          setCheckingSession(false);
-        }
-      }
-    }
-
-    loadCurrentUser();
-
-    return () => {
-      isMounted = false;
-    };
-  }, [hasToken]);
-
-  function handleLoginSuccess(user) {
-    setCurrentUser(user);
-    setHasToken(true);
-  }
-
-  function handleLogout() {
-    localStorage.removeItem("access_token");
-    setCurrentUser(null);
-    setHasToken(false);
-  }
-
-  if (!hasToken) {
-    return <LoginPage onLoginSuccess={handleLoginSuccess} />;
-  }
-
-  if (checkingSession || !currentUser) {
+  if (loading) {
     return (
       <main className="session-loading-screen">
         <div>
@@ -75,10 +31,67 @@ function App() {
     );
   }
 
+  return <Navigate to={isAuthenticated ? "/dashboard" : "/login"} replace />;
+}
+
+function AppRoutes() {
   return (
-    <DashboardLayout currentUser={currentUser} onLogout={handleLogout}>
-      <Dashboard currentUser={currentUser} />
-    </DashboardLayout>
+    <Routes>
+      <Route path="/login" element={<Login />} />
+      <Route element={<ProtectedRoute />}>
+        <Route element={<DashboardLayout />}>
+          <Route path="/dashboard" element={<Dashboard />} />
+          <Route path="/profile" element={<Profile />} />
+          <Route element={<RoleRoute allowedPermissions={["users.view"]} allowedRoles={[ROLES.ADMIN, ROLES.MANAGER]} />}>
+            <Route path="/users" element={<Users />} />
+          </Route>
+          <Route element={<RoleRoute allowedPermissions={["services.view", "services.create", "services.delete"]} allowedRoles={[ROLES.ADMIN, ROLES.MANAGER]} />}>
+            <Route
+              path="/services"
+              element={<Services />}
+            />
+          </Route>
+          <Route element={<RoleRoute allowedPermissions={["projects.view", "projects.create", "projects.update"]} allowedRoles={[ROLES.ADMIN, ROLES.MANAGER]} />}>
+            <Route
+              path="/projects"
+              element={<Projects />}
+            />
+          </Route>
+          <Route path="/my-tasks" element={<MyTasks />} />
+          <Route path="/tasks" element={<Tasks />} />
+          <Route element={<RoleRoute allowedPermissions={["messages.view"]} />}>
+            <Route
+              path="/messages"
+              element={<Messages />}
+            />
+          </Route>
+          <Route path="/notifications" element={<Notifications />} />
+          <Route element={<RoleRoute allowedPermissions={["settings.view"]} allowedRoles={[ROLES.ADMIN]} />}>
+            <Route
+              path="/clickup"
+              element={<ClickUpIntegration />}
+            />
+            <Route
+              path="/settings"
+              element={<Settings />}
+            />
+          </Route>
+          <Route path="/access-denied" element={<AccessDenied />} />
+        </Route>
+      </Route>
+      <Route path="/" element={<AuthRedirect />} />
+      <Route path="*" element={<AuthRedirect />} />
+    </Routes>
+  );
+}
+
+function App() {
+  return (
+    <BrowserRouter>
+      <AuthProvider>
+        <AppRoutes />
+      </AuthProvider>
+    </BrowserRouter>
   );
 }
 

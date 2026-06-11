@@ -1,27 +1,53 @@
-import { cloneElement, isValidElement, useState } from "react";
+import { useState } from "react";
+import { Outlet, useLocation, useNavigate } from "react-router-dom";
 import MainSidebar from "../components/dashboard/MainSidebar";
+import { useAuth } from "../context/AuthContext";
 import "../styles/dashboard.css";
 
-function DashboardLayout({ children, currentUser, onLogout }) {
-  const [activeItem, setActiveItem] = useState("Dashboard");
+const itemRoutes = {
+  Dashboard: "/dashboard",
+  Utilisateurs: "/users",
+  Services: "/services",
+  Projets: "/projects",
+  Tâches: "/tasks",
+  "Mes tâches": "/my-tasks",
+  Messagerie: "/messages",
+  "ClickUp Sync": "/clickup",
+  Paramètres: "/settings",
+  Profile: "/profile",
+};
+
+function getActiveItem(pathname) {
+  const match = Object.entries(itemRoutes).find(([, route]) => pathname.startsWith(route));
+
+  return match?.[0] || "Dashboard";
+}
+
+function DashboardLayout() {
+  const location = useLocation();
+  const navigate = useNavigate();
+  const { currentUser, logout } = useAuth();
   const [sidebarCollapsed, setSidebarCollapsed] = useState(false);
+  const activeItem = getActiveItem(location.pathname);
+
+  function handleSelect(itemLabel) {
+    navigate(itemRoutes[itemLabel] || "/dashboard");
+  }
 
   return (
-    <div
-      className={`dashboard-shell ${sidebarCollapsed ? "sidebar-collapsed" : ""}`}
-    >
+    <div className={`dashboard-shell ${sidebarCollapsed ? "sidebar-collapsed" : ""}`}>
       <MainSidebar
         activeItem={activeItem}
         currentUser={currentUser}
         collapsed={sidebarCollapsed}
-        onSelect={setActiveItem}
+        onSelect={handleSelect}
         onToggleCollapse={() => setSidebarCollapsed((current) => !current)}
-        onLogout={onLogout}
+        onLogout={logout}
       />
       <main className="dashboard-main">
-        {isValidElement(children)
-          ? cloneElement(children, { activeItem, onLogout })
-          : children}
+        <div className="dashboard-content">
+          <Outlet />
+        </div>
       </main>
     </div>
   );
