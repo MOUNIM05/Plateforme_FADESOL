@@ -13,9 +13,7 @@ from app.core.config import settings
 from app.models.task import Task
 from app.schemas.task_schema import (
     TaskAssign,
-    TaskClickUpSync,
     TaskCreate,
-    TaskImportFromClickUp,
     TaskStatusUpdate,
     TaskUpdate,
 )
@@ -110,15 +108,10 @@ def get_task_by_id(db: Session, task_id: str) -> Task | None:
     return db.query(Task).filter(Task.id == task_id).first()
 
 
-def get_task_by_clickup_id(db: Session, clickup_task_id: str) -> Task | None:
-    """Retourne une tache a partir de son identifiant ClickUp."""
-    return db.query(Task).filter(Task.clickup_task_id == clickup_task_id).first()
-
-
 def create_task(db: Session, payload: TaskCreate) -> Task:
     """Cree une tache locale."""
-    # Creation d'une tache locale, par opposition aux taches importees depuis ClickUp.
-    task = Task(**_payload_data(payload), source="local")
+    # Creation d'une tache interne dans la base task_db.
+    task = Task(**_payload_data(payload))
     db.add(task)
     db.commit()
     db.refresh(task)
@@ -153,28 +146,6 @@ def delete_task(db: Session, task_id: str) -> None:
 
     db.delete(task)
     db.commit()
-
-
-def upsert_task_from_clickup(db: Session, payload: TaskImportFromClickUp) -> Task:
-    """Cree ou met a jour une tache importee depuis ClickUp."""
-    # Upsert ClickUp : met a jour la tache existante si l'id ClickUp est connu, sinon la cree.
-    task = get_task_by_clickup_id(db, payload.clickup_task_id)
-    data = _payload_data(payload)
-    data["source"] = "clickup"
-    data["est_synchronisee_clickup"] = True
-    data["date_synchronisation"] = datetime.now(timezone.utc)
-
-    if task:
-        for field, value in data.items():
-            setattr(task, field, value)
-    else:
-        task = Task(**data)
-        db.add(task)
-
-    db.commit()
-    db.refresh(task)
-
-    return task
 
 
 def assigner_task(db: Session, task_id: str, utilisateur_id: str) -> Task:
@@ -233,41 +204,6 @@ def changer_statut_task(db: Session, task_id: str, statut: StatutTache) -> Task:
         raise not_found("Tache introuvable.")
 
     task.changerStatut(statut)
-    db.commit()
-    db.refresh(task)
-
-    return task
-
-
-def synchroniser_clickup(db: Session, task_id: str, clickup_task_id: str | None = None) -> Task:
-    """Marque une tache comme synchronisee avec ClickUp."""
-    # Marque une tache comme synchronisee avec ClickUp et renseigne la date de synchronisation.
-    task = get_task_by_id(db, task_id)
-
-    if not task:
-        raise not_found("Tache introuvable.")
-
-    task.synchroniserAvecClickUp(clickup_task_id)
-    task.date_synchronisation = datetime.now(timezone.utc)
-    db.commit()
-    db.refresh(task)
-
-    return task
-
-
-def mark_task_clickup_sync(db: Session, task_id: str, payload: TaskClickUpSync) -> Task:
-    """Sauvegarde l'identifiant ClickUp apres une synchronisation sortante."""
-    # Route appelee par clickup_service apres creation de la tache dans ClickUp.
-    task = get_task_by_id(db, task_id)
-
-    if not task:
-        raise not_found("Tache introuvable.")
-
-    task.clickup_task_id = payload.clickup_task_id
-    task.est_synchronisee_clickup = payload.est_synchronisee_clickup
-    task.source = "clickup"
-    task.date_synchronisation = datetime.now(timezone.utc)
-    task.updated_at = datetime.now(timezone.utc)
     db.commit()
     db.refresh(task)
 

@@ -36,7 +36,6 @@ const defaultSettings = {
   allowManagerExports: false,
   emailNotifications: true,
   taskDelayAlerts: true,
-  clickupAutoSync: false,
   maintenanceMode: false,
 };
 
@@ -385,12 +384,6 @@ function Settings() {
               name="taskDelayAlerts"
               label="Alertes tâches en retard"
               checked={settings.taskDelayAlerts}
-              onChange={handleChange}
-            />
-            <SettingSwitch
-              name="clickupAutoSync"
-              label="Synchronisation ClickUp auto"
-              checked={settings.clickupAutoSync}
               onChange={handleChange}
             />
             <SettingSwitch

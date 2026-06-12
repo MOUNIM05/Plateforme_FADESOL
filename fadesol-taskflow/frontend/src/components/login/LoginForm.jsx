@@ -17,14 +17,6 @@ function LoginForm({ onSubmit, loading, error }) {
 
   function handleSubmit(event) {
     event.preventDefault();
-
-    // Cette trace facilite la démonstration PFE et le debugging navigateur.
-    console.log("Login form values:", {
-      email: email.trim(),
-      password,
-      rememberMe,
-    });
-
     onSubmit({ email, password, rememberMe });
   }
 

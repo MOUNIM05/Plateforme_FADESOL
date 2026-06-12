@@ -30,7 +30,6 @@ const moduleIcons = {
   users: Users,
   services: Building2,
   messaging: MessageSquareText,
-  clickup: RefreshCw,
   reporting: FileText,
   settings: Settings,
 };
@@ -68,10 +67,6 @@ const moduleSubFunctions = {
   messaging: [
     { label: "Conversations", icon: MessageSquareText },
     { label: "Messages internes", icon: MessageSquareReply },
-  ],
-  clickup: [
-    { label: "Espaces ClickUp", icon: KanbanSquare },
-    { label: "Synchroniser tâche", icon: RefreshCw },
   ],
   reporting: [
     { label: "Rapports activité", icon: FileText },

@@ -19,7 +19,6 @@ class Settings:
     PROJECT_SERVICE_URL: str = os.getenv("PROJECT_SERVICE_URL", "http://localhost:8004")
     TASK_SERVICE_URL: str = os.getenv("TASK_SERVICE_URL", "http://localhost:8005")
     MESSAGE_SERVICE_URL: str = os.getenv("MESSAGE_SERVICE_URL", "http://localhost:8006")
-    CLICKUP_SERVICE_URL: str = os.getenv("CLICKUP_SERVICE_URL", "http://localhost:8007")
     DASHBOARD_SERVICE_URL: str = os.getenv("DASHBOARD_SERVICE_URL", "http://localhost:8008")
 
 

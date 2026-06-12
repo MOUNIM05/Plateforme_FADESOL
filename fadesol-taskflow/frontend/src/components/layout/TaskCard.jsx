@@ -1,4 +1,4 @@
-import { CalendarDays, RefreshCw } from "lucide-react";
+import { CalendarDays } from "lucide-react";
 
 function TaskCard({ task }) {
   return (
@@ -12,10 +12,6 @@ function TaskCard({ task }) {
 
       <div className="tf-task-card__meta">
         <span className={`status status--${task.statusKey}`}>{task.status}</span>
-        <span className="tf-sync-badge">
-          <RefreshCw size={12} />
-          ClickUp
-        </span>
       </div>
 
       <div className="tf-task-card__footer">

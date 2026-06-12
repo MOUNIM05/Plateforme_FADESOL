@@ -1,5 +1,5 @@
 import { Fragment, useEffect, useMemo, useState } from "react";
-import { ClipboardList, GitBranch, PlusCircle, RefreshCw } from "lucide-react";
+import { ClipboardList, GitBranch, PlusCircle } from "lucide-react";
 import {
   assignTask,
   assignSubtask,
@@ -124,7 +124,6 @@ function Tasks() {
   const [assigningSubtaskId, setAssigningSubtaskId] = useState("");
   const [message, setMessage] = useState("");
   const [error, setError] = useState("");
-  const [clickupMessage, setClickupMessage] = useState("");
 
   async function loadTasks({ showLoading = true } = {}) {
     setError("");
@@ -582,26 +581,17 @@ function Tasks() {
     }
   }
 
-  function handleClickupPlaceholder() {
-    setClickupMessage("La synchronisation ClickUp sera activée prochainement.");
-  }
-
   return (
     <div className="dashboard-page tasks-page">
       <div className="board-toolbar">
         <div>
           <h2>Création des tâches</h2>
-          <p>Créer une tâche manuellement et préparer la future synchronisation ClickUp.</p>
+          <p>Créer, affecter et suivre les tâches internes de la plateforme.</p>
         </div>
-        <button className="sync-button" type="button" onClick={handleClickupPlaceholder}>
-          <RefreshCw size={18} />
-          Synchroniser depuis ClickUp
-        </button>
       </div>
 
       {message && <p className="notice success">{message}</p>}
       {error && <p className="notice error">{error}</p>}
-      {clickupMessage && <p className="notice">{clickupMessage}</p>}
 
       <section className="management-grid">
         {canCreateTasks ? (

@@ -2,7 +2,6 @@ import { BrowserRouter, Navigate, Route, Routes } from "react-router-dom";
 import { AuthProvider, ROLES, useAuth } from "./context/AuthContext";
 import DashboardLayout from "./layouts/DashboardLayout";
 import AccessDenied from "./pages/AccessDenied";
-import ClickUpIntegration from "./pages/ClickUpIntegration";
 import Dashboard from "./pages/Dashboard";
 import Login from "./pages/LoginPage";
 import Messages from "./pages/Messages";
@@ -67,10 +66,6 @@ function AppRoutes() {
           </Route>
           <Route path="/notifications" element={<Notifications />} />
           <Route element={<RoleRoute allowedPermissions={["settings.view"]} allowedRoles={[ROLES.ADMIN]} />}>
-            <Route
-              path="/clickup"
-              element={<ClickUpIntegration />}
-            />
             <Route
               path="/settings"
               element={<Settings />}

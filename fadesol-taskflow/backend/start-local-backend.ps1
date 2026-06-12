@@ -171,7 +171,6 @@ Start-LocalService `
         "`$env:PROJECT_SERVICE_URL = 'http://127.0.0.1:8004'"
         "`$env:TASK_SERVICE_URL = 'http://127.0.0.1:8005'"
         "`$env:MESSAGE_SERVICE_URL = 'http://127.0.0.1:8006'"
-        "`$env:CLICKUP_SERVICE_URL = 'http://127.0.0.1:8007'"
         "`$env:DASHBOARD_SERVICE_URL = 'http://127.0.0.1:8008'"
     )
 

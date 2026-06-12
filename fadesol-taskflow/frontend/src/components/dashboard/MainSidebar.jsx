@@ -8,7 +8,6 @@ import {
   KeyRound,
   LogOut,
   MessageSquareText,
-  RefreshCw,
   Settings,
   ShieldCheck,
   UsersRound,
@@ -43,7 +42,6 @@ const sections = [
   {
     title: "INTÉGRATION",
     items: [
-      { label: "ClickUp Sync", icon: RefreshCw, roles: [ROLES.ADMIN] },
     ],
   },
   {

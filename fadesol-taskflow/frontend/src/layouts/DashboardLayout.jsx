@@ -12,7 +12,6 @@ const itemRoutes = {
   Tâches: "/tasks",
   "Mes tâches": "/my-tasks",
   Messagerie: "/messages",
-  "ClickUp Sync": "/clickup",
   Paramètres: "/settings",
   Profile: "/profile",
 };

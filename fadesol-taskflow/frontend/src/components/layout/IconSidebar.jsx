@@ -4,7 +4,6 @@ import {
   FolderKanban,
   GitBranch,
   MessageSquare,
-  PlugZap,
   Settings,
   ShieldCheck,
   SquareCheckBig,
@@ -22,7 +21,6 @@ const moduleIconMap = {
   users: Users,
   services: Wrench,
   messaging: MessageSquare,
-  clickup: PlugZap,
   reporting: BellDot,
   settings: Settings,
 };

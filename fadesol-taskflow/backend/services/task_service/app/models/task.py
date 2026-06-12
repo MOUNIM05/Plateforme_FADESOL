@@ -3,7 +3,7 @@
 from datetime import date
 from uuid import uuid4
 
-from sqlalchemy import Boolean, Column, Date, DateTime, String, Text
+from sqlalchemy import Column, Date, DateTime, String, Text
 from sqlalchemy.orm import synonym
 from sqlalchemy.sql import func
 
@@ -40,12 +40,6 @@ class Task(Base):
         nullable=False,
     )
 
-    # Champs prevus pour l'integration ClickUp : id distant, origine et date de synchronisation.
-    clickup_task_id = Column(String(120), unique=True, nullable=True, index=True)
-    source = Column(String(40), default="local", nullable=False)
-    est_synchronisee_clickup = Column(Boolean, default=False, nullable=False)
-    date_synchronisation = Column(DateTime(timezone=True), nullable=True)
-
     # Alias de compatibilite : le code peut utiliser les noms anglais ou francais sans dupliquer les colonnes.
     titre = synonym("title")
     projet_id = synonym("project_id")
@@ -72,15 +66,6 @@ class Task(Base):
         if not self.due_date:
             return False
         return self.due_date < date.today() and self.status != StatutTache.TERMINE.value
-
-    def synchroniserAvecClickUp(self, clickup_task_id: str | None = None) -> None:
-        """Marque la tache comme synchronisee avec ClickUp."""
-        # Marque la tache comme synchronisee avec ClickUp et conserve l'id distant si fourni.
-        self.source = "clickup"
-        self.est_synchronisee_clickup = True
-        if clickup_task_id:
-            self.clickup_task_id = clickup_task_id
-
 
 Tache = Task
 

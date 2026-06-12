@@ -43,18 +43,9 @@ def on_startup():
             connection.execute(text("ALTER TABLE sous_taches ADD COLUMN service_id VARCHAR(36)"))
         if not has_column("sous_taches", "assignee_a"):
             connection.execute(text("ALTER TABLE sous_taches ADD COLUMN assignee_a VARCHAR(36)"))
-        if not has_column("taches", "clickup_task_id"):
-            connection.execute(text("ALTER TABLE taches ADD COLUMN clickup_task_id VARCHAR(120)"))
-        if not has_column("taches", "source"):
-            connection.execute(text("ALTER TABLE taches ADD COLUMN source VARCHAR(40) DEFAULT 'local' NOT NULL"))
-        if not has_column("taches", "est_synchronisee_clickup"):
-            connection.execute(text("ALTER TABLE taches ADD COLUMN est_synchronisee_clickup BOOLEAN DEFAULT FALSE NOT NULL"))
-        if not has_column("taches", "date_synchronisation"):
-            connection.execute(text("ALTER TABLE taches ADD COLUMN date_synchronisation TIMESTAMP"))
 
         connection.execute(text("CREATE INDEX IF NOT EXISTS ix_sous_taches_service_id ON sous_taches (service_id)"))
         connection.execute(text("CREATE INDEX IF NOT EXISTS ix_sous_taches_assignee_a ON sous_taches (assignee_a)"))
-        connection.execute(text("CREATE UNIQUE INDEX IF NOT EXISTS ix_taches_clickup_task_id ON taches (clickup_task_id)"))
 
 
 @app.get("/health")

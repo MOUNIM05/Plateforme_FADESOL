@@ -67,7 +67,7 @@ function EmployeeDashboard({ currentUser }) {
             </div>
           </div>
           <div className="task-list-compact">
-            {["Préparer les documents projet", "Mettre à jour le statut ClickUp", "Répondre au message manager"].map((task) => (
+            {["Préparer les documents projet", "Mettre à jour le statut tâche", "Répondre au message manager"].map((task) => (
               <div key={task}>
                 <span className="status-badge"><Clock3 size={14} />En cours</span>
                 <strong>{task}</strong>

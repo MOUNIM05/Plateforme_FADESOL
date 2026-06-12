@@ -1,4 +1,4 @@
-import { DownloadCloud, ListPlus, SearchCheck } from "lucide-react";
+import { ListPlus, SearchCheck } from "lucide-react";
 
 function EmptyState({ selectedService, onCreateClick }) {
   return (
@@ -21,10 +21,6 @@ function EmptyState({ selectedService, onCreateClick }) {
         <button type="button" onClick={onCreateClick}>
           <ListPlus size={18} />
           Créer une liste
-        </button>
-        <button type="button">
-          <DownloadCloud size={18} />
-          Importer depuis ClickUp
         </button>
       </div>
     </div>

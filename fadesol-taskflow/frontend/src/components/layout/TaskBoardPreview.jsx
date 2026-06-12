@@ -23,7 +23,7 @@ const tasks = [
   {
     id: 2,
     column: "todo",
-    title: "Valider la structure ClickUp",
+    title: "Valider la structure des services",
     service: "Technique",
     priority: "Urgente",
     priorityKey: "urgent",
@@ -47,7 +47,7 @@ const tasks = [
   {
     id: 4,
     column: "blocked",
-    title: "Synchroniser tâches avec ClickUp",
+    title: "Mettre a jour les priorites taches",
     service: "Commercial",
     priority: "Haute",
     priorityKey: "high",

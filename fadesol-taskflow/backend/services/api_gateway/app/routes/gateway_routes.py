@@ -191,17 +191,6 @@ def build_message_health_url() -> str:
     return f"{settings.MESSAGE_SERVICE_URL.rstrip('/')}/health"
 
 
-def build_clickup_service_url(path: str = "") -> str:
-    """Construit l'URL cible de clickup_service."""
-    # Construit l'URL du service ClickUp pour centraliser les appels externes via le gateway.
-    clickup_base_url = settings.CLICKUP_SERVICE_URL.rstrip("/")
-
-    if not path:
-        return f"{clickup_base_url}/api/clickup"
-
-    return f"{clickup_base_url}/api/clickup/{path}"
-
-
 @router.get("/gateway/services")
 def list_services():
     """Retourne les URLs connues par le gateway pour diagnostic."""
@@ -214,7 +203,6 @@ def list_services():
         "task_service": settings.TASK_SERVICE_URL,
         "dashboard_service": settings.DASHBOARD_SERVICE_URL,
         "message_service": settings.MESSAGE_SERVICE_URL,
-        "clickup_service": settings.CLICKUP_SERVICE_URL,
     }
 
 
@@ -363,19 +351,6 @@ async def proxy_api_messages_websocket(websocket: WebSocket):
     await websocket_endpoint(websocket)
 
 
-@router.api_route("/clickup", methods=["GET", "POST", "PUT", "PATCH", "DELETE"])
-async def proxy_api_clickup_root(request: Request):
-    """Proxy vers la racine /api/clickup."""
-    return await proxy_request(request, build_clickup_service_url(), "ClickUp service")
-
-
-@router.api_route("/clickup/{path:path}", methods=["GET", "POST", "PUT", "PATCH", "DELETE"])
-async def proxy_api_clickup(path: str, request: Request):
-    """Proxy vers clickup_service."""
-    # Proxy vers clickup_service pour isoler l'integration ClickUp du frontend.
-    return await proxy_request(request, build_clickup_service_url(path), "ClickUp service")
-
-
 @root_router.api_route("/users", methods=["GET", "POST", "PUT", "PATCH", "DELETE"])
 async def proxy_users_root(request: Request):
     """Proxy racine sans prefixe /api pour /users."""
@@ -511,13 +486,3 @@ async def proxy_messages_websocket(websocket: WebSocket):
     await websocket_endpoint(websocket)
 
 
-@root_router.api_route("/clickup", methods=["GET", "POST", "PUT", "PATCH", "DELETE"])
-async def proxy_clickup_root(request: Request):
-    """Proxy racine sans prefixe /api pour /clickup."""
-    return await proxy_request(request, build_clickup_service_url(), "ClickUp service")
-
-
-@root_router.api_route("/clickup/{path:path}", methods=["GET", "POST", "PUT", "PATCH", "DELETE"])
-async def proxy_clickup(path: str, request: Request):
-    """Proxy racine sans prefixe /api pour /clickup/*."""
-    return await proxy_request(request, build_clickup_service_url(path), "ClickUp service")

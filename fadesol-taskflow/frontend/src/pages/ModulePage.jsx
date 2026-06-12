@@ -5,7 +5,6 @@ import {
   ClipboardList,
   FolderKanban,
   MessageSquareText,
-  RefreshCw,
   Settings,
 } from "lucide-react";
 
@@ -14,7 +13,6 @@ const iconMap = {
   projects: FolderKanban,
   tasks: ClipboardList,
   messages: MessageSquareText,
-  clickup: RefreshCw,
   reporting: BarChart3,
   settings: Settings,
 };

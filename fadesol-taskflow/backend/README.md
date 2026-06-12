@@ -14,7 +14,6 @@ backend/
     project_service/
     task_service/
     message_service/
-    clickup_service/
     dashboard_service/
   shared/
   docker/
@@ -35,7 +34,6 @@ service_fadesol_service 8003
 project_service         8004
 task_service            8005
 message_service         8006
-clickup_service         8007
 dashboard_service       8008
 pgAdmin                 5050
 PostgreSQL              5432
@@ -153,14 +151,6 @@ uvicorn app.main:app --reload --port 8006
 ```
 Swagger: http://localhost:8006/docs
 
-#### ClickUp Service
-```powershell
-cd backend/services/clickup_service
-pip install -r requirements.txt
-uvicorn app.main:app --reload --port 8007
-```
-Swagger: http://localhost:8007/docs
-
 #### Dashboard Service
 ```powershell
 cd backend/services/dashboard_service
@@ -202,7 +192,6 @@ http://localhost:8003/health
 http://localhost:8004/health
 http://localhost:8005/health
 http://localhost:8006/health
-http://localhost:8007/health
 http://localhost:8008/health
 ```
 
@@ -237,7 +226,6 @@ service_fadesol_db
 project_db
 task_db
 message_db
-clickup_db
 dashboard_db
 ```
 

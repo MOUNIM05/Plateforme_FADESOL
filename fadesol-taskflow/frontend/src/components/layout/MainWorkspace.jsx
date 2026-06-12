@@ -1,4 +1,4 @@
-import { BarChart3, CalendarDays, Kanban, LayoutList, Plus, RefreshCw } from "lucide-react";
+import { BarChart3, CalendarDays, Kanban, LayoutList, Plus } from "lucide-react";
 import EmptyState from "./EmptyState";
 import ModuleOverview from "./ModuleOverview";
 import TaskBoardPreview from "./TaskBoardPreview";
@@ -66,17 +66,6 @@ function MainWorkspace({ selectedService, selectedModule, showCreateNotice, onCr
           )}
         </section>
 
-        <aside className="tf-sync-card">
-          <div className="tf-sync-card__icon">
-            <RefreshCw size={20} />
-          </div>
-          <div>
-            <h3>ClickUp Sync</h3>
-            <p>status: <strong>Connecté</strong></p>
-            <p>last sync: Aujourd’hui</p>
-          </div>
-          <button type="button">Synchroniser</button>
-        </aside>
       </div>
     </main>
   );

@@ -17,7 +17,6 @@ from app.schemas.task_schema import (
     TacheResponse,
     TacheUpdate,
     TaskCreate,
-    TaskImportFromClickUp,
     TaskProgressResponse,
     TaskResponse,
     TaskUpdate,

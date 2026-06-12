@@ -56,7 +56,6 @@ services:
       PROJECT_SERVICE_URL: ${PROJECT_SERVICE_URL}
       TASK_SERVICE_URL: ${TASK_SERVICE_URL}
       MESSAGE_SERVICE_URL: ${MESSAGE_SERVICE_URL}
-      CLICKUP_SERVICE_URL: ${CLICKUP_SERVICE_URL}
       DASHBOARD_SERVICE_URL: ${DASHBOARD_SERVICE_URL}
     depends_on:
       auth_service:
@@ -209,35 +208,6 @@ services:
         condition: service_healthy
     healthcheck:
       test: ["CMD-SHELL", "python -c \"import urllib.request; urllib.request.urlopen('http://localhost:8006/health').read()\""]
-      interval: 30s
-      timeout: 10s
-      retries: 3
-      start_period: 15s
-
-  clickup_service:
-    build:
-      context: ./backend
-      dockerfile: services/clickup_service/Dockerfile
-    container_name: clickup_service
-    restart: unless-stopped
-    ports:
-      - "8007:8007"
-    env_file: .env
-    environment:
-      DATABASE_URL: postgresql://postgres:${POSTGRES_PASSWORD}@postgres_db:5432/clickup_db
-      CLICKUP_DATABASE_URL: postgresql://postgres:${POSTGRES_PASSWORD}@postgres_db:5432/clickup_db
-      CLICKUP_TOKEN: ${CLICKUP_TOKEN}
-      CLICKUP_API_BASE_URL: ${CLICKUP_API_BASE_URL}
-      CLICKUP_WORKSPACE_ID: ${CLICKUP_WORKSPACE_ID}
-      CLICKUP_SPACE_ID: ${CLICKUP_SPACE_ID}
-      CLICKUP_FOLDER_ID: ${CLICKUP_FOLDER_ID}
-      CLICKUP_LIST_ID: ${CLICKUP_LIST_ID}
-      TASK_SERVICE_URL: ${TASK_SERVICE_URL}
-    depends_on:
-      postgres_db:
-        condition: service_healthy
-    healthcheck:
-      test: ["CMD-SHELL", "python -c \"import urllib.request; urllib.request.urlopen('http://localhost:8007/health').read()\""]
       interval: 30s
       timeout: 10s
       retries: 3

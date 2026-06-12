@@ -1,8 +1,8 @@
 # Fadesol TaskFlow
 
-Fadesol TaskFlow is a PFE project for an internal task management platform based on a microservices architecture and integrated with ClickUp.
+Fadesol TaskFlow is a PFE project for an internal task management platform based on a microservices architecture.
 
-The goal is to help Fadesol centralize internal tasks, assign work by service, track progress, detect delays, and synchronize selected tasks with ClickUp.
+The goal is to help Fadesol centralize internal tasks, assign work by service, track progress, detect delays, and manage internal collaboration.
 
 ## Technologies
 
@@ -31,9 +31,6 @@ DevOps and tools:
 - Postman
 - VS Code
 
-External integration:
-- ClickUp API
-
 ## Project Structure
 
 ```text
@@ -45,8 +42,7 @@ fadesol-taskflow/
 │   ├── user-service/
 │   ├── project-service/
 │   ├── task-service/
-│   ├── dashboard-service/
-│   └── clickup-service/
+│   └── dashboard-service/
 ├── docs/
 │   ├── cahier-des-charges/
 │   ├── diagrams/
@@ -67,7 +63,6 @@ The API Gateway forwards requests to internal services:
 - Project Service for project management
 - Task Service for tasks and subtasks
 - Dashboard Service for statistics and reporting
-- ClickUp Service for communication with the ClickUp API
 
 For the MVP, all services can share one PostgreSQL instance while keeping the code separated by service.
 

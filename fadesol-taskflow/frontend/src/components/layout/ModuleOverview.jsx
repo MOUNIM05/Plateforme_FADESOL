@@ -2,7 +2,6 @@ import {
   BarChart3,
   FolderKanban,
   MessageSquare,
-  PlugZap,
   Settings,
   ShieldCheck,
 } from "lucide-react";
@@ -49,12 +48,6 @@ const moduleDetails = {
     description: "Centraliser les échanges autour des projets, tâches et services.",
     stats: ["Conversations", "Messages", "Notifications"],
     icon: MessageSquare,
-  },
-  clickup: {
-    title: "Intégration ClickUp",
-    description: "Synchroniser les tâches sélectionnées avec ClickUp sans exposer le token au frontend.",
-    stats: ["Connecté", "Dernière sync aujourd’hui", "Logs actifs"],
-    icon: PlugZap,
   },
   reporting: {
     title: "Reporting & activité",

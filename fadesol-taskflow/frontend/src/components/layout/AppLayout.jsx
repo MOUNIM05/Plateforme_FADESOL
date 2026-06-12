@@ -39,7 +39,6 @@ const modules = [
   { id: "users", name: "Users", shortLabel: "Users" },
   { id: "services", name: "Services", shortLabel: "Serv." },
   { id: "messaging", name: "Messaging", shortLabel: "Msg" },
-  { id: "clickup", name: "ClickUp Integration", shortLabel: "ClickUp" },
   { id: "reporting", name: "Reporting", shortLabel: "Report" },
   { id: "settings", name: "Settings", shortLabel: "Config" },
 ];

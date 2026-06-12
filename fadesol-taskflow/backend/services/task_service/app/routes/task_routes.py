@@ -7,9 +7,7 @@ from app.db.database import get_db
 from app.schemas.subtask_schema import SubTaskAssign, SubTaskCreate, SubTaskResponse
 from app.schemas.task_schema import (
     TaskAssign,
-    TaskClickUpSync,
     TaskCreate,
-    TaskImportFromClickUp,
     TaskProgressResponse,
     TaskResponse,
     TaskStatusUpdate,
@@ -30,12 +28,9 @@ from app.services.task_service import (
     delete_task,
     get_task_by_id,
     get_tasks,
-    mark_task_clickup_sync,
     resolve_current_user_uuid,
-    synchroniser_clickup,
     update_task,
     update_task_status,
-    upsert_task_from_clickup,
 )
 from shared.enums import StatutTache
 from shared.exceptions import not_found
@@ -72,13 +67,6 @@ def create(payload: TaskCreate, db: Session = Depends(get_db)):
     """Cree une tache principale."""
     # Cree une tache locale dans la table taches.
     return create_task(db, payload)
-
-
-@router.post("/import-clickup", response_model=TaskResponse)
-def import_clickup(payload: TaskImportFromClickUp, db: Session = Depends(get_db)):
-    """Importe ou met a jour une tache depuis ClickUp."""
-    # Cree ou met a jour une tache provenant de ClickUp grace a son identifiant distant.
-    return upsert_task_from_clickup(db, payload)
 
 
 @router.get("/{task_id}/progress", response_model=TaskProgressResponse)
@@ -152,13 +140,6 @@ def update_status(task_id: str, payload: TaskStatusUpdate, db: Session = Depends
     return update_task_status(db, task_id, payload)
 
 
-@router.patch("/{task_id}/clickup-sync", response_model=TaskResponse)
-def mark_clickup_sync(task_id: str, payload: TaskClickUpSync, db: Session = Depends(get_db)):
-    """Enregistre l'identifiant ClickUp d'une tache synchronisee."""
-    # Endpoint interne appele par clickup_service apres creation de la tache dans ClickUp.
-    return mark_task_clickup_sync(db, task_id, payload)
-
-
 @router.delete("/{task_id}", response_model=MessageResponse)
 def delete(task_id: str, db: Session = Depends(get_db)):
     """Supprime une tache."""
@@ -215,13 +196,6 @@ def legacy_assign(task_id: str, utilisateur_id: str, db: Session = Depends(get_d
 def change_status(task_id: str, statut: StatutTache, db: Session = Depends(get_db)):
     """Change le statut via l'ancienne route en francais."""
     return changer_statut_task(db, task_id, statut)
-
-
-@legacy_router.patch("/{task_id}/clickup", response_model=TaskResponse)
-def sync_clickup(task_id: str, clickup_task_id: str | None = None, db: Session = Depends(get_db)):
-    """Marque une tache comme synchronisee avec ClickUp."""
-    # Marque manuellement une tache comme synchronisee avec ClickUp.
-    return synchroniser_clickup(db, task_id, clickup_task_id)
 
 
 @legacy_router.delete("/{task_id}", response_model=MessageResponse)
