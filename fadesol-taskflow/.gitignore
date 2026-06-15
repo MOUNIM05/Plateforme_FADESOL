@@ -32,6 +32,7 @@ Thumbs.db
 # Logs
 *.log
 logs/
+backend/.local/
 
 # Docker / database data
 postgres_data/

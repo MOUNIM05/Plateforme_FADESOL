@@ -11,7 +11,7 @@ class Settings:
     # Base de donnees propre aux utilisateurs; les autres services y accedent via API, pas via SQL direct.
     DATABASE_URL: str = os.getenv("DATABASE_URL") or os.getenv(
         "USER_DATABASE_URL",
-        "postgresql+psycopg2://postgres:mounim@localhost:5432/fadesol_users",
+        "postgresql+psycopg2://postgres:postgres@localhost:5432/user_db",
     )
 
     # Parametres de lecture des JWT emis par auth_service.

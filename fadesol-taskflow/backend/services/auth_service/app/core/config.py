@@ -17,7 +17,7 @@ class Settings:
     # Chaque microservice garde sa base afin de limiter les dependances directes entre services.
     DATABASE_URL: str = os.getenv("DATABASE_URL") or os.getenv(
         "AUTH_DATABASE_URL",
-        "postgresql+psycopg2://postgres:mounim@localhost:5432/auth_db",
+        "postgresql+psycopg2://postgres:postgres@localhost:5432/auth_db",
     )
 
     # Parametres JWT : cle de signature, algorithme et duree de validite du token.
