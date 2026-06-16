@@ -39,11 +39,13 @@ class User(Base):
     # service_id/reference service permet de filtrer les utilisateurs sans joindre une autre base.
     service_id = Column(String(36), nullable=True, index=True)
     service = Column(String(80), nullable=True)
+    photo_url = Column(String(500), nullable=True)
 
     # Deux noms d'etat actif sont conserves pour rester compatibles avec l'ancien et le nouveau vocabulaire.
     is_active = Column(Boolean, default=True, nullable=False)
     est_actif = Column(Boolean, default=True, nullable=False)
     created_at = Column(DateTime(timezone=True), server_default=func.now(), nullable=False)
+    updated_at = Column(DateTime(timezone=True), server_default=func.now(), onupdate=func.now(), nullable=True)
     date_creation = Column(DateTime(timezone=True), server_default=func.now(), nullable=False)
 
     def seConnecter(self) -> bool:

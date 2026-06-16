@@ -47,3 +47,4 @@ def require_roles(allowed_roles: list[str]):
 
 
 require_admin_or_manager = require_roles([UserRole.ADMIN.value, UserRole.MANAGER.value])
+require_dashboard_user = require_roles([UserRole.ADMIN.value, UserRole.MANAGER.value, UserRole.EMPLOYEE.value])

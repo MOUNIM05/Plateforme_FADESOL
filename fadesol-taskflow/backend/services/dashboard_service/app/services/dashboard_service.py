@@ -4,6 +4,8 @@ from urllib.error import HTTPError, URLError
 from urllib.request import Request as UrlRequest
 from urllib.request import urlopen
 
+from fastapi import HTTPException, status
+
 from app.core.config import settings
 from app.schemas.dashboard_schema import (
     DashboardMemberWorkloadItem,
@@ -16,8 +18,12 @@ from app.schemas.dashboard_schema import (
 from app.schemas.service_statistic_schema import StatistiqueService
 
 IN_PROGRESS_STATUSES = {"En cours", "EN_PROGRESS", "IN_PROGRESS", "EnCours"}
+PENDING_STATUSES = {"A faire", "À faire", "AFaire", "Nouveau"}
 COMPLETED_STATUSES = {"Terminé", "Terminée", "DONE", "COMPLETED", "Termine", "Validee"}
 BLOCKED_STATUSES = {"Bloqué", "BLOCKED", "Bloque"}
+LOW_PRIORITIES = {"Basse", "Faible", "LOW", "Low"}
+MEDIUM_PRIORITIES = {"Moyenne", "Normale", "MEDIUM", "Medium"}
+HIGH_PRIORITIES = {"Haute", "Urgente", "HIGH", "High", "URGENT"}
 FALLBACK_STATISTICS = DashboardStatisticsResponse()
 
 
@@ -28,13 +34,11 @@ def get_dashboard_statistics() -> StatistiquesTableauBord:
 
 
 def get_global_dashboard_statistics(authorization: str | None = None) -> DashboardStatisticsResponse:
-    try:
-        tasks = _fetch_list(settings.TASK_SERVICE_URL, "/api/taches/", authorization)
-        projects = _fetch_list(settings.PROJECT_SERVICE_URL, "/api/projects/", authorization)
-        services = _fetch_list(settings.SERVICE_FADESOL_URL, "/api/services/", authorization)
-    except (HTTPError, URLError, JSONDecodeError, TimeoutError, ValueError):
-        # Safe fallback until all dependent services are available locally.
-        return FALLBACK_STATISTICS
+    profile = _fetch_current_profile(authorization)
+    services, users, projects, tasks = _fetch_dashboard_sources(authorization, profile)
+    visible_services = _visible_services(profile, services)
+    tasks = _filter_tasks_for_profile(tasks, visible_services, profile)
+    projects = _filter_records_for_services(projects, visible_services, profile)
 
     return DashboardStatisticsResponse(
         total_tasks=len(tasks),
@@ -43,12 +47,58 @@ def get_global_dashboard_statistics(authorization: str | None = None) -> Dashboa
         tasks_late=_count_tasks_late(tasks),
         tasks_blocked=_count_tasks_blocked(tasks),
         total_projects=len(projects),
-        active_services=sum(1 for service in services if service.get("is_active", True)),
+        active_services=sum(1 for service in visible_services if service.get("is_active", True)),
     )
 
 
+def get_dashboard_analytics(authorization: str | None = None) -> dict:
+    profile = _fetch_current_profile(authorization)
+    services, users, projects, tasks = _fetch_dashboard_sources(authorization, profile)
+    visible_services = _visible_services(profile, services)
+    visible_users = _filter_records_for_services(users, visible_services, profile)
+    visible_projects = _filter_records_for_services(projects, visible_services, profile)
+    visible_tasks = _filter_tasks_for_profile(tasks, visible_services, profile)
+    stats = get_global_dashboard_statistics(authorization)
+    completed = _count_tasks_completed(visible_tasks)
+    total_tasks = len(visible_tasks)
+
+    return {
+        "kpis": {
+            "total_tasks": total_tasks,
+            "tasks_in_progress": _count_tasks_in_progress(visible_tasks),
+            "tasks_done": completed,
+            "tasks_completed": completed,
+            "tasks_late": _count_tasks_late(visible_tasks),
+            "tasks_blocked": _count_tasks_blocked(visible_tasks),
+            "active_services": sum(1 for service in visible_services if service.get("is_active", True)),
+            "active_users": sum(1 for user in visible_users if _is_active_user(user)),
+            "active_projects": len(visible_projects),
+            "total_projects": stats.total_projects,
+        },
+        "tasks_by_status": _tasks_by_status(visible_tasks),
+        "tasks_by_service": _tasks_by_service(visible_tasks, visible_services),
+        "workload_by_member": [
+            {
+                "label": item.full_name,
+                "value": item.total_tasks,
+                "completed": item.completed_tasks,
+                "in_progress": item.in_progress_tasks,
+                "blocked": item.blocked_tasks,
+            }
+            for item in get_members_workload(authorization)
+        ],
+        "tasks_by_priority": _tasks_by_priority(visible_tasks),
+        "global_progress": _calculate_progress(total_tasks, completed),
+    }
+
+
 def get_services_overview(authorization: str | None = None) -> list[DashboardServiceOverviewItem]:
-    services, users, projects, tasks = _fetch_dashboard_sources(authorization)
+    profile = _fetch_current_profile(authorization)
+    services, users, projects, tasks = _fetch_dashboard_sources(authorization, profile)
+    services = _visible_services(profile, services)
+    users = _filter_records_for_services(users, services, profile)
+    projects = _filter_records_for_services(projects, services, profile)
+    tasks = _filter_tasks_for_profile(tasks, services, profile)
 
     return [
         _build_service_overview_item(service, users, projects, tasks)
@@ -57,8 +107,17 @@ def get_services_overview(authorization: str | None = None) -> list[DashboardSer
 
 
 def get_service_dashboard(service_id: str, authorization: str | None = None) -> DashboardServiceDetail:
-    services, users, projects, tasks = _fetch_dashboard_sources(authorization)
-    service = _find_service(services, service_id)
+    profile = _fetch_current_profile(authorization)
+    services, users, projects, tasks = _fetch_dashboard_sources(authorization, profile)
+    visible_services = _visible_services(profile, services)
+    service = _find_service(visible_services, service_id)
+
+    if not _is_admin(profile) and not any(str(service.get("id")) in _service_identifiers(item) for item in visible_services):
+        raise HTTPException(status_code=status.HTTP_403_FORBIDDEN, detail="Dashboard service non autorise.")
+
+    users = _filter_records_for_services(users, [service], profile)
+    projects = _filter_records_for_services(projects, [service], profile)
+    tasks = _filter_tasks_for_profile(tasks, [service], profile)
 
     overview = _build_service_overview_item(service, users, projects, tasks)
     members = [
@@ -78,9 +137,13 @@ def get_members_workload(
     service_id: str | None = None,
     search: str | None = None,
 ) -> list[DashboardMemberWorkloadItem]:
-    services, users, _, tasks = _fetch_dashboard_sources(authorization)
-    selected_service = _find_service(services, service_id) if service_id else None
+    profile = _fetch_current_profile(authorization)
+    services, users, _, tasks = _fetch_dashboard_sources(authorization, profile)
+    visible_services = _visible_services(profile, services)
+    selected_service = _find_service(visible_services, service_id) if service_id else None
     normalized_search = (search or "").strip().lower()
+    users = _filter_records_for_services(users, visible_services, profile)
+    tasks = _filter_tasks_for_profile(tasks, visible_services, profile)
 
     members = [
         user
@@ -102,16 +165,26 @@ def get_service_statistics(service_id: str) -> StatistiqueService:
     return stats
 
 
-def _fetch_dashboard_sources(authorization: str | None) -> tuple[list[dict], list[dict], list[dict], list[dict]]:
-    try:
-        services = _fetch_list(settings.SERVICE_FADESOL_URL, "/api/services/", authorization)
-        users = _fetch_list(settings.USER_SERVICE_URL, "/api/users/", authorization)
-        projects = _fetch_list(settings.PROJECT_SERVICE_URL, "/api/projects/", authorization)
-        tasks = _fetch_list(settings.TASK_SERVICE_URL, "/api/taches/", authorization)
-    except (HTTPError, URLError, JSONDecodeError, TimeoutError, ValueError):
-        return _fallback_services(), [], [], []
+def _fetch_dashboard_sources(
+    authorization: str | None,
+    profile: dict | None = None,
+) -> tuple[list[dict], list[dict], list[dict], list[dict]]:
+    services = _safe_fetch_list(settings.SERVICE_FADESOL_URL, "/api/services/", authorization) or _fallback_services()
+    users = _safe_fetch_list(settings.USER_SERVICE_URL, "/api/users/", authorization)
+    projects = _safe_fetch_list(settings.PROJECT_SERVICE_URL, "/api/projects/", authorization)
+    tasks = _safe_fetch_list(settings.TASK_SERVICE_URL, "/api/tasks/", authorization)
+
+    if not users and profile:
+        users = [profile]
 
     return services, users, projects, tasks
+
+
+def _safe_fetch_list(base_url: str, path: str, authorization: str | None) -> list[dict]:
+    try:
+        return _fetch_list(base_url, path, authorization)
+    except (HTTPError, URLError, JSONDecodeError, TimeoutError, ValueError):
+        return []
 
 
 def _fetch_list(base_url: str, path: str, authorization: str | None) -> list[dict]:
@@ -136,6 +209,35 @@ def _fetch_list(base_url: str, path: str, authorization: str | None) -> list[dic
     return []
 
 
+def _fetch_current_profile(authorization: str | None) -> dict | None:
+    if not authorization:
+        return None
+
+    try:
+        data = _fetch_json(settings.USER_SERVICE_URL, "/api/users/me/profile", authorization)
+    except (HTTPError, URLError, JSONDecodeError, TimeoutError, ValueError):
+        return None
+
+    return data if isinstance(data, dict) else None
+
+
+def _fetch_json(base_url: str, path: str, authorization: str | None) -> dict | list:
+    url = f"{base_url.rstrip('/')}{path}"
+    headers = {"Accept": "application/json"}
+
+    if authorization:
+        headers["Authorization"] = authorization
+
+    request = UrlRequest(url, headers=headers, method="GET")
+
+    with urlopen(request, timeout=5) as response:
+        data = response.read()
+
+    import json
+
+    return json.loads(data.decode("utf-8"))
+
+
 def _fallback_services() -> list[dict]:
     return [
         {"id": "commercial", "name": "Commercial", "is_active": True},
@@ -147,12 +249,98 @@ def _fallback_services() -> list[dict]:
     ]
 
 
+def _service_label(service: dict) -> str:
+    return (
+        service.get("name")
+        or service.get("nom")
+        or service.get("nom_service")
+        or service.get("libelle")
+        or service.get("id")
+        or "Service"
+    )
+
+
+def _service_identifiers(service: dict) -> set[str]:
+    return {
+        str(identifier)
+        for identifier in [
+            service.get("id"),
+            service.get("uuid"),
+            service.get("name"),
+            service.get("nom"),
+            service.get("nom_service"),
+            service.get("libelle"),
+        ]
+        if identifier not in {None, ""}
+    }
+
+
 def _find_service(services: list[dict], service_id: str) -> dict:
     for service in services:
-        if str(service.get("id")) == str(service_id):
+        if str(service_id) in _service_identifiers(service):
             return service
 
     return {"id": service_id, "name": "Service Fadesol", "is_active": True}
+
+
+def _role(profile: dict | None) -> str:
+    return str((profile or {}).get("role") or "").lower()
+
+
+def _is_admin(profile: dict | None) -> bool:
+    return _role(profile) in {"admin", "administrateur"}
+
+
+def _is_employee(profile: dict | None) -> bool:
+    return _role(profile) in {"employee", "employe", "employé"}
+
+
+def _visible_services(profile: dict | None, services: list[dict]) -> list[dict]:
+    if not profile or _is_admin(profile):
+        return services
+
+    service_value = str(profile.get("service_id") or profile.get("id_service") or profile.get("service") or "")
+
+    if not service_value:
+        return []
+
+    return [
+        service
+        for service in services
+        if service_value in _service_identifiers(service)
+    ]
+
+
+def _filter_records_for_services(records: list[dict], services: list[dict], profile: dict | None) -> list[dict]:
+    if not profile or _is_admin(profile):
+        return records
+
+    if not services:
+        return []
+
+    return [record for record in records if any(_record_belongs_to_service(record, service) for service in services)]
+
+
+def _filter_tasks_for_profile(tasks: list[dict], services: list[dict], profile: dict | None) -> list[dict]:
+    if not profile or _is_admin(profile):
+        return tasks
+
+    scoped_tasks = [
+        task
+        for task in tasks
+        if any(_record_belongs_to_service(task, service) for service in services)
+    ]
+
+    if _is_employee(profile):
+        member_ids = _member_identifiers(profile)
+        return [
+            task
+            for task in scoped_tasks
+            if _task_belongs_to_member(task, profile)
+            or str(task.get("assigned_to") or task.get("assignee_a") or "") in member_ids
+        ] or scoped_tasks
+
+    return scoped_tasks
 
 
 def _build_service_overview_item(
@@ -166,7 +354,7 @@ def _build_service_overview_item(
 
     return DashboardServiceOverviewItem(
         service_id=str(service.get("id")),
-        service_name=service.get("name") or "Service Fadesol",
+        service_name=_service_label(service),
         total_members=sum(1 for user in users if _belongs_to_service(user, service)),
         total_projects=sum(1 for project in projects if _record_belongs_to_service(project, service)),
         total_tasks=len(service_tasks),
@@ -282,7 +470,7 @@ def _member_service_id(user: dict, services: list[dict]) -> str | None:
         return None
 
     for service in services:
-        if service_value in {str(service.get("id") or ""), str(service.get("name") or "")}:
+        if service_value in _service_identifiers(service):
             return str(service.get("id") or service_value)
 
     return service_value
@@ -295,18 +483,16 @@ def _member_service_name(user: dict, services: list[dict]) -> str:
         return "Non affecté"
 
     for service in services:
-        if service_value in {str(service.get("id") or ""), str(service.get("name") or "")}:
-            return service.get("name") or service_value
+        if service_value in _service_identifiers(service):
+            return _service_label(service)
 
     return service_value
 
 
 def _record_belongs_to_service(record: dict, service: dict) -> bool:
-    service_id = str(service.get("id") or "")
-    service_name = str(service.get("name") or "")
-    record_service = str(record.get("service_id") or record.get("service") or "")
+    record_service = str(record.get("service_id") or record.get("id_service") or record.get("service") or "")
 
-    return record_service in {service_id, service_name}
+    return record_service in _service_identifiers(service)
 
 
 def _belongs_to_service(user: dict, service: dict) -> bool:
@@ -321,15 +507,15 @@ def _calculate_progress(total_tasks: int, completed_tasks: int) -> int:
 
 
 def _count_tasks_in_progress(tasks: list[dict]) -> int:
-    return sum(1 for task in tasks if task.get("statut") in IN_PROGRESS_STATUSES)
+    return sum(1 for task in tasks if _task_status(task) in IN_PROGRESS_STATUSES)
 
 
 def _count_tasks_completed(tasks: list[dict]) -> int:
-    return sum(1 for task in tasks if task.get("statut") in COMPLETED_STATUSES)
+    return sum(1 for task in tasks if _task_status(task) in COMPLETED_STATUSES)
 
 
 def _count_tasks_blocked(tasks: list[dict]) -> int:
-    return sum(1 for task in tasks if task.get("statut") in BLOCKED_STATUSES)
+    return sum(1 for task in tasks if _task_status(task) in BLOCKED_STATUSES)
 
 
 def _count_tasks_late(tasks: list[dict]) -> int:
@@ -339,7 +525,7 @@ def _count_tasks_late(tasks: list[dict]) -> int:
     for task in tasks:
         due_date = task.get("date_limite") or task.get("due_date")
 
-        if not due_date or task.get("statut") in COMPLETED_STATUSES:
+        if not due_date or _task_status(task) in COMPLETED_STATUSES:
             continue
 
         try:
@@ -351,3 +537,74 @@ def _count_tasks_late(tasks: list[dict]) -> int:
             late_count += 1
 
     return late_count
+
+
+def _task_status(task: dict) -> str | None:
+    return task.get("statut") or task.get("status")
+
+
+def _task_priority(task: dict) -> str | None:
+    return task.get("priorite") or task.get("priority")
+
+
+def _group_tasks_by_field(tasks: list[dict], *fields: str) -> list[dict]:
+    grouped: dict[str, int] = {}
+
+    for task in tasks:
+        label = next((str(task.get(field)) for field in fields if task.get(field)), "Non renseigne")
+        grouped[label] = grouped.get(label, 0) + 1
+
+    return [{"label": label, "value": value} for label, value in grouped.items()]
+
+
+def _tasks_by_status(tasks: list[dict]) -> list[dict]:
+    counters = {
+        "À faire": 0,
+        "En cours": 0,
+        "Terminée": 0,
+        "Bloquée": 0,
+        "En retard": _count_tasks_late(tasks),
+    }
+
+    for task in tasks:
+        status_value = str(_task_status(task) or "")
+
+        if status_value in PENDING_STATUSES:
+            counters["À faire"] += 1
+        elif status_value in IN_PROGRESS_STATUSES:
+            counters["En cours"] += 1
+        elif status_value in COMPLETED_STATUSES:
+            counters["Terminée"] += 1
+        elif status_value in BLOCKED_STATUSES:
+            counters["Bloquée"] += 1
+
+    return [{"label": label, "value": value} for label, value in counters.items()]
+
+
+def _tasks_by_priority(tasks: list[dict]) -> list[dict]:
+    counters = {"Basse": 0, "Moyenne": 0, "Haute": 0}
+
+    for task in tasks:
+        priority_value = str(_task_priority(task) or "")
+
+        if priority_value in LOW_PRIORITIES:
+            counters["Basse"] += 1
+        elif priority_value in HIGH_PRIORITIES:
+            counters["Haute"] += 1
+        elif priority_value in MEDIUM_PRIORITIES or priority_value:
+            counters["Moyenne"] += 1
+
+    return [{"label": label, "value": value} for label, value in counters.items()]
+
+
+def _tasks_by_service(tasks: list[dict], services: list[dict]) -> list[dict]:
+    items = []
+
+    for service in services:
+        service_tasks = [task for task in tasks if _record_belongs_to_service(task, service)]
+        items.append({
+            "label": _service_label(service),
+            "value": len(service_tasks),
+        })
+
+    return items

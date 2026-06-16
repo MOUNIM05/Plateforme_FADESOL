@@ -1,9 +1,13 @@
 """Routes HTTP du service utilisateur."""
 
-from fastapi import APIRouter, Depends
+from pathlib import Path
+from uuid import uuid4
+
+from fastapi import APIRouter, Depends, File, UploadFile
+from fastapi.responses import FileResponse
 from sqlalchemy.orm import Session
 
-from app.core.security import get_current_claims, require_admin, require_admin_or_manager
+from app.core.security import get_current_claims, require_admin, require_admin_or_manager, require_internal_service
 from app.db.database import get_db
 from app.schemas.permission_schema import PermissionGroup, UserPermissionsResponse, UserPermissionsUpdate
 from app.schemas.user_schema import UserCreate, UserResponse, UserUpdate
@@ -17,15 +21,22 @@ from app.services.user_service import (
     create_user,
     delete_user,
     get_user_by_id,
+    get_user_by_uuid,
     list_users,
     set_user_active_state,
     update_user,
+    update_user_photo,
 )
-from shared.exceptions import not_found
+from shared.exceptions import bad_request, not_found
 from shared.responses import MessageResponse
 
 
 router = APIRouter(prefix="/users", tags=["Users"])
+from app.core.config import settings
+
+UPLOAD_ROOT = Path(settings.UPLOAD_DIR) / "profile_photos"
+ALLOWED_PHOTO_EXTENSIONS = {"jpg", "jpeg", "png", "webp"}
+MAX_PHOTO_SIZE_BYTES = 3 * 1024 * 1024
 
 
 @router.post("/", response_model=UserResponse, dependencies=[Depends(require_admin)])
@@ -83,6 +94,65 @@ def permissions_catalog():
     return list_permission_groups()
 
 
+@router.get("/internal/uuid/{user_uuid}", response_model=UserResponse, dependencies=[Depends(require_internal_service)])
+def get_by_uuid_internal(user_uuid: str, db: Session = Depends(get_db)):
+    """Retourne un utilisateur par UUID pour les validations inter-services."""
+    user = get_user_by_uuid(db, user_uuid)
+
+    if not user:
+        raise not_found("Utilisateur introuvable.")
+
+    return user
+
+
+@router.get("/me", response_model=UserResponse)
+def get_me(claims: dict = Depends(get_current_claims), db: Session = Depends(get_db)):
+    return get_my_profile(claims, db)
+
+
+@router.post("/me/photo", response_model=UserResponse)
+async def upload_my_photo(
+    file: UploadFile = File(...),
+    claims: dict = Depends(get_current_claims),
+    db: Session = Depends(get_db),
+):
+    user_id = claims.get("user_id")
+
+    if not user_id:
+        raise not_found("Profil utilisateur introuvable.")
+
+    extension = Path(file.filename or "").suffix.lower().lstrip(".")
+
+    if extension not in ALLOWED_PHOTO_EXTENSIONS:
+        raise bad_request("Format photo non pris en charge.")
+
+    UPLOAD_ROOT.mkdir(parents=True, exist_ok=True)
+    filename = f"user_{user_id}_{uuid4().hex}.{extension}"
+    destination = UPLOAD_ROOT / filename
+    content = await file.read()
+
+    if len(content) > MAX_PHOTO_SIZE_BYTES:
+        raise bad_request("La photo ne doit pas depasser 3 Mo.")
+
+    destination.write_bytes(content)
+
+    # Return a browser-usable URL proxied by the API gateway
+    photo_path = f"/api/users/uploads/profile_photos/{filename}"
+
+    return update_user_photo(db, int(user_id), photo_path)
+
+
+@router.get("/uploads/profile_photos/{filename}")
+def get_profile_photo(filename: str):
+    file_path = UPLOAD_ROOT / Path(filename).name
+
+    if not file_path.exists():
+        raise not_found("Photo introuvable.")
+
+    # Serve file response; FastAPI will set appropriate headers
+    return FileResponse(file_path)
+
+
 @router.get("/{user_id}/permissions", response_model=UserPermissionsResponse, dependencies=[Depends(require_admin)])
 def get_permissions_for_user(user_id: int, db: Session = Depends(get_db)):
     user = get_user_or_404(db, user_id)
@@ -92,6 +162,17 @@ def get_permissions_for_user(user_id: int, db: Session = Depends(get_db)):
 
 @router.put("/{user_id}/permissions", response_model=UserPermissionsResponse, dependencies=[Depends(require_admin)])
 def update_permissions_for_user(
+    user_id: int,
+    payload: UserPermissionsUpdate,
+    db: Session = Depends(get_db),
+):
+    user = get_user_or_404(db, user_id)
+
+    return update_user_permissions(db, user, payload)
+
+
+@router.patch("/{user_id}/permissions", response_model=UserPermissionsResponse, dependencies=[Depends(require_admin)])
+def patch_permissions_for_user(
     user_id: int,
     payload: UserPermissionsUpdate,
     db: Session = Depends(get_db),

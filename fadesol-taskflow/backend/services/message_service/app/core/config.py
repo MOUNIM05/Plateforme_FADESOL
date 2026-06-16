@@ -8,6 +8,7 @@ class Settings:
         "MESSAGE_DATABASE_URL",
         "postgresql+psycopg2://postgres:postgres@localhost:5432/message_db",
     )
+    USER_SERVICE_URL: str = os.getenv("USER_SERVICE_URL", "http://localhost:8002")
 
 
 settings = Settings()

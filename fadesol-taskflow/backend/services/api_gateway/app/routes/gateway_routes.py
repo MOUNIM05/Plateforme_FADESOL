@@ -21,8 +21,31 @@ root_router = APIRouter(tags=["Gateway"])
 
 
 async def websocket_endpoint(websocket: WebSocket):
-    """Maintient une connexion WebSocket cote gateway pour la messagerie."""
-    await gateway_ws_manager.connect(websocket)
+    """Maintient une connexion WebSocket cote gateway pour la messagerie.
+
+    Tente d'identifier l'utilisateur via l'entete Authorization ou le query param `authorization`.
+    """
+    # try to get authorization token from headers or query params
+    auth = websocket.headers.get("authorization")
+    if not auth:
+        try:
+            auth = websocket.query_params.get("authorization") or websocket.query_params.get("token")
+        except Exception:
+            auth = None
+
+    user_id = None
+    if auth:
+        # call user service to resolve profile
+        try:
+            req = UrlRequest(build_user_service_url("me/profile"), headers={"Authorization": auth}, method="GET")
+            with urlopen(req, timeout=5) as resp:
+                payload = json.loads(resp.read().decode("utf-8"))
+                if isinstance(payload, dict):
+                    user_id = str(payload.get("uuid") or payload.get("id") or "__anonymous__")
+        except Exception:
+            user_id = "__anonymous__"
+
+    await gateway_ws_manager.connect(websocket, user_id)
 
     try:
         await websocket.send_json({"type": "connected", "message": "Messagerie temps reel connectee."})
@@ -31,6 +54,16 @@ async def websocket_endpoint(websocket: WebSocket):
             await websocket.receive_text()
     except WebSocketDisconnect:
         gateway_ws_manager.disconnect(websocket)
+
+
+@router.get("/messages/online-users")
+def api_messages_online_users():
+    return gateway_ws_manager.get_online_users()
+
+
+@root_router.get("/messages/online-users")
+def root_messages_online_users():
+    return gateway_ws_manager.get_online_users()
 
 
 async def broadcast_proxied_message(response: Response, event_type: str) -> None:
@@ -232,6 +265,18 @@ async def proxy_api_users(path: str, request: Request):
     """Proxy vers les sous-routes /api/users/*."""
     # Proxy des sous-routes utilisateur : detail, update, activate, profile, etc.
     return await proxy_request(request, build_user_service_url(path), "User service")
+
+
+@router.api_route("/permissions", methods=["GET"])
+async def proxy_api_permissions_catalog(request: Request):
+    """Alias Admin vers le catalogue des permissions."""
+    return await proxy_request(request, build_user_service_url("permissions"), "User service")
+
+
+@router.api_route("/permissions/{user_id}", methods=["GET", "PUT", "PATCH"])
+async def proxy_api_permissions_user(user_id: int, request: Request):
+    """Alias Admin vers les permissions d'un utilisateur."""
+    return await proxy_request(request, build_user_service_url(f"{user_id}/permissions"), "User service")
 
 
 @router.api_route("/tasks", methods=["GET", "POST", "PUT", "PATCH", "DELETE"])

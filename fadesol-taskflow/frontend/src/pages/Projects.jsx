@@ -7,7 +7,11 @@ import {
   updateProject,
 } from "../services/projectService";
 import { useAuth } from "../context/AuthContext";
-import { getServices } from "../services/serviceService";
+import {
+  getFadesolServiceLabel,
+  getFadesolServiceValue,
+  getFadesolServices,
+} from "../services/serviceFadesolService";
 import { getUsers } from "../services/userService";
 import { DATA_EVENTS, dispatchDataChanged, subscribeDataEvents } from "../utils/dataEvents";
 
@@ -66,7 +70,9 @@ function normalizeProjectPayload(formData) {
 }
 
 function getServiceName(services, serviceId) {
-  return services.find((service) => String(service.id) === String(serviceId))?.name || serviceId || "Non affecté";
+  const service = services.find((item) => getFadesolServiceValue(item) === String(serviceId));
+
+  return service ? getFadesolServiceLabel(service) : serviceId || "Non affecte";
 }
 
 function getStatusLabel(statusValue) {
@@ -161,7 +167,7 @@ function Projects() {
 
     const [projectResult, serviceResult, userResult] = await Promise.allSettled([
       getProjects({ service_id: serviceFilter, status: statusFilter }),
-      getServices(),
+      getFadesolServices(),
       getUsers(),
     ]);
 
@@ -187,7 +193,7 @@ function Projects() {
       setServices(serviceData);
       setFormData((current) => ({
         ...current,
-        service_id: current.service_id || serviceData[0]?.id || "",
+        service_id: current.service_id || getFadesolServiceValue(serviceData[0]) || "",
       }));
     } else {
       console.error("Load services error:", serviceResult.reason);
@@ -226,7 +232,7 @@ function Projects() {
 
   const serviceById = useMemo(() => {
     return services.reduce((acc, service) => {
-      acc[service.id] = service.name;
+      acc[getFadesolServiceValue(service)] = getFadesolServiceLabel(service);
       return acc;
     }, {});
   }, [services]);
@@ -266,7 +272,7 @@ function Projects() {
     setEditingProjectId(null);
     setFormData({
       ...emptyProject,
-      service_id: services[0]?.id || "",
+      service_id: getFadesolServiceValue(services[0]) || "",
     });
   }
 
@@ -395,7 +401,7 @@ function Projects() {
           <form className="workspace-panel user-form project-form" onSubmit={handleSubmit}>
             <div className="panel-title">
               <h3>{editingProjectId ? "Modifier projet" : "Nouveau projet"}</h3>
-              {editingProjectId ? <button type="button" onClick={resetForm}>Annuler</button> : <span>US11</span>}
+              {editingProjectId ? <button type="button" onClick={resetForm}>Annuler</button> : <span>Creation</span>}
             </div>
 
             <div className="form-grid">
@@ -431,8 +437,8 @@ function Projects() {
                 >
                   <option value="">Sélectionner un service</option>
                   {services.map((service) => (
-                    <option key={service.id} value={service.id}>
-                      {service.name}
+                    <option key={getFadesolServiceValue(service)} value={getFadesolServiceValue(service)}>
+                      {getFadesolServiceLabel(service)}
                     </option>
                   ))}
                 </select>
@@ -523,8 +529,8 @@ function Projects() {
               <select value={serviceFilter} onChange={(event) => setServiceFilter(event.target.value)}>
                 <option value="">Tous les services</option>
                 {services.map((service) => (
-                  <option key={service.id} value={service.id}>
-                    {service.name}
+                  <option key={getFadesolServiceValue(service)} value={getFadesolServiceValue(service)}>
+                    {getFadesolServiceLabel(service)}
                   </option>
                 ))}
               </select>

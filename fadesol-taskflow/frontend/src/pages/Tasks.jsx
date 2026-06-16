@@ -1,17 +1,31 @@
 import { Fragment, useEffect, useMemo, useState } from "react";
-import { ClipboardList, GitBranch, PlusCircle } from "lucide-react";
+import { useNavigate, useSearchParams } from "react-router-dom";
+import { ClipboardList, Edit3, Eye, GitBranch, PlusCircle, Trash2, X } from "lucide-react";
 import {
   assignTask,
   assignSubtask,
   createSubtask,
   createTask,
+  deleteTask,
+  deleteSubtaskAttachment,
+  deleteTaskAttachment,
+  getTask,
+  getSubtaskAttachments,
   getSubtasksByTask,
+  getTaskAttachments,
   getTaskProgress,
   getTasks,
+  uploadSubtaskAttachment,
+  uploadTaskAttachment,
+  updateTask,
   updateTaskStatus,
 } from "../services/taskService";
 import { getProjects } from "../services/projectService";
-import { getServices } from "../services/serviceService";
+import {
+  getFadesolServiceLabel,
+  getFadesolServiceValue,
+  getFadesolServices,
+} from "../services/serviceFadesolService";
 import { getUsers } from "../services/userService";
 import { useAuth } from "../context/AuthContext";
 import { DATA_EVENTS, dispatchDataChanged, subscribeDataEvents } from "../utils/dataEvents";
@@ -85,11 +99,11 @@ function getProjectLabel(project) {
 }
 
 function getServiceLabel(service) {
-  return service.name || service.nom || service.service_name || service.id || service.service_id;
+  return getFadesolServiceLabel(service);
 }
 
 function getServiceValue(service) {
-  return String(service.id || service.service_id || service.name || service.nom || "");
+  return getFadesolServiceValue(service);
 }
 
 function getUserDisplayName(user) {
@@ -98,14 +112,39 @@ function getUserDisplayName(user) {
   return fullName || user.email || user.uuid;
 }
 
+function toDateInputValue(value) {
+  return value ? String(value).slice(0, 10) : "";
+}
+
 function Tasks() {
-  const { hasPermission } = useAuth();
+  const { currentUser, hasPermission } = useAuth();
+  const navigate = useNavigate();
   const canCreateTasks = hasPermission("tasks.create");
+  const canUpdateTasks = hasPermission("tasks.update");
+  const canDeleteTasks = hasPermission("tasks.delete");
+  const role = currentUser?.role;
+  const isManager = role === "Manager";
+  const isEmployee = role === "Employee" || role === "Employe" || role === "EmployÃ©";
+  const currentServiceId = currentUser?.id_service || currentUser?.service_id || "";
+  const [searchParams] = useSearchParams();
+
+  const isAdmin = role === "Admin" || role === "Administrateur";
+
+  const currentUserIds = useMemo(() => {
+    return new Set(
+      [currentUser?.uuid, currentUser?.id, currentUser?.user_id]
+        .filter(Boolean)
+        .map(String)
+    );
+  }, [currentUser]);
   const [tasks, setTasks] = useState([]);
   const [users, setUsers] = useState([]);
   const [projects, setProjects] = useState([]);
   const [services, setServices] = useState([]);
   const [formData, setFormData] = useState(emptyTaskForm);
+  const [editingTaskId, setEditingTaskId] = useState("");
+  const [selectedTask, setSelectedTask] = useState(null);
+  const [taskDetailsLoading, setTaskDetailsLoading] = useState(false);
   const [loading, setLoading] = useState(true);
   const [usersLoading, setUsersLoading] = useState(true);
   const [projectsLoading, setProjectsLoading] = useState(true);
@@ -116,12 +155,17 @@ function Tasks() {
   const [expandedTaskId, setExpandedTaskId] = useState("");
   const [progressByTask, setProgressByTask] = useState({});
   const [subtasksByTask, setSubtasksByTask] = useState({});
+  const [attachmentsByTask, setAttachmentsByTask] = useState({});
+  const [attachmentsBySubtask, setAttachmentsBySubtask] = useState({});
   const [subtaskForms, setSubtaskForms] = useState({});
   const [subtaskAssignForms, setSubtaskAssignForms] = useState({});
   const [subtaskMembersByService, setSubtaskMembersByService] = useState({});
   const [loadingSubtasksTaskId, setLoadingSubtasksTaskId] = useState("");
   const [savingSubtaskTaskId, setSavingSubtaskTaskId] = useState("");
   const [assigningSubtaskId, setAssigningSubtaskId] = useState("");
+  const [uploadingAttachmentKey, setUploadingAttachmentKey] = useState("");
+  const [deletingAttachmentId, setDeletingAttachmentId] = useState("");
+  const [deletingTaskId, setDeletingTaskId] = useState("");
   const [message, setMessage] = useState("");
   const [error, setError] = useState("");
 
@@ -132,8 +176,28 @@ function Tasks() {
     }
 
     try {
-      const data = await getTasks();
-      setTasks(data);
+      const filters = {
+        ...(isEmployee ? { assigned_to: "me" } : {}),
+        ...(isManager && currentServiceId ? { service_id: currentServiceId } : {}),
+      };
+      const data = await getTasks(filters);
+      let taskData = Array.isArray(data) ? data : [];
+
+      // For managers, exclude tasks that are assigned directly to the manager
+      if (isManager && currentUserIds && currentUserIds.size) {
+        taskData = taskData.filter((t) => {
+          const assignedTo = String(t.assigned_to || t.assignee || t.assigned_user || t.assignee_id || "");
+          return !currentUserIds.has(assignedTo);
+        });
+      }
+
+      setTasks(
+        [...taskData].sort((firstTask, secondTask) => {
+          const firstDate = new Date(firstTask.created_at || firstTask.date_creation || 0).getTime();
+          const secondDate = new Date(secondTask.created_at || secondTask.date_creation || 0).getTime();
+          return secondDate - firstDate;
+        })
+      );
     } catch (err) {
       console.error("Load tasks error:", err);
       setError("Impossible de charger les tâches.");
@@ -148,7 +212,7 @@ function Tasks() {
     setUsersLoading(true);
 
     try {
-      const data = await getUsers();
+      const data = await getUsers(isManager && currentServiceId ? currentServiceId : undefined);
       setUsers(data);
     } catch (err) {
       console.error("Load users error:", err);
@@ -162,7 +226,7 @@ function Tasks() {
     setProjectsLoading(true);
 
     try {
-      const data = await getProjects();
+      const data = await getProjects(isManager && currentServiceId ? { service_id: currentServiceId } : {});
       setProjects(Array.isArray(data) ? data : []);
     } catch (err) {
       console.error("Load projects error:", err);
@@ -176,8 +240,13 @@ function Tasks() {
     setServicesLoading(true);
 
     try {
-      const data = await getServices();
-      setServices(Array.isArray(data) ? data : []);
+      const data = await getFadesolServices();
+      const serviceData = Array.isArray(data) ? data : [];
+      setServices(
+        isManager && currentServiceId
+          ? serviceData.filter((service) => String(service.id || service.uuid || "") === String(currentServiceId))
+          : serviceData
+      );
     } catch (err) {
       console.error("Load services error:", err);
       setError("Impossible de charger les services.");
@@ -187,11 +256,80 @@ function Tasks() {
   }
 
   useEffect(() => {
+    // Redirect employees to their personal tasks page
+    if (isEmployee) {
+      // If a taskId param exists, prefer opening MyTasks with the taskId
+      const taskIdFromUrl = searchParams.get("taskId");
+      if (taskIdFromUrl) {
+        navigate(`/my-tasks?taskId=${taskIdFromUrl}`, { replace: true });
+        return;
+      }
+
+      navigate("/my-tasks", { replace: true });
+      return;
+    }
+
     loadTasks();
     loadUsers();
     loadProjects();
     loadServices();
-  }, []);
+  }, [isEmployee]);
+
+
+  useEffect(() => {
+    const taskId = searchParams.get("taskId");
+
+    if (!taskId) {
+      return;
+    }
+
+    // Employees are redirected to /my-tasks earlier
+    if (isEmployee) {
+      return;
+    }
+
+    // If the task is already in the loaded list, open it
+    const found = tasks.find((t) => String(t.id) === String(taskId));
+
+    if (found) {
+      openTaskDetails(found);
+      return;
+    }
+
+    // Otherwise fetch the single task and open it if authorized
+    let isMounted = true;
+
+    (async () => {
+      setTaskDetailsLoading(true);
+      setError("");
+
+      try {
+        const taskData = await getTask(taskId);
+
+        if (!isMounted) return;
+
+        const assignedTo = String(taskData.assigned_to || taskData.assignee || taskData.assigned_user || "");
+
+        if (
+          isAdmin ||
+          (isManager && (String(taskData.service_id) === String(currentServiceId) || currentUserIds.has(assignedTo)))
+        ) {
+          setSelectedTask(taskData);
+        } else {
+          setError("Élément introuvable ou non autorisé.");
+        }
+      } catch (err) {
+        console.error("Load task by id error:", err);
+        setError("Élément introuvable ou non autorisé.");
+      } finally {
+        if (isMounted) setTaskDetailsLoading(false);
+      }
+    })();
+
+    return () => {
+      isMounted = false;
+    };
+  }, [searchParams, tasks, isEmployee, isManager, isAdmin, currentServiceId, currentUserIds]);
 
   useEffect(() => {
     return subscribeDataEvents([DATA_EVENTS.PROJECTS_CHANGED], loadProjects);
@@ -293,7 +431,13 @@ function Tasks() {
   }
 
   function getAssignedUserName(userUuid) {
-    const user = users.find((candidate) => candidate.uuid === userUuid);
+    if (!userUuid) {
+      return "Non affectee";
+    }
+
+    const user = users.find((candidate) =>
+      [candidate.uuid, candidate.id, candidate.user_id, candidate.email].map(String).includes(String(userUuid))
+    );
 
     return user ? getUserDisplayName(user) : userUuid;
   }
@@ -304,6 +448,18 @@ function Tasks() {
       completed_subtasks: 0,
       progression: 0,
     };
+  }
+
+  function formatFileSize(size = 0) {
+    if (size < 1024) {
+      return `${size} o`;
+    }
+
+    if (size < 1024 * 1024) {
+      return `${(size / 1024).toFixed(1)} Ko`;
+    }
+
+    return `${(size / (1024 * 1024)).toFixed(1)} Mo`;
   }
 
   function getSubtaskAssignForm(subtask) {
@@ -335,18 +491,92 @@ function Tasks() {
     }));
   }
 
+  function resetTaskForm() {
+    setEditingTaskId("");
+    setFormData(emptyTaskForm);
+    setError("");
+  }
+
+  async function openTaskDetails(task) {
+    setTaskDetailsLoading(true);
+    setSelectedTask(task);
+    setError("");
+
+    try {
+      const data = await getTask(task.id);
+      setSelectedTask(data);
+    } catch (err) {
+      console.error("Load task details error:", err);
+      setError(err.response?.data?.detail || "Impossible de charger les details de la tache.");
+    } finally {
+      setTaskDetailsLoading(false);
+    }
+  }
+
+  function startEditTask(task) {
+    if (!canUpdateTasks) {
+      setError("Vous n'avez pas l'autorisation de modifier les taches.");
+      return;
+    }
+
+    setSelectedTask(null);
+    setEditingTaskId(task.id);
+    setFormData({
+      title: task.title || task.titre || "",
+      description: task.description || "",
+      project_id: task.project_id || task.projet_id || "",
+      assigned_to: task.assigned_to || task.assignee_a || "",
+      service_id: task.service_id || "",
+      status: task.status || task.statut || "Nouveau",
+      priority: task.priority || task.priorite || "Normale",
+      due_date: toDateInputValue(task.due_date || task.date_limite),
+    });
+    setMessage("");
+    setError("");
+  }
+
+  async function handleDeleteTask(task) {
+    if (!canDeleteTasks) {
+      setError("Vous n'avez pas l'autorisation de supprimer les taches.");
+      return;
+    }
+
+    const confirmed = window.confirm(`Confirmer la suppression de la tache "${task.title || task.titre}" ?`);
+
+    if (!confirmed) {
+      return;
+    }
+
+    setDeletingTaskId(task.id);
+    setMessage("");
+    setError("");
+
+    try {
+      await deleteTask(task.id);
+      setSelectedTask((current) => (current?.id === task.id ? null : current));
+      setMessage("Tache supprimee avec succes.");
+      await loadTasks({ showLoading: false });
+      dispatchDataChanged(DATA_EVENTS.TASKS_CHANGED);
+    } catch (err) {
+      console.error("Delete task error:", err);
+      setError(err.response?.data?.detail || "Erreur pendant la suppression de la tache.");
+    } finally {
+      setDeletingTaskId("");
+    }
+  }
+
   async function handleSubmit(event) {
     event.preventDefault();
     setError("");
     setMessage("");
 
-    if (!canCreateTasks) {
+    if (!editingTaskId && !canCreateTasks) {
       setError("Vous n'avez pas l'autorisation de créer des tâches.");
       return;
     }
 
-    if (!formData.project_id) {
-      setError("Veuillez sélectionner un projet.");
+    if (editingTaskId && !canUpdateTasks) {
+      setError("Vous n'avez pas l'autorisation de modifier les taches.");
       return;
     }
 
@@ -358,10 +588,18 @@ function Tasks() {
     setSaving(true);
 
     try {
-      const createdTask = await createTask(normalizeTaskPayload(formData));
-      setTasks((current) => [createdTask, ...current]);
+      const payload = normalizeTaskPayload(formData);
+
+      if (editingTaskId) {
+        await updateTask(editingTaskId, payload);
+        setMessage("Tache modifiee avec succes.");
+      } else {
+        await createTask(payload);
+        setMessage("Tâche créée avec succès.");
+      }
+
+      setEditingTaskId("");
       setFormData(emptyTaskForm);
-      setMessage("Tâche créée avec succès.");
       await loadTasks({ showLoading: false });
       dispatchDataChanged(DATA_EVENTS.TASKS_CHANGED);
     } catch (err) {
@@ -445,11 +683,32 @@ function Tasks() {
 
         return next;
       });
+
+      const attachmentEntries = await Promise.all(
+        data.map(async (subtask) => [subtask.id, await getSubtaskAttachments(taskId, subtask.id)])
+      );
+      setAttachmentsBySubtask((current) => ({
+        ...current,
+        ...Object.fromEntries(attachmentEntries),
+      }));
     } catch (err) {
       console.error("Load subtasks error:", err);
       setError(err.response?.data?.detail || "Impossible de charger les sous-taches.");
     } finally {
       setLoadingSubtasksTaskId("");
+    }
+  }
+
+  async function loadTaskAttachments(taskId) {
+    try {
+      const data = await getTaskAttachments(taskId);
+      setAttachmentsByTask((current) => ({
+        ...current,
+        [taskId]: data,
+      }));
+    } catch (err) {
+      console.error("Load task attachments error:", err);
+      setError(err.response?.data?.detail || "Impossible de charger les pieces jointes.");
     }
   }
 
@@ -468,8 +727,103 @@ function Tasks() {
       [taskId]: current[taskId] || emptySubtaskForm,
     }));
 
-    if (!subtasksByTask[taskId]) {
-      await loadSubtasks(taskId);
+    await Promise.all([
+      attachmentsByTask[taskId] ? Promise.resolve() : loadTaskAttachments(taskId),
+      subtasksByTask[taskId] ? Promise.resolve() : loadSubtasks(taskId),
+    ]);
+  }
+
+  async function handleUploadTaskAttachment(taskId, event) {
+    const file = event.target.files?.[0];
+
+    if (!file) {
+      return;
+    }
+
+    setError("");
+    setMessage("");
+    setUploadingAttachmentKey(`task:${taskId}`);
+
+    try {
+      const attachment = await uploadTaskAttachment(taskId, file);
+      setAttachmentsByTask((current) => ({
+        ...current,
+        [taskId]: [...(current[taskId] || []), attachment],
+      }));
+      setMessage("Piece jointe ajoutee avec succes.");
+    } catch (err) {
+      console.error("Upload task attachment error:", err);
+      setError(err.response?.data?.detail || "Erreur pendant l'ajout de la piece jointe.");
+    } finally {
+      event.target.value = "";
+      setUploadingAttachmentKey("");
+    }
+  }
+
+  async function handleUploadSubtaskAttachment(taskId, subtaskId, event) {
+    const file = event.target.files?.[0];
+
+    if (!file) {
+      return;
+    }
+
+    setError("");
+    setMessage("");
+    setUploadingAttachmentKey(`subtask:${subtaskId}`);
+
+    try {
+      const attachment = await uploadSubtaskAttachment(taskId, subtaskId, file);
+      setAttachmentsBySubtask((current) => ({
+        ...current,
+        [subtaskId]: [...(current[subtaskId] || []), attachment],
+      }));
+      setMessage("Piece jointe ajoutee avec succes.");
+    } catch (err) {
+      console.error("Upload subtask attachment error:", err);
+      setError(err.response?.data?.detail || "Erreur pendant l'ajout de la piece jointe.");
+    } finally {
+      event.target.value = "";
+      setUploadingAttachmentKey("");
+    }
+  }
+
+  async function handleDeleteTaskAttachment(taskId, attachmentId) {
+    setError("");
+    setMessage("");
+    setDeletingAttachmentId(attachmentId);
+
+    try {
+      await deleteTaskAttachment(taskId, attachmentId);
+      setAttachmentsByTask((current) => ({
+        ...current,
+        [taskId]: (current[taskId] || []).filter((attachment) => attachment.id !== attachmentId),
+      }));
+      setMessage("Piece jointe supprimee.");
+    } catch (err) {
+      console.error("Delete task attachment error:", err);
+      setError(err.response?.data?.detail || "Erreur pendant la suppression de la piece jointe.");
+    } finally {
+      setDeletingAttachmentId("");
+    }
+  }
+
+  async function handleDeleteSubtaskAttachment(taskId, subtaskId, attachmentId) {
+    setError("");
+    setMessage("");
+    setDeletingAttachmentId(attachmentId);
+
+    try {
+      await deleteSubtaskAttachment(taskId, subtaskId, attachmentId);
+      setAttachmentsBySubtask((current) => ({
+        ...current,
+        [subtaskId]: (current[subtaskId] || []).filter((attachment) => attachment.id !== attachmentId),
+      }));
+      setMessage("Piece jointe supprimee.");
+    } catch (err) {
+      console.error("Delete subtask attachment error:", err);
+      setError(err.response?.data?.detail || "Erreur pendant la suppression de la piece jointe.");
+    } finally {
+      setDeletingAttachmentId("");
     }
   }
 
@@ -594,11 +948,17 @@ function Tasks() {
       {error && <p className="notice error">{error}</p>}
 
       <section className="management-grid">
-        {canCreateTasks ? (
+        {(canCreateTasks || (editingTaskId && canUpdateTasks)) ? (
         <form className="workspace-panel user-form" onSubmit={handleSubmit}>
           <div className="panel-title">
-            <h3>Nouvelle tâche</h3>
-            <span>Source locale</span>
+            <h3>{editingTaskId ? "Modifier tache" : "Nouvelle tache"}</h3>
+            {editingTaskId ? (
+              <button type="button" onClick={resetTaskForm}>
+                Annuler
+              </button>
+            ) : (
+              <span>Creation</span>
+            )}
           </div>
 
           <div className="form-grid">
@@ -612,15 +972,10 @@ function Tasks() {
                 name="project_id"
                 value={formData.project_id}
                 onChange={handleChange}
-                disabled={projectsLoading || projectOptions.length === 0}
-                required
+                disabled={projectsLoading}
               >
                 <option value="">
-                  {projectsLoading
-                    ? "Chargement des projets..."
-                    : projectOptions.length
-                      ? "Sélectionner un projet"
-                      : "Aucun projet disponible"}
+                  {projectsLoading ? "Chargement des projets..." : "Aucun projet"}
                 </option>
                 {projectOptions.map((project) => (
                   <option key={project.value} value={project.value}>
@@ -691,7 +1046,7 @@ function Tasks() {
           </label>
 
           <button className="primary-action" type="submit" disabled={saving}>
-            {saving ? "Création..." : "Créer la tâche"}
+            {saving ? "Enregistrement..." : editingTaskId ? "Modifier la tache" : "Creer la tache"}
           </button>
         </form>
         ) : (
@@ -720,27 +1075,32 @@ function Tasks() {
               <span>Progression</span>
               <span>Échéance</span>
               <span>Affecter a</span>
+              <span>Actions</span>
             </div>
 
             {recentTasks.map((task) => (
               <Fragment key={task.id}>
                 <div className="table-row">
                   <span>{task.title}</span>
-                  <span>{projectById[String(task.project_id || "")] || task.project_id || "Aucun"}</span>
+                  <span>{projectById[String(task.project_id || "")] || task.project_id || "Sans projet"}</span>
                   <span>{serviceById[String(task.service_id || "")] || task.service_id || "Aucun"}</span>
                   <span>
-                    <select
-                      className="assignment-select status-select"
-                      value={task.status || ""}
-                      onChange={(event) => handleStatusChange(task.id, event.target.value)}
-                      disabled={updatingStatusTaskId === task.id}
-                    >
-                      {statusOptions.map((status) => (
-                        <option key={status.value} value={status.value}>
-                          {status.label}
-                        </option>
-                      ))}
-                    </select>
+                    {canUpdateTasks ? (
+                      <select
+                        className="assignment-select status-select"
+                        value={task.status || ""}
+                        onChange={(event) => handleStatusChange(task.id, event.target.value)}
+                        disabled={updatingStatusTaskId === task.id}
+                      >
+                        {statusOptions.map((status) => (
+                          <option key={status.value} value={status.value}>
+                            {status.label}
+                          </option>
+                        ))}
+                      </select>
+                    ) : (
+                      <strong>{task.status || "Nouveau"}</strong>
+                    )}
                   </span>
                   <span>{getOptionLabel(priorityOptions, task.priority)}</span>
                   <span className="task-progress-cell">
@@ -754,29 +1114,93 @@ function Tasks() {
                   </span>
                   <span>{task.due_date || "Aucune"}</span>
                   <span className="task-actions-cell">
-                    <select
-                      className="assignment-select"
-                      value={task.assigned_to || ""}
-                      onChange={(event) => handleAssignTask(task.id, event.target.value)}
-                      disabled={assigningTaskId === task.id || usersLoading}
-                    >
-                      <option value="">Choisir</option>
-                      {getTaskAssignableUsers(task).map((user) => (
-                        <option key={user.uuid} value={user.uuid}>
-                          {getUserDisplayName(user)}
-                        </option>
-                      ))}
-                    </select>
+                    {canUpdateTasks ? (
+                      <select
+                        className="assignment-select"
+                        value={task.assigned_to || ""}
+                        onChange={(event) => handleAssignTask(task.id, event.target.value)}
+                        disabled={assigningTaskId === task.id || usersLoading}
+                      >
+                        <option value="">Choisir</option>
+                        {getTaskAssignableUsers(task).map((user) => (
+                          <option key={user.uuid} value={user.uuid}>
+                            {getUserDisplayName(user)}
+                          </option>
+                        ))}
+                      </select>
+                    ) : (
+                      <small>{getAssignedUserName(task.assigned_to)}</small>
+                    )}
                     <button className="secondary-action compact-action" type="button" onClick={() => handleToggleSubtasks(task.id)}>
                       <PlusCircle size={15} />
                       Sous-tache
                     </button>
+                  </span>
+                  <span className="task-row-actions">
+                    <button type="button" onClick={() => openTaskDetails(task)}>
+                      <Eye size={15} />
+                      Voir
+                    </button>
+                    {canUpdateTasks && (
+                      <button type="button" onClick={() => startEditTask(task)}>
+                        <Edit3 size={15} />
+                        Modifier
+                      </button>
+                    )}
+                    {canDeleteTasks && (
+                      <button type="button" onClick={() => handleDeleteTask(task)} disabled={deletingTaskId === task.id}>
+                        <Trash2 size={15} />
+                        Supprimer
+                      </button>
+                    )}
                   </span>
                 </div>
 
                 {expandedTaskId === task.id && (
                   <div className="subtask-row">
                     <div className="subtask-panel">
+                      <section className="attachments-panel">
+                        <div className="subtask-panel-title">
+                          <div>
+                            <h4>Pieces jointes de la tache</h4>
+                            <span>{(attachmentsByTask[task.id] || []).length} fichier(s)</span>
+                          </div>
+                          <label className="attachment-upload">
+                            Ajouter
+                            <input
+                              type="file"
+                              accept=".pdf,.doc,.docx,.xls,.xlsx,.png,.jpg,.jpeg"
+                              onChange={(event) => handleUploadTaskAttachment(task.id, event)}
+                              disabled={uploadingAttachmentKey === `task:${task.id}`}
+                            />
+                          </label>
+                        </div>
+                        <div className="attachment-list">
+                          {(attachmentsByTask[task.id] || []).map((attachment) => (
+                            <article className="attachment-item" key={attachment.id}>
+                              <span>
+                                <strong>{attachment.original_filename}</strong>
+                                <small>
+                                  {attachment.content_type || "Type inconnu"} - {formatFileSize(attachment.size)} -{" "}
+                                  {new Date(attachment.created_at).toLocaleDateString()}
+                                </small>
+                              </span>
+                              <button
+                                className="secondary-action compact-action"
+                                type="button"
+                                onClick={() => handleDeleteTaskAttachment(task.id, attachment.id)}
+                                disabled={deletingAttachmentId === attachment.id}
+                              >
+                                Supprimer
+                              </button>
+                            </article>
+                          ))}
+                          {(attachmentsByTask[task.id] || []).length === 0 && (
+                            <p className="subtask-empty">Aucune piece jointe pour cette tache.</p>
+                          )}
+                        </div>
+                      </section>
+
                       <div className="subtask-list">
                         <div className="subtask-panel-title">
                           <div>
@@ -795,6 +1219,7 @@ function Tasks() {
                                 {getOptionLabel(statusOptions, subtask.status)} - {getOptionLabel(priorityOptions, subtask.priority)}
                                 {subtask.due_date ? ` - ${subtask.due_date}` : ""}
                               </span>
+                              <small>Assignee a : {getAssignedUserName(subtask.assigned_to)}</small>
                               <div className="subtask-assignment-controls">
                                 <label>
                                   Service
@@ -836,6 +1261,47 @@ function Tasks() {
                                   {assigningSubtaskId === subtask.id ? "Affectation..." : "Affecter"}
                                 </button>
                               </div>
+                              <section className="attachments-panel subtask-attachments">
+                                <div className="subtask-panel-title">
+                                  <div>
+                                    <h4>Pieces jointes</h4>
+                                    <span>{(attachmentsBySubtask[subtask.id] || []).length} fichier(s)</span>
+                                  </div>
+                                  <label className="attachment-upload">
+                                    Ajouter
+                                    <input
+                                      type="file"
+                                      accept=".pdf,.doc,.docx,.xls,.xlsx,.png,.jpg,.jpeg"
+                                      onChange={(event) => handleUploadSubtaskAttachment(task.id, subtask.id, event)}
+                                      disabled={uploadingAttachmentKey === `subtask:${subtask.id}`}
+                                    />
+                                  </label>
+                                </div>
+                                <div className="attachment-list">
+                                  {(attachmentsBySubtask[subtask.id] || []).map((attachment) => (
+                                    <article className="attachment-item" key={attachment.id}>
+                                      <span>
+                                        <strong>{attachment.original_filename}</strong>
+                                        <small>
+                                          {attachment.content_type || "Type inconnu"} - {formatFileSize(attachment.size)} -{" "}
+                                          {new Date(attachment.created_at).toLocaleDateString()}
+                                        </small>
+                                      </span>
+                                      <button
+                                        className="secondary-action compact-action"
+                                        type="button"
+                                        onClick={() => handleDeleteSubtaskAttachment(task.id, subtask.id, attachment.id)}
+                                        disabled={deletingAttachmentId === attachment.id}
+                                      >
+                                        Supprimer
+                                      </button>
+                                    </article>
+                                  ))}
+                                  {(attachmentsBySubtask[subtask.id] || []).length === 0 && (
+                                    <p className="subtask-empty">Aucune piece jointe.</p>
+                                  )}
+                                </div>
+                              </section>
                             </div>
                           </article>
                         ))}
@@ -919,6 +1385,65 @@ function Tasks() {
           </div>
         </section>
       </section>
+
+      {selectedTask && (
+        <div className="service-modal-backdrop" role="presentation">
+          <article className="service-modal task-details-modal" role="dialog" aria-modal="true" aria-labelledby="task-details-title">
+            <header>
+              <div>
+                <h3 id="task-details-title">{selectedTask.title || selectedTask.titre || "Tache"}</h3>
+                <p>{taskDetailsLoading ? "Chargement..." : "Details de la tache"}</p>
+              </div>
+              <button type="button" className="service-modal-close" onClick={() => setSelectedTask(null)} aria-label="Fermer">
+                <X size={18} />
+              </button>
+            </header>
+
+            <dl className="details-list compact">
+              <div>
+                <dt>Projet</dt>
+                <dd>{projectById[String(selectedTask.project_id || "")] || selectedTask.project_id || "Sans projet"}</dd>
+              </div>
+              <div>
+                <dt>Service</dt>
+                <dd>{serviceById[String(selectedTask.service_id || "")] || selectedTask.service_id || "Aucun"}</dd>
+              </div>
+              <div>
+                <dt>Affectee a</dt>
+                <dd>{getAssignedUserName(selectedTask.assigned_to)}</dd>
+              </div>
+              <div>
+                <dt>Statut</dt>
+                <dd>{getOptionLabel(statusOptions, selectedTask.status || selectedTask.statut)}</dd>
+              </div>
+              <div>
+                <dt>Priorite</dt>
+                <dd>{getOptionLabel(priorityOptions, selectedTask.priority || selectedTask.priorite)}</dd>
+              </div>
+              <div>
+                <dt>Echeance</dt>
+                <dd>{toDateInputValue(selectedTask.due_date || selectedTask.date_limite) || "Aucune"}</dd>
+              </div>
+              <div>
+                <dt>Description</dt>
+                <dd>{selectedTask.description || "Non renseignee"}</dd>
+              </div>
+            </dl>
+
+            <footer>
+              {canUpdateTasks && (
+                <button type="button" className="secondary-action" onClick={() => startEditTask(selectedTask)}>
+                  <Edit3 size={16} />
+                  Modifier
+                </button>
+              )}
+              <button type="button" className="secondary-action" onClick={() => setSelectedTask(null)}>
+                Fermer
+              </button>
+            </footer>
+          </article>
+        </div>
+      )}
     </div>
   );
 }

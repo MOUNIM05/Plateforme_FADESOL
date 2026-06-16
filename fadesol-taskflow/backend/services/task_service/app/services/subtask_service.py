@@ -10,6 +10,7 @@ from sqlalchemy.orm import Session
 from app.models.subtask import SubTask
 from app.models.task import Task
 from app.schemas.subtask_schema import SubTaskAssign, SubTaskCreate, SubTaskCreateLegacy, SubTaskUpdate
+from app.services.integration_service import normalize_optional_uuid, validate_user_exists
 from shared.enums import StatutTache
 from shared.exceptions import not_found
 
@@ -95,6 +96,8 @@ def create_subtask(db: Session, task_id: str, subtask_data: SubTaskCreate) -> Su
 
     data = _payload_data(subtask_data)
     data.pop("task_id", None)
+    data["assigned_to"] = validate_user_exists(data.get("assigned_to"))
+    data["service_id"] = normalize_optional_uuid(data.get("service_id"))
 
     subtask = SubTask(task_id=task_id, **data)
     db.add(subtask)
@@ -118,7 +121,15 @@ def update_subtask(db: Session, subtask_id: str, payload: SubTaskUpdate) -> SubT
     if not subtask:
         raise not_found("Sous-tache introuvable.")
 
-    for field, value in _payload_data(payload, exclude_unset=True).items():
+    data = _payload_data(payload, exclude_unset=True)
+
+    if "assigned_to" in data:
+        data["assigned_to"] = validate_user_exists(data.get("assigned_to"))
+
+    if "service_id" in data:
+        data["service_id"] = normalize_optional_uuid(data.get("service_id"))
+
+    for field, value in data.items():
         setattr(subtask, field, value)
 
     db.commit()
@@ -147,6 +158,7 @@ def assigner_subtask(db: Session, subtask_id: str, utilisateur_id: str) -> SubTa
     if not subtask:
         raise not_found("Sous-tache introuvable.")
 
+    utilisateur_id = validate_user_exists(utilisateur_id)
     subtask.assigner(utilisateur_id)
     db.commit()
     db.refresh(subtask)
@@ -165,10 +177,10 @@ def assign_subtask(db: Session, subtask_id: str, payload: SubTaskAssign) -> SubT
     data = payload.model_dump(exclude_unset=True)
 
     if "service_id" in data:
-        subtask.service_id = data["service_id"]
+        subtask.service_id = normalize_optional_uuid(data["service_id"])
 
     if "assigned_to" in data:
-        subtask.assigned_to = data["assigned_to"]
+        subtask.assigned_to = validate_user_exists(data["assigned_to"])
 
     subtask.updated_at = datetime.now(timezone.utc)
     db.commit()

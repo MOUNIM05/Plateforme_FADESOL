@@ -1,7 +1,7 @@
 /* eslint-disable react-refresh/only-export-components */
 import { createContext, useCallback, useContext, useEffect, useMemo, useState } from "react";
 import { getCurrentUser, loginUser } from "../services/authService";
-import { getMyPermissions } from "../services/userService";
+import { getMyPermissions, getMyUserProfile } from "../services/userService";
 import { DATA_EVENTS, subscribeDataEvents } from "../utils/dataEvents";
 
 export const ROLES = {
@@ -12,9 +12,15 @@ export const ROLES = {
 
 const roleAliases = {
   Admin: ROLES.ADMIN,
+  admin: ROLES.ADMIN,
+  ADMIN: ROLES.ADMIN,
   Administrateur: ROLES.ADMIN,
   Manager: ROLES.MANAGER,
+  manager: ROLES.MANAGER,
+  MANAGER: ROLES.MANAGER,
   Employee: ROLES.EMPLOYEE,
+  employee: ROLES.EMPLOYEE,
+  EMPLOYEE: ROLES.EMPLOYEE,
   Employe: ROLES.EMPLOYEE,
   "Employé": ROLES.EMPLOYEE,
 };
@@ -54,20 +60,33 @@ export function getDashboardPath() {
 }
 
 async function getCurrentUserWithPermissions() {
-  const user = await getCurrentUser();
+  const authUser = await getCurrentUser();
+  let profile = {};
+
+  try {
+    profile = await getMyUserProfile();
+  } catch (error) {
+    console.error("Current user profile load error:", error);
+  }
 
   try {
     const permissionData = await getMyPermissions();
-    return { ...user, permissions: permissionData.permissions || {} };
+    return { ...authUser, ...profile, permissions: permissionData.permissions || {} };
   } catch (error) {
     console.error("Current user permissions load error:", error);
-    return { ...user, permissions: {} };
+    return { ...authUser, ...profile, permissions: {} };
   }
 }
 
 export function AuthProvider({ children }) {
   const [token, setToken] = useState(() => localStorage.getItem("access_token"));
-  const [currentUser, setCurrentUser] = useState(null);
+  const [currentUser, setCurrentUser] = useState(() => {
+    try {
+      return JSON.parse(localStorage.getItem("current_user") || localStorage.getItem("user") || "null");
+    } catch {
+      return null;
+    }
+  });
   const [loading, setLoading] = useState(Boolean(localStorage.getItem("access_token")));
 
   const refreshCurrentUser = useCallback(async () => {
@@ -85,11 +104,17 @@ export function AuthProvider({ children }) {
     try {
       const user = await getCurrentUserWithPermissions();
       setCurrentUser(user);
+      // Persist a concise current user object for components that read localStorage directly
+      const toStore = user;
+      localStorage.setItem("current_user", JSON.stringify(toStore));
+      localStorage.setItem("user", JSON.stringify(toStore));
       setToken(storedToken);
       return user;
     } catch (error) {
       console.error("Current user load error:", error);
       localStorage.removeItem("access_token");
+      localStorage.removeItem("current_user");
+      localStorage.removeItem("user");
       setCurrentUser(null);
       setToken(null);
       return null;
@@ -112,12 +137,16 @@ export function AuthProvider({ children }) {
       .then((user) => {
         if (isMounted) {
           setCurrentUser(user);
+          localStorage.setItem("current_user", JSON.stringify(user));
+          localStorage.setItem("user", JSON.stringify(user));
           setToken(storedToken);
         }
       })
       .catch((error) => {
         console.error("Current user load error:", error);
         localStorage.removeItem("access_token");
+        localStorage.removeItem("current_user");
+        localStorage.removeItem("user");
         if (isMounted) {
           setCurrentUser(null);
           setToken(null);
@@ -149,9 +178,13 @@ export function AuthProvider({ children }) {
     try {
       const user = await getCurrentUserWithPermissions();
       setCurrentUser(user);
+      localStorage.setItem("current_user", JSON.stringify(user));
+      localStorage.setItem("user", JSON.stringify(user));
       return user;
     } catch (error) {
       localStorage.removeItem("access_token");
+      localStorage.removeItem("current_user");
+      localStorage.removeItem("user");
       setToken(null);
       setCurrentUser(null);
       throw error;
@@ -160,6 +193,8 @@ export function AuthProvider({ children }) {
 
   function logout() {
     localStorage.removeItem("access_token");
+    localStorage.removeItem("current_user");
+    localStorage.removeItem("user");
     setToken(null);
     setCurrentUser(null);
   }

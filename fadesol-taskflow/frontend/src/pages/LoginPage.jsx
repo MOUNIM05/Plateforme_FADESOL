@@ -115,7 +115,11 @@ function LoginPage() {
               <span>Remember me</span>
             </label>
 
-            <button type="button" className="ft-forgot-link">
+            <button
+              type="button"
+              className="ft-forgot-link"
+              onClick={() => setError("Contactez l'administrateur Fadesol pour reinitialiser votre mot de passe.")}
+            >
               Forget Password?
             </button>
           </div>

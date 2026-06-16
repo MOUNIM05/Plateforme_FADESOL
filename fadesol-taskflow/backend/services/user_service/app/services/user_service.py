@@ -38,6 +38,11 @@ def get_user_by_id(db: Session, user_id: int) -> User | None:
     return db.query(User).filter(User.id == user_id).first()
 
 
+def get_user_by_uuid(db: Session, user_uuid: str) -> User | None:
+    """Retourne un utilisateur par UUID public."""
+    return db.query(User).filter(User.uuid == user_uuid).first()
+
+
 def list_users(db: Session, skip: int = 0, limit: int = 100, service_id: str | None = None) -> list[User]:
     """Liste les utilisateurs, avec filtre facultatif par service."""
     # Construit la requete de liste avec pagination et filtre facultatif par service.
@@ -271,6 +276,19 @@ def set_user_active_state(db: Session, user_id: int, is_active: bool) -> User:
 
     user.is_active = is_active
     user.est_actif = is_active
+    db.commit()
+    db.refresh(user)
+
+    return user
+
+
+def update_user_photo(db: Session, user_id: int, photo_url: str) -> User:
+    user = get_user_by_id(db, user_id)
+
+    if not user:
+        raise not_found("Utilisateur introuvable.")
+
+    user.photo_url = photo_url
     db.commit()
     db.refresh(user)
 

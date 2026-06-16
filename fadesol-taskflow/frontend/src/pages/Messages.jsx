@@ -1,4 +1,5 @@
 import { useEffect, useMemo, useRef, useState } from "react";
+import { useSearchParams } from "react-router-dom";
 import { Inbox, MessageCircle, Radio, Search, Send, UsersRound } from "lucide-react";
 import { getRoleLabel, useAuth } from "../context/AuthContext";
 import { getProjects } from "../services/projectService";
@@ -8,8 +9,10 @@ import {
   createMessage,
   getConversation,
   getConversations,
+  getMessages,
   getMessagesWebSocketUrl,
   markMessageAsRead,
+  getOnlineUsers,
 } from "../services/messageService";
 import { DATA_EVENTS, dispatchDataChanged } from "../utils/dataEvents";
 
@@ -60,6 +63,17 @@ function formatTime(value) {
   }).format(new Date(value));
 }
 
+function presenceLabel(info) {
+  if (!info) return "";
+  if (info.is_online) return "En ligne";
+  if (info.last_seen) {
+    const last = new Date(info.last_seen).getTime();
+    const diffMinutes = (Date.now() - last) / 1000 / 60;
+    return diffMinutes < 15 ? "Vu récemment" : "Hors ligne";
+  }
+  return "Hors ligne";
+}
+
 function Messages() {
   const { currentUser, hasPermission } = useAuth();
   const canSendMessages = hasPermission("messages.send");
@@ -79,6 +93,7 @@ function Messages() {
   const [realtimeStatus, setRealtimeStatus] = useState("connecting");
   const [notice, setNotice] = useState("");
   const [error, setError] = useState("");
+  const [presence, setPresence] = useState({});
   const selectedThreadIdRef = useRef("");
   const selectedConversationIdRef = useRef("");
   const chatHistoryRef = useRef(null);
@@ -99,6 +114,9 @@ function Messages() {
 
   const currentMessagingUserId =
     String(myProfile?.uuid || myProfile?.id || currentUser?.user_id || currentUser?.uuid || currentUser?.id || "");
+  const currentServiceId = myProfile?.id_service || myProfile?.service_id || currentUser?.id_service || currentUser?.service_id || "";
+  const currentRole = currentUser?.role;
+  const isAdmin = currentRole === "Admin" || currentRole === "Administrateur";
 
   const userById = useMemo(() => {
     return users.reduce((accumulator, user) => {
@@ -107,6 +125,17 @@ function Messages() {
       return accumulator;
     }, {});
   }, [users]);
+
+  const visibleUsers = useMemo(() => {
+    if (isAdmin || !currentServiceId) {
+      return users;
+    }
+
+    return users.filter((user) =>
+      [user.id_service, user.service_id, user.service].map(String).includes(String(currentServiceId)) ||
+      user.service === myProfile?.service
+    );
+  }, [currentServiceId, isAdmin, myProfile?.service, users]);
 
   const serviceById = useMemo(() => {
     return services.reduce((accumulator, service) => {
@@ -190,7 +219,7 @@ function Messages() {
   const threadItems = useMemo(() => {
     const itemsById = {};
 
-    users.forEach((user) => {
+    visibleUsers.forEach((user) => {
       const userId = getUserId(user);
 
       if (!userId || currentUserIdentifiers.has(userId) || user.email === currentUser?.email) {
@@ -250,7 +279,7 @@ function Messages() {
           sensitivity: "base",
         })
       );
-  }, [conversationByUserId, conversations, currentUser, currentUserIdentifiers, searchTerm, userById, users]);
+  }, [conversationByUserId, conversations, currentUser, currentUserIdentifiers, searchTerm, userById, visibleUsers]);
 
   const selectedThread = useMemo(
     () => threadItems.find((item) => item.id === selectedThreadId) || null,
@@ -260,6 +289,46 @@ function Messages() {
   useEffect(() => {
     loadMessagingData();
   }, []);
+
+  // Handle query params to open a conversation or message
+  const [searchParams] = useSearchParams();
+
+  useEffect(() => {
+    const conversationId = searchParams.get("conversationId");
+    const messageId = searchParams.get("messageId");
+
+    if (conversationId) {
+      // ensure data loaded then open conversation
+      (async () => {
+        await loadMessagingData(false);
+        setSelectedThreadId(String(conversationId));
+        await loadConversation(conversationId);
+      })();
+      return;
+    }
+
+    if (messageId) {
+      // Try to fetch messages and find the conversation containing this message
+      (async () => {
+        try {
+          const data = await getMessages();
+          const msg = Array.isArray(data) ? data.find((m) => String(m.id) === String(messageId)) : null;
+
+          if (msg) {
+            const convId = msg.conversation_id || msg.conversation || msg.conversationId;
+
+            if (convId) {
+              await loadMessagingData(false);
+              setSelectedThreadId(String(convId));
+              await loadConversation(convId);
+            }
+          }
+        } catch (err) {
+          console.error("Message lookup error:", err);
+        }
+      })();
+    }
+  }, [searchParams]);
 
   useEffect(() => {
     selectedThreadIdRef.current = selectedThreadId;
@@ -288,9 +357,15 @@ function Messages() {
         if (payload.type === "message_read") {
           setMessages((current) =>
             current.map((message) =>
-              message.id === payload.message?.id ? { ...message, est_lu: true } : message
+              message.id === payload.message?.id
+                ? { ...message, est_lu: true, date_lecture: payload.read_at || message.date_lecture }
+                : message
             )
           );
+        }
+
+        if (payload.type === "presence_update") {
+          setPresence((prev) => ({ ...prev, [payload.user_id]: { is_online: !!payload.is_online, last_seen: payload.last_seen } }));
         }
       } catch (socketError) {
         console.error("Realtime message error:", socketError);
@@ -389,16 +464,70 @@ function Messages() {
     setError("");
 
     try {
-      const [conversationsData, usersData, profileData, servicesData, projectsData] = await Promise.allSettled([
+      const [conversationsData, usersData, profileData, servicesData, projectsData, onlineData] = await Promise.allSettled([
         getConversations(),
         getUsers(),
         getMyUserProfile(),
         getServices(),
         getProjects(),
+        getOnlineUsers(),
       ]);
 
       if (conversationsData.status === "fulfilled") {
         setConversations(Array.isArray(conversationsData.value) ? conversationsData.value : []);
+      } else {
+        // fallback: try loading raw messages and build conversation summaries client-side
+        try {
+          const raw = await getMessages();
+
+          if (Array.isArray(raw)) {
+            const grouped = {};
+
+            function convIdForMessage(msg) {
+              if (msg.tache_id) return `tache--${msg.tache_id}`;
+              if (msg.projet_id) return `projet--${msg.projet_id}`;
+              if (msg.service_id) return `service--${msg.service_id}`;
+              if (msg.destinataire_id) {
+                const parts = [String(msg.expediteur_id), String(msg.destinataire_id)].sort();
+                return `direct--${parts[0]}--${parts[1]}`;
+              }
+              return `general--${msg.expediteur_id}`;
+            }
+
+            raw.forEach((m) => {
+              const cid = convIdForMessage(m);
+              grouped[cid] = grouped[cid] || [];
+              grouped[cid].push(m);
+            });
+
+            const convs = Object.entries(grouped).map(([conversation_id, msgs]) => {
+              const last = msgs[msgs.length - 1];
+              const first = msgs[0];
+
+              return {
+                conversation_id,
+                type: conversation_id.split("--")[0],
+                title: conversation_id.startsWith("direct--")
+                  ? `Conversation ${first.expediteur_id} / ${first.destinataire_id}`
+                  : conversation_id,
+                total_messages: msgs.length,
+                unread_count: msgs.filter((m) => !m.est_lu).length,
+                last_message: last.contenu,
+                last_message_at: last.date_creation,
+                expediteur_id: first.expediteur_id,
+                destinataire_id: first.destinataire_id,
+                service_id: first.service_id,
+                tache_id: first.tache_id,
+                projet_id: first.projet_id,
+              };
+            });
+
+            setConversations(convs);
+          }
+        } catch (fallbackError) {
+          // if fallback also fails, surface a single informative error
+          setError("Conversations temporairement indisponibles.");
+        }
       }
 
       if (usersData.status === "fulfilled") {
@@ -415,6 +544,11 @@ function Messages() {
 
       if (projectsData.status === "fulfilled") {
         setProjects(Array.isArray(projectsData.value) ? projectsData.value : []);
+      }
+
+      if (onlineData.status === "fulfilled") {
+        // onlineData.value expected as { user_id: { is_online: bool, last_seen: string } }
+        setPresence(typeof onlineData.value === "object" && onlineData.value ? onlineData.value : {});
       }
 
       if (conversationsData.status === "rejected") {
@@ -555,27 +689,30 @@ function Messages() {
             {loading ? (
               <div className="messages-empty">Chargement des conversations...</div>
             ) : threadItems.length ? (
-              threadItems.map((thread) => (
-                <button
-                  type="button"
-                  key={thread.id}
-                  className={`conversation-item ${selectedThreadId === thread.id ? "is-selected" : ""}`}
-                  onClick={() => setSelectedThreadId(thread.id)}
-                >
-                  <div className="message-avatar">{getNameInitials(thread.name)}</div>
-                  <div>
-                    <header>
-                      <strong>{thread.name}</strong>
-                      <time>{formatDate(thread.lastMessageAt)}</time>
-                    </header>
-                    <p>{thread.lastMessage}</p>
-                    <footer>
-                      <span>{thread.role}</span>
-                      {thread.unreadCount > 0 && <mark>{thread.unreadCount}</mark>}
-                    </footer>
-                  </div>
-                </button>
-              ))
+                      threadItems.map((thread) => (
+                        <button
+                          type="button"
+                          key={thread.id}
+                          className={`conversation-item ${selectedThreadId === thread.id ? "is-selected" : ""}`}
+                          onClick={() => setSelectedThreadId(thread.id)}
+                        >
+                          <div className="message-avatar">
+                            {getNameInitials(thread.name)}
+                            <span className={`presence-dot ${presence[thread.userId]?.is_online ? "is-online" : "is-offline"}`} />
+                          </div>
+                          <div>
+                            <header>
+                              <strong>{thread.name}</strong>
+                              <time>{formatDate(thread.lastMessageAt)}</time>
+                            </header>
+                            <p>{thread.lastMessage}</p>
+                            <footer>
+                              <span>{thread.role}</span>
+                              {thread.unreadCount > 0 && <mark>{thread.unreadCount}</mark>}
+                            </footer>
+                          </div>
+                        </button>
+                      ))
             ) : (
               <div className="messages-empty">Aucune conversation disponible.</div>
             )}
@@ -595,6 +732,7 @@ function Messages() {
                 <div>
                   <h3>{selectedThread.name}</h3>
                   <span>{selectedThread.user?.email || selectedThread.role || "Conversation"}</span>
+                  <small className="presence-text">{presenceLabel(presence[selectedThread.userId])}</small>
                 </div>
                 <UsersRound size={20} />
               </header>
@@ -607,7 +745,18 @@ function Messages() {
                     <article key={message.id} className={`message-bubble-row ${isMine(message) ? "is-mine" : ""}`}>
                       <div className="message-bubble">
                         <p>{message.contenu}</p>
-                        <time>{formatTime(message.date_creation)}</time>
+                        <div className="message-meta">
+                          <time>{formatTime(message.date_creation)}</time>
+                          {isMine(message) && (
+                            <small className="message-status">
+                              {message.est_lu
+                                ? message.date_lecture
+                                  ? ` · Vu ${formatTime(message.date_lecture)}`
+                                  : " · Vu"
+                                : " · Envoyé"}
+                            </small>
+                          )}
+                        </div>
                       </div>
                     </article>
                   ))

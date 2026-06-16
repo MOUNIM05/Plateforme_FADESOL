@@ -6,6 +6,12 @@ export async function getDashboardStatistics() {
   return response.data;
 }
 
+export async function getDashboardAnalytics() {
+  const response = await api.get("/dashboard/analytics");
+
+  return response.data;
+}
+
 export async function getServicesOverview() {
   const response = await api.get("/dashboard/services-overview");
 

@@ -1,6 +1,8 @@
 import { useEffect, useMemo, useState } from "react";
-import { CalendarDays, ClipboardList, Filter, UserRound } from "lucide-react";
-import { getTasks, updateTaskStatus } from "../services/taskService";
+import { useSearchParams } from "react-router-dom";
+import { useAuth } from "../context/AuthContext";
+import { CalendarDays, ClipboardList, Eye, Filter, Paperclip, UserRound, X } from "lucide-react";
+import { getTask, getTaskAttachments, getSubtasksByTask, getTasks, updateTaskStatus } from "../services/taskService";
 
 const statusOptions = [
   { label: "Tous les statuts", value: "" },
@@ -39,11 +41,18 @@ function formatDate(value) {
 }
 
 function MyTasks() {
+  const { hasPermission } = useAuth();
+  const canUpdateTasks = hasPermission("tasks.update");
+
   const [tasks, setTasks] = useState([]);
   const [statusFilter, setStatusFilter] = useState("");
   const [priorityFilter, setPriorityFilter] = useState("");
   const [loading, setLoading] = useState(true);
   const [updatingStatusTaskId, setUpdatingStatusTaskId] = useState("");
+  const [selectedTask, setSelectedTask] = useState(null);
+  const [selectedSubtasks, setSelectedSubtasks] = useState([]);
+  const [selectedAttachments, setSelectedAttachments] = useState([]);
+  const [detailsLoading, setDetailsLoading] = useState(false);
   const [message, setMessage] = useState("");
   const [error, setError] = useState("");
 
@@ -55,6 +64,21 @@ function MyTasks() {
     }),
     [priorityFilter, statusFilter]
   );
+
+  const [searchParams] = useSearchParams();
+
+  useEffect(() => {
+    // If a taskId is present in query params, open the modal for that task after load
+    const taskId = searchParams.get("taskId");
+
+    if (taskId && tasks.length) {
+      const found = tasks.find((t) => String(t.id) === String(taskId));
+
+      if (found) {
+        openTaskDetails(found);
+      }
+    }
+  }, [searchParams, tasks]);
 
   useEffect(() => {
     let isMounted = true;
@@ -111,6 +135,39 @@ function MyTasks() {
     }
   }
 
+  async function openTaskDetails(task) {
+    setSelectedTask(task);
+    setSelectedSubtasks([]);
+    setSelectedAttachments([]);
+    setDetailsLoading(true);
+    setError("");
+
+    try {
+      const [taskResult, subtasksResult, attachmentsResult] = await Promise.allSettled([
+        getTask(task.id),
+        getSubtasksByTask(task.id),
+        getTaskAttachments(task.id),
+      ]);
+
+      if (taskResult.status === "fulfilled") {
+        setSelectedTask(taskResult.value);
+      }
+
+      if (subtasksResult.status === "fulfilled") {
+        setSelectedSubtasks(Array.isArray(subtasksResult.value) ? subtasksResult.value : []);
+      }
+
+      if (attachmentsResult.status === "fulfilled") {
+        setSelectedAttachments(Array.isArray(attachmentsResult.value) ? attachmentsResult.value : []);
+      }
+    } catch (err) {
+      console.error("Load task details error:", err);
+      setError("Impossible de charger le détail de la tâche.");
+    } finally {
+      setDetailsLoading(false);
+    }
+  }
+
   return (
     <div className="dashboard-page my-tasks-page">
       <div className="board-toolbar">
@@ -160,23 +217,27 @@ function MyTasks() {
                 <p>{task.description || "Aucune description."}</p>
               </div>
 
-              <div className="my-task-meta">
+                  <div className="my-task-meta">
                 <span>
                   <ClipboardList size={15} />
-                  <select
-                    className="assignment-select status-select"
-                    value={task.status || ""}
-                    onChange={(event) => handleStatusChange(task.id, event.target.value)}
-                    disabled={updatingStatusTaskId === task.id}
-                  >
-                    {statusOptions
-                      .filter((status) => status.value)
-                      .map((status) => (
-                        <option key={status.value} value={status.value}>
-                          {status.label}
-                        </option>
-                      ))}
-                  </select>
+                    {canUpdateTasks ? (
+                      <select
+                        className="assignment-select status-select"
+                        value={task.status || ""}
+                        onChange={(event) => handleStatusChange(task.id, event.target.value)}
+                        disabled={updatingStatusTaskId === task.id}
+                      >
+                        {statusOptions
+                          .filter((status) => status.value)
+                          .map((status) => (
+                            <option key={status.value} value={status.value}>
+                              {status.label}
+                            </option>
+                          ))}
+                      </select>
+                    ) : (
+                      <strong>{task.status || "Nouveau"}</strong>
+                    )}
                 </span>
                 <span>
                   <Filter size={15} />
@@ -190,6 +251,10 @@ function MyTasks() {
                   <UserRound size={15} />
                   {task.assigned_to || "Non affectee"}
                 </span>
+                <button type="button" className="secondary-action" onClick={() => openTaskDetails(task)}>
+                  <Eye size={15} />
+                  Voir
+                </button>
               </div>
             </article>
           ))}
@@ -205,6 +270,59 @@ function MyTasks() {
           {loading && <p className="loading-line">Chargement de vos taches...</p>}
         </div>
       </section>
+
+      {selectedTask && (
+        <div className="service-modal-backdrop" role="presentation" onMouseDown={() => setSelectedTask(null)}>
+          <article className="service-modal task-details-modal" role="dialog" aria-modal="true" onMouseDown={(event) => event.stopPropagation()}>
+            <header>
+              <div>
+                <h3>{selectedTask.title || selectedTask.titre || "Détail tâche"}</h3>
+                <p>{selectedTask.description || "Aucune description."}</p>
+              </div>
+              <button type="button" className="icon-button" aria-label="Fermer" onClick={() => setSelectedTask(null)}>
+                <X size={18} />
+              </button>
+            </header>
+
+            {detailsLoading && <p className="loading-line">Chargement du détail...</p>}
+
+            <dl className="details-list">
+              <div><dt>Statut</dt><dd>{getOptionLabel(statusOptions, selectedTask.status)}</dd></div>
+              <div><dt>Priorité</dt><dd>{getOptionLabel(priorityOptions, selectedTask.priority)}</dd></div>
+              <div><dt>Date limite</dt><dd>{formatDate(selectedTask.due_date)}</dd></div>
+              <div><dt>Projet</dt><dd>{selectedTask.project_id || selectedTask.projet_id || "Sans projet"}</dd></div>
+            </dl>
+
+            <section className="modal-section">
+              <h4>Sous-tâches</h4>
+              {selectedSubtasks.length > 0 ? (
+                selectedSubtasks.map((subtask) => (
+                  <div className="modal-list-row" key={subtask.id}>
+                    <strong>{subtask.title || subtask.titre}</strong>
+                    <span>{subtask.status || subtask.statut || "Nouveau"}</span>
+                  </div>
+                ))
+              ) : (
+                <p className="helper-text">Aucune sous-tâche liée.</p>
+              )}
+            </section>
+
+            <section className="modal-section">
+              <h4>Pièces jointes</h4>
+              {selectedAttachments.length > 0 ? (
+                selectedAttachments.map((attachment) => (
+                  <div className="modal-list-row" key={attachment.id}>
+                    <strong><Paperclip size={14} /> {attachment.filename || attachment.nom_fichier || "Pièce jointe"}</strong>
+                    <span>{attachment.content_type || attachment.type || ""}</span>
+                  </div>
+                ))
+              ) : (
+                <p className="helper-text">Aucune pièce jointe.</p>
+              )}
+            </section>
+          </article>
+        </div>
+      )}
     </div>
   );
 }

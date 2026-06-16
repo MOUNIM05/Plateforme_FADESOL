@@ -3,6 +3,7 @@ import {
   Building2,
   CheckCircle2,
   Clock3,
+  Eye,
   Plus,
   RefreshCw,
   ShieldCheck,
@@ -13,6 +14,7 @@ import {
 } from "lucide-react";
 import { ROLES, getRoleLabel, normalizeRole, useAuth } from "../context/AuthContext";
 import { getServiceDashboard, getServicesOverview } from "../services/dashboardService";
+import { getFadesolServiceDetails } from "../services/serviceFadesolService";
 import { createService, deleteService, getServices } from "../services/serviceService";
 import { getUsers } from "../services/userService";
 import { DATA_EVENTS, dispatchDataChanged, subscribeDataEvents } from "../utils/dataEvents";
@@ -102,6 +104,32 @@ function memberKey(member, index) {
   return member.id || member.email || `${getMemberName(member)}-${index}`;
 }
 
+function getServiceId(service) {
+  return service?.id || service?.service_id;
+}
+
+function getServiceName(service) {
+  return service?.nom || service?.nom_service || service?.service_name || service?.name || "Non renseigne";
+}
+
+function getDetailValue(value, fallback = "Non renseigne") {
+  return value === null || value === undefined || value === "" ? fallback : value;
+}
+
+function formatDate(value) {
+  if (!value) {
+    return "Non renseigne";
+  }
+
+  const date = new Date(value);
+
+  if (Number.isNaN(date.getTime())) {
+    return "Non renseigne";
+  }
+
+  return new Intl.DateTimeFormat("fr-FR", { dateStyle: "medium" }).format(date);
+}
+
 function Services() {
   const { hasPermission } = useAuth();
   const canCreateServices = hasPermission("services.create");
@@ -116,6 +144,13 @@ function Services() {
   const [saving, setSaving] = useState(false);
   const [serviceToDelete, setServiceToDelete] = useState(null);
   const [deleting, setDeleting] = useState(false);
+  const [detailsModal, setDetailsModal] = useState({
+    open: false,
+    loading: false,
+    data: null,
+    serviceName: "",
+    error: "",
+  });
 
   async function loadServices() {
     setLoading(true);
@@ -224,6 +259,55 @@ function Services() {
     setNotice("");
     setWarning("");
     setServiceToDelete(service);
+  }
+
+  async function openServiceDetails(service) {
+    const serviceId = getServiceId(service);
+
+    if (!serviceId) {
+      setWarning("Impossible d'identifier ce service.");
+      return;
+    }
+
+    setNotice("");
+    setWarning("");
+    setDetailsModal({
+      open: true,
+      loading: true,
+      data: null,
+      serviceName: getServiceName(service),
+      error: "",
+    });
+
+    try {
+      const data = await getFadesolServiceDetails(serviceId);
+      setDetailsModal({
+        open: true,
+        loading: false,
+        data,
+        serviceName: getServiceName(data?.service || service),
+        error: "",
+      });
+    } catch (error) {
+      console.error("Load service details error:", error);
+      setDetailsModal({
+        open: true,
+        loading: false,
+        data: null,
+        serviceName: getServiceName(service),
+        error: error.response?.data?.detail || "Impossible de charger les details du service.",
+      });
+    }
+  }
+
+  function closeServiceDetails() {
+    setDetailsModal({
+      open: false,
+      loading: false,
+      data: null,
+      serviceName: "",
+      error: "",
+    });
   }
 
   async function handleDeleteService() {
@@ -341,6 +425,15 @@ function Services() {
                   </div>
                   <div className="service-admin-card__actions">
                     <strong>{progress}%</strong>
+                    <button
+                      type="button"
+                      className="secondary-action compact-action"
+                      onClick={() => openServiceDetails(service)}
+                      aria-label={`Voir ${service.service_name}`}
+                    >
+                      <Eye size={16} />
+                      <span>Voir</span>
+                    </button>
                     {canDeleteServices && !service.is_local_fallback && (
                       <button
                         type="button"
@@ -417,6 +510,94 @@ function Services() {
             );
           })}
         </section>
+      )}
+
+      {detailsModal.open && (
+        <div className="service-modal-backdrop" role="presentation">
+          <article className="service-modal service-details-modal" role="dialog" aria-modal="true" aria-labelledby="service-details-title">
+            <header>
+              <div>
+                <h3 id="service-details-title">Details du service</h3>
+                <p>{detailsModal.serviceName}</p>
+              </div>
+              <button type="button" className="service-modal-close" onClick={closeServiceDetails} aria-label="Fermer">
+                <X size={18} />
+              </button>
+            </header>
+
+            {detailsModal.loading && <p className="loading-line">Chargement des details...</p>}
+            {detailsModal.error && <p className="notice warning">{detailsModal.error}</p>}
+
+            {!detailsModal.loading && !detailsModal.error && (
+              <div className="service-details-content">
+                <section className="service-details-section">
+                  <h4>Informations</h4>
+                  <dl className="details-list compact">
+                    <div>
+                      <dt>Nom du service</dt>
+                      <dd>{getServiceName(detailsModal.data?.service)}</dd>
+                    </div>
+                    <div>
+                      <dt>Description</dt>
+                      <dd>{getDetailValue(detailsModal.data?.service?.description)}</dd>
+                    </div>
+                    <div>
+                      <dt>Manager / responsable</dt>
+                      <dd>{Object.keys(detailsModal.data?.manager || {}).length ? getMemberName(detailsModal.data.manager) : "Non renseigne"}</dd>
+                    </div>
+                    <div>
+                      <dt>Statut</dt>
+                      <dd>{detailsModal.data?.service?.is_active === false ? "Inactif" : getDetailValue(detailsModal.data?.service?.statut, "Actif")}</dd>
+                    </div>
+                    <div>
+                      <dt>Date de creation</dt>
+                      <dd>{formatDate(detailsModal.data?.service?.created_at)}</dd>
+                    </div>
+                    <div>
+                      <dt>Date de mise a jour</dt>
+                      <dd>{formatDate(detailsModal.data?.service?.updated_at)}</dd>
+                    </div>
+                  </dl>
+                </section>
+
+                <section className="service-details-section">
+                  <h4>Statistiques</h4>
+                  <div className="service-admin-stats service-details-stats">
+                    <div><UsersRound size={15} /><span>Utilisateurs</span><strong>{detailsModal.data?.members?.length || 0}</strong></div>
+                    <div><Building2 size={15} /><span>Projets</span><strong>{detailsModal.data?.projects_count || 0}</strong></div>
+                    <div><Workflow size={15} /><span>Taches</span><strong>{detailsModal.data?.tasks_count || 0}</strong></div>
+                    <div><Clock3 size={15} /><span>En cours</span><strong>{detailsModal.data?.tasks_in_progress || 0}</strong></div>
+                    <div><CheckCircle2 size={15} /><span>Terminees</span><strong>{detailsModal.data?.tasks_done || 0}</strong></div>
+                    <div><ShieldCheck size={15} /><span>Bloquees</span><strong>{detailsModal.data?.tasks_blocked || 0}</strong></div>
+                    <div><Clock3 size={15} /><span>En retard</span><strong>{detailsModal.data?.tasks_late || 0}</strong></div>
+                  </div>
+                </section>
+
+                <section className="service-details-section">
+                  <h4>Membres</h4>
+                  {detailsModal.data?.members?.length ? (
+                    <div className="service-details-members">
+                      {detailsModal.data.members.map((member, index) => (
+                        <article key={memberKey(member, index)} className="service-member-chip">
+                          <span>{getMemberName(member)}</span>
+                          <small>{member.email || "Non renseigne"} - {getRoleLabel(member.role)}</small>
+                        </article>
+                      ))}
+                    </div>
+                  ) : (
+                    <p className="helper-text">Aucun membre trouve.</p>
+                  )}
+                </section>
+              </div>
+            )}
+
+            <footer>
+              <button type="button" className="secondary-action" onClick={closeServiceDetails}>
+                Fermer
+              </button>
+            </footer>
+          </article>
+        </div>
       )}
 
       {isCreateModalOpen && (

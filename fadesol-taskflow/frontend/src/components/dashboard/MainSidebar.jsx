@@ -6,7 +6,6 @@ import {
   ClipboardList,
   FolderKanban,
   KeyRound,
-  LogOut,
   MessageSquareText,
   Settings,
   ShieldCheck,
@@ -14,62 +13,65 @@ import {
 } from "lucide-react";
 import fadesolLogo from "../../assets/fadesol-logo.png";
 import energyIcon from "../../assets/fadesol-energy-icon.png";
-import { ROLES, getInitials, getRoleLabel, normalizeRole, useAuth } from "../../context/AuthContext";
+import { ROLES, normalizeRole, useAuth } from "../../context/AuthContext";
+import AccountMenu from "./AccountMenu";
 
 const sections = [
   {
     title: "ORGANISATION",
     items: [
-      { label: "Dashboard", icon: BarChart3, permission: "dashboard.view" },
-      { label: "Services", icon: Building2, permission: "services.view" },
-      { label: "Utilisateurs", icon: UsersRound, permission: "users.view" },
+      { label: "Dashboard", icon: BarChart3, roles: [ROLES.ADMIN, ROLES.MANAGER, ROLES.EMPLOYEE] },
+      { label: "Services", icon: Building2, roles: [ROLES.ADMIN], permission: "services.view" },
+      { label: "Utilisateurs", icon: UsersRound, roles: [ROLES.ADMIN], permission: "users.view" },
     ],
   },
-  {
-    title: "PROJETS & TÂCHES",
-    items: [
-      { label: "Projets", icon: FolderKanban, permission: "projects.view" },
-      { label: "Tâches", icon: ClipboardList, permission: "tasks.view" },
-      { label: "Mes tâches", icon: ShieldCheck, roles: [ROLES.EMPLOYEE] },
-    ],
-  },
+      {
+        title: "PROJETS & TACHES",
+        items: [
+          { label: "Projets", icon: FolderKanban, roles: [ROLES.ADMIN, ROLES.MANAGER], permission: "projects.view" },
+          { label: "Taches", icon: ClipboardList, roles: [ROLES.ADMIN, ROLES.MANAGER], permission: "tasks.view" },
+          { label: "Mes taches", icon: ShieldCheck, roles: [ROLES.MANAGER, ROLES.EMPLOYEE] },
+        ],
+      },
   {
     title: "COMMUNICATION",
     items: [
-      { label: "Messagerie", icon: MessageSquareText, badge: 4, permission: "messages.view" },
+      {
+        label: "Messagerie",
+        icon: MessageSquareText,
+        roles: [ROLES.ADMIN, ROLES.MANAGER, ROLES.EMPLOYEE],
+        permission: "messages.view",
+      },
     ],
   },
   {
-    title: "INTÉGRATION",
+    title: "SYSTEME",
     items: [
-    ],
-  },
-  {
-    title: "SYSTÈME",
-    items: [
-      { label: "Paramètres", icon: Settings, permission: "settings.view" },
-      { label: "Profile", icon: KeyRound, roles: [ROLES.ADMIN, ROLES.MANAGER, ROLES.EMPLOYEE] },
+      { label: "Parametres systeme", icon: Settings, roles: [ROLES.ADMIN], permission: "settings.view" },
+      { label: "Permissions", icon: KeyRound, roles: [ROLES.ADMIN], permission: "settings.permissions.manage" },
+      { label: "Parametres", icon: Settings, roles: [ROLES.MANAGER, ROLES.EMPLOYEE] },
     ],
   },
 ];
 
-function MainSidebar({ activeItem, currentUser, collapsed, onSelect, onToggleCollapse, onLogout }) {
+function MainSidebar({ activeItem, currentUser, collapsed, onSelect, onToggleCollapse }) {
   const { hasPermission } = useAuth();
-  const fullName =
-    currentUser?.prenom && currentUser?.nom
-      ? `${currentUser.prenom} ${currentUser.nom}`
-      : currentUser?.email || "Utilisateur Fadesol";
   const role = normalizeRole(currentUser?.role);
-  const initials = getInitials(currentUser);
   const visibleSections = sections
     .map((section) => ({
       ...section,
       items: section.items.filter((item) => {
+        const hasAllowedRole = item.roles?.includes(role) ?? true;
+
+        if (!hasAllowedRole) {
+          return false;
+        }
+
         if (item.permission) {
           return hasPermission(item.permission);
         }
 
-        return item.roles.includes(role);
+        return true;
       }),
     }))
     .filter((section) => section.items.length > 0);
@@ -95,8 +97,8 @@ function MainSidebar({ activeItem, currentUser, collapsed, onSelect, onToggleCol
           type="button"
           className="sidebar-collapse"
           onClick={onToggleCollapse}
-          aria-label={collapsed ? "Déplier la navigation" : "Réduire la navigation"}
-          title={collapsed ? "Déplier" : "Réduire"}
+          aria-label={collapsed ? "Deplier la navigation" : "Reduire la navigation"}
+          title={collapsed ? "Deplier" : "Reduire"}
         >
           {collapsed ? <ChevronRight size={18} /> : <ChevronLeft size={18} />}
         </button>
@@ -121,7 +123,6 @@ function MainSidebar({ activeItem, currentUser, collapsed, onSelect, onToggleCol
                   >
                     <Icon size={20} />
                     <span className="sidebar-link-label">{item.label}</span>
-                    {item.badge ? <b>{item.badge}</b> : null}
                   </button>
                 );
               })}
@@ -131,15 +132,7 @@ function MainSidebar({ activeItem, currentUser, collapsed, onSelect, onToggleCol
       </nav>
 
       <footer className="sidebar-profile">
-        <div className="sidebar-avatar">{initials}</div>
-        <div className="sidebar-profile__copy">
-          <strong>{fullName}</strong>
-          <span>{getRoleLabel(role)}</span>
-        </div>
-        <button type="button" onClick={onLogout} title="Se déconnecter" aria-label="Se déconnecter">
-          <LogOut size={18} />
-          <span>Se déconnecter</span>
-        </button>
+        <AccountMenu currentUser={currentUser} compact={collapsed} />
       </footer>
     </aside>
   );

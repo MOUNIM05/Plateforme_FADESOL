@@ -4,7 +4,7 @@ import { useNavigate } from "react-router-dom";
 import { useAuth } from "../../context/AuthContext";
 import { getMessages, getMessagesWebSocketUrl } from "../../services/messageService";
 import { getTasks } from "../../services/taskService";
-import { getMyUserProfile } from "../../services/userService";
+import { getMyUserProfile, getUsers } from "../../services/userService";
 import { DATA_EVENTS, subscribeDataEvents } from "../../utils/dataEvents";
 
 function getUserIdentifiers(user) {
@@ -15,34 +15,61 @@ function getUserIdentifiers(user) {
   );
 }
 
-function NotificationButton() {
+function NotificationDropdown() {
   const navigate = useNavigate();
   const { currentUser } = useAuth();
   const [messages, setMessages] = useState([]);
   const [tasks, setTasks] = useState([]);
   const [profile, setProfile] = useState(null);
+  const [serviceUsers, setServiceUsers] = useState([]);
   const [open, setOpen] = useState(false);
   const dropdownRef = useRef(null);
+
+  const role = currentUser?.role;
+  const isAdmin = role === "Admin" || role === "Administrateur";
+  const isManager = role === "Manager";
+  const isEmployee = role === "Employee" || role === "Employe" || role === "EmployÃ©";
+
+  const currentServiceId = profile?.id_service || profile?.service_id || currentUser?.id_service || currentUser?.service_id || "";
 
   const userIds = useMemo(() => {
     return new Set([...getUserIdentifiers(currentUser), ...getUserIdentifiers(profile)]);
   }, [currentUser, profile]);
 
-  const loadUnreadMessages = useCallback(async () => {
+  const loadNotifications = useCallback(async () => {
     try {
-      const [messagesData, tasksData] = await Promise.allSettled([
-        getMessages(),
-        getTasks({ assigned_to: "me" }),
-      ]);
+      const taskFilters = isEmployee ? { assigned_to: "me" } : isManager && currentServiceId ? { service_id: currentServiceId } : {};
 
-      setMessages(messagesData.status === "fulfilled" && Array.isArray(messagesData.value) ? messagesData.value : []);
-      setTasks(tasksData.status === "fulfilled" && Array.isArray(tasksData.value) ? tasksData.value : []);
+      const [messagesData, tasksData] = await Promise.allSettled([getMessages(), getTasks(taskFilters)]);
+
+      const rawMessages = messagesData.status === "fulfilled" && Array.isArray(messagesData.value) ? messagesData.value : [];
+      const rawTasks = tasksData.status === "fulfilled" && Array.isArray(tasksData.value) ? tasksData.value : [];
+
+      // Filter messages by role
+      let visibleMessages = rawMessages;
+
+      if (isEmployee) {
+        visibleMessages = rawMessages.filter((message) => {
+          const recipientId = String(message.destinataire_id || "");
+          return userIds.has(recipientId);
+        });
+      } else if (isManager && serviceUsers.length > 0) {
+        const serviceIds = new Set(serviceUsers.flatMap((u) => [String(u.id), String(u.uuid)]));
+        visibleMessages = rawMessages.filter((message) => {
+          const recipientId = String(message.destinataire_id || "");
+          const senderId = String(message.expediteur_id || "");
+          return serviceIds.has(recipientId) || serviceIds.has(senderId);
+        });
+      }
+
+      setMessages(visibleMessages);
+      setTasks(rawTasks);
     } catch (error) {
       console.error("Notification load error:", error);
       setMessages([]);
       setTasks([]);
     }
-  }, []);
+  }, [isEmployee, isManager, currentServiceId, serviceUsers, userIds]);
 
   useEffect(() => {
     function handleDocumentClick(event) {
@@ -56,14 +83,6 @@ function NotificationButton() {
   }, []);
 
   useEffect(() => {
-    loadUnreadMessages();
-  }, [loadUnreadMessages]);
-
-  useEffect(() => {
-    return subscribeDataEvents([DATA_EVENTS.MESSAGES_CHANGED], loadUnreadMessages);
-  }, [loadUnreadMessages]);
-
-  useEffect(() => {
     let isMounted = true;
 
     getMyUserProfile()
@@ -73,15 +92,29 @@ function NotificationButton() {
         }
       })
       .catch(() => {
-        if (isMounted) {
-          setProfile(null);
-        }
+        if (isMounted) setProfile(null);
       });
 
     return () => {
       isMounted = false;
     };
   }, []);
+
+  useEffect(() => {
+    if (isManager && currentServiceId) {
+      getUsers(currentServiceId)
+        .then((data) => setServiceUsers(Array.isArray(data) ? data : []))
+        .catch(() => setServiceUsers([]));
+    }
+  }, [isManager, currentServiceId]);
+
+  useEffect(() => {
+    loadNotifications();
+  }, [loadNotifications]);
+
+  useEffect(() => {
+    return subscribeDataEvents([DATA_EVENTS.MESSAGES_CHANGED, DATA_EVENTS.TASKS_CHANGED], loadNotifications);
+  }, [loadNotifications]);
 
   useEffect(() => {
     const websocket = new WebSocket(getMessagesWebSocketUrl());
@@ -91,21 +124,19 @@ function NotificationButton() {
         const payload = JSON.parse(event.data);
 
         if (payload.type === "message_created" || payload.type === "message_read") {
-          loadUnreadMessages();
+          loadNotifications();
         }
       } catch (error) {
         console.error("Notification websocket error:", error);
       }
     };
 
-    websocket.onerror = () => {
-      websocket.close();
-    };
+    websocket.onerror = () => websocket.close();
 
     return () => {
       websocket.close();
     };
-  }, [loadUnreadMessages]);
+  }, [loadNotifications]);
 
   const unreadCount = messages.filter((message) => {
     const recipientId = String(message.destinataire_id || "");
@@ -116,35 +147,32 @@ function NotificationButton() {
 
   const notificationItems = useMemo(() => {
     const messageNotifications = messages
-      .filter((message) => {
-        const recipientId = String(message.destinataire_id || "");
-        const senderId = String(message.expediteur_id || "");
-        return userIds.has(recipientId) && !userIds.has(senderId);
-      })
       .slice(0, 3)
       .map((message) => ({
         id: `message-${message.id}`,
+        type: "message",
         title: "Nouveau message reçu",
         detail: message.contenu,
-        date: message.date_creation,
+        date: message.date_creation || message.created_at,
         unread: !message.est_lu,
       }));
 
-    const taskNotifications = tasks.slice(0, 2).map((task) => ({
-      id: `task-${task.id}`,
-      title: "Une tâche vous a été affectée",
-      detail: task.title || task.titre || "Tâche",
-      date: task.created_at || task.date_creation || task.due_date,
-      unread: false,
-    }));
+    const taskNotifications = tasks
+      .slice(0, 3)
+      .map((task) => ({
+        id: `task-${task.id}`,
+        type: "task",
+        title: "Une tâche vous a été affectée",
+        detail: task.title || task.titre || "Tâche",
+        date: task.created_at || task.date_creation || task.due_date,
+        unread: false,
+      }));
 
     return [...messageNotifications, ...taskNotifications].slice(0, 5);
-  }, [messages, tasks, userIds]);
+  }, [messages, tasks]);
 
   function formatNotificationDate(value) {
-    if (!value) {
-      return "";
-    }
+    if (!value) return "";
 
     return new Intl.DateTimeFormat("fr-FR", {
       day: "2-digit",
@@ -178,7 +206,16 @@ function NotificationButton() {
 
           <div className="notification-dropdown__list">
             {notificationItems.map((item) => (
-              <article key={item.id} className={item.unread ? "is-unread" : ""}>
+              <article
+                key={item.id}
+                className={item.unread ? "is-unread" : ""}
+                onClick={() => {
+                  setOpen(false);
+                  if (item.type === "task") navigate("/tasks");
+                  if (item.type === "message") navigate("/messages");
+                }}
+                style={{ cursor: "pointer" }}
+              >
                 <div>
                   <strong>{item.title}</strong>
                   <p>{item.detail}</p>
@@ -190,20 +227,22 @@ function NotificationButton() {
             {notificationItems.length === 0 && <p className="empty-notifications">Aucune notification pour le moment.</p>}
           </div>
 
-          <button
-            type="button"
-            className="notification-dropdown__footer"
-            onClick={() => {
-              setOpen(false);
-              navigate("/notifications");
-            }}
-          >
-            Voir tout
-          </button>
+          <div style={{ display: "flex", gap: 8, padding: 12 }}>
+            <button
+              type="button"
+              className="notification-dropdown__footer"
+              onClick={() => {
+                setOpen(false);
+                navigate("/notifications");
+              }}
+            >
+              Voir tout
+            </button>
+          </div>
         </div>
       )}
     </div>
   );
 }
 
-export default NotificationButton;
+export default NotificationDropdown;

@@ -7,12 +7,14 @@ import Login from "./pages/LoginPage";
 import Messages from "./pages/Messages";
 import MyTasks from "./pages/MyTasks";
 import Notifications from "./pages/Notifications";
+import Permissions from "./pages/Permissions";
 import Profile from "./pages/Profile";
 import Projects from "./pages/Projects";
 import Services from "./pages/Services";
 import Settings from "./pages/Settings";
 import Tasks from "./pages/Tasks";
 import Users from "./pages/Users";
+import UserSettings from "./pages/UserSettings";
 import ProtectedRoute from "./routes/ProtectedRoute";
 import RoleRoute from "./routes/RoleRoute";
 
@@ -41,10 +43,10 @@ function AppRoutes() {
         <Route element={<DashboardLayout />}>
           <Route path="/dashboard" element={<Dashboard />} />
           <Route path="/profile" element={<Profile />} />
-          <Route element={<RoleRoute allowedPermissions={["users.view"]} allowedRoles={[ROLES.ADMIN, ROLES.MANAGER]} />}>
+          <Route element={<RoleRoute allowedRoles={[ROLES.ADMIN]} />}>
             <Route path="/users" element={<Users />} />
           </Route>
-          <Route element={<RoleRoute allowedPermissions={["services.view", "services.create", "services.delete"]} allowedRoles={[ROLES.ADMIN, ROLES.MANAGER]} />}>
+          <Route element={<RoleRoute allowedRoles={[ROLES.ADMIN]} />}>
             <Route
               path="/services"
               element={<Services />}
@@ -65,10 +67,17 @@ function AppRoutes() {
             />
           </Route>
           <Route path="/notifications" element={<Notifications />} />
-          <Route element={<RoleRoute allowedPermissions={["settings.view"]} allowedRoles={[ROLES.ADMIN]} />}>
+          <Route path="/settings" element={<UserSettings />} />
+          <Route element={<RoleRoute allowedRoles={[ROLES.ADMIN]} />}>
             <Route
-              path="/settings"
+              path="/system-settings"
               element={<Settings />}
+            />
+          </Route>
+          <Route element={<RoleRoute allowedRoles={[ROLES.ADMIN]} />}>
+            <Route
+              path="/permissions"
+              element={<Permissions />}
             />
           </Route>
           <Route path="/access-denied" element={<AccessDenied />} />

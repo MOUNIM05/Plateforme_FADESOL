@@ -14,6 +14,18 @@ export function getMessagesWebSocketUrl() {
   apiUrl.search = "";
   apiUrl.hash = "";
 
+  // attach current auth token as a query param so the backend can identify the user
+  try {
+    const token = localStorage.getItem("access_token");
+
+    if (token) {
+      const sep = apiUrl.search ? "&" : "?";
+      apiUrl.search = `${apiUrl.search}${sep}authorization=${encodeURIComponent("Bearer " + token)}`;
+    }
+  } catch (e) {
+    // ignore
+  }
+
   return apiUrl.toString();
 }
 
@@ -57,6 +69,12 @@ export async function sendMessage(messageData) {
 
 export async function markMessageAsRead(messageId) {
   const response = await api.patch(`/messages/${messageId}/lu`);
+
+  return response.data;
+}
+
+export async function getOnlineUsers() {
+  const response = await api.get(`/messages/online-users`);
 
   return response.data;
 }

@@ -15,6 +15,7 @@ from app.services.service_fadesol_service import (
     create_service,
     delete_service,
     get_service,
+    get_service_details,
     get_service_members,
     get_service_statistics,
     list_services,
@@ -39,6 +40,15 @@ def list_all(skip: int = 0, limit: int = 100, db: Session = Depends(get_db)):
 @router.post("/", response_model=ServiceResponse, dependencies=[Depends(require_permission("services.create"))])
 def create(payload: ServiceCreate, db: Session = Depends(get_db)):
     return create_service(db, payload)
+
+
+@router.get("/{service_id}/details", dependencies=[Depends(require_admin_or_manager)])
+def details(
+    service_id: str,
+    authorization: str | None = Header(default=None),
+    db: Session = Depends(get_db),
+):
+    return get_service_details(db, service_id, authorization)
 
 
 @router.get("/{service_id}", response_model=ServiceResponse, dependencies=[Depends(require_admin_or_manager)])
@@ -99,6 +109,15 @@ def legacy_list_all(skip: int = 0, limit: int = 100, db: Session = Depends(get_d
 @legacy_router.post("/", response_model=ServiceResponse, dependencies=[Depends(require_permission("services.create"))])
 def legacy_create(payload: ServiceCreate, db: Session = Depends(get_db)):
     return create_service(db, payload)
+
+
+@legacy_router.get("/{service_id}/details", dependencies=[Depends(require_admin_or_manager)])
+def legacy_details(
+    service_id: str,
+    authorization: str | None = Header(default=None),
+    db: Session = Depends(get_db),
+):
+    return get_service_details(db, service_id, authorization)
 
 
 @legacy_router.get("/{service_id}", response_model=ServiceResponse, dependencies=[Depends(require_admin_or_manager)])

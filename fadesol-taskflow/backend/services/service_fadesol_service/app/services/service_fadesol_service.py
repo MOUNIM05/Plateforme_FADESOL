@@ -1,4 +1,5 @@
 import json
+from datetime import date
 from urllib.parse import quote
 from urllib.error import HTTPError, URLError
 from urllib.request import Request as UrlRequest
@@ -179,6 +180,89 @@ def get_service_statistics(
         completed_tasks=0,
         pending_tasks=0,
     )
+
+
+def _parse_date(value: str | None) -> date | None:
+    if not value:
+        return None
+
+    try:
+        return date.fromisoformat(str(value)[:10])
+    except ValueError:
+        return None
+
+
+def _is_done_status(status: str | None) -> bool:
+    normalized = str(status or "").strip().lower()
+    return normalized in {"termine", "terminé", "done", "completed", "validee", "validée"}
+
+
+def _is_blocked_status(status: str | None) -> bool:
+    return "bloque" in str(status or "").strip().lower() or "bloqué" in str(status or "").strip().lower()
+
+
+def _is_in_progress_status(status: str | None) -> bool:
+    normalized = str(status or "").strip().lower()
+    return normalized in {"encours", "en cours", "in_progress", "progress"}
+
+
+def get_service_details(db: Session, service_id: str, authorization: str | None) -> dict:
+    service = get_service(db, service_id)
+    users = fetch_users_from_user_service(authorization)
+    members = crud_get_service_members(service, users)
+    manager = next(
+        (
+            member
+            for member in members
+            if str(member.get("id") or member.get("uuid") or "") == str(service.manager_id or "")
+            or str(member.get("role") or "").lower() == "manager"
+        ),
+        None,
+    )
+
+    encoded_service_id = quote(service.id)
+    projects_url = f"{settings.PROJECT_SERVICE_URL.rstrip('/')}/api/projects/?service_id={encoded_service_id}&limit=1000"
+    tasks_url = f"{settings.TASK_SERVICE_URL.rstrip('/')}/api/tasks/?limit=1000"
+    projects = fetch_remote_list(projects_url, authorization, "Project service")
+    all_tasks = fetch_remote_list(tasks_url, authorization, "Task service")
+    tasks = [
+        task
+        for task in all_tasks
+        if str(task.get("service_id") or "") in {service.id, service.name}
+    ]
+    today = date.today()
+
+    tasks_done = sum(1 for task in tasks if _is_done_status(task.get("status") or task.get("statut")))
+    tasks_blocked = sum(1 for task in tasks if _is_blocked_status(task.get("status") or task.get("statut")))
+    tasks_in_progress = sum(1 for task in tasks if _is_in_progress_status(task.get("status") or task.get("statut")))
+    tasks_late = sum(
+        1
+        for task in tasks
+        if not _is_done_status(task.get("status") or task.get("statut"))
+        and (_parse_date(task.get("due_date") or task.get("date_limite")) or today) < today
+    )
+
+    return {
+        "service": {
+            "id": service.id,
+            "name": service.name,
+            "nom": service.name,
+            "description": service.description,
+            "manager_id": service.manager_id,
+            "is_active": service.is_active,
+            "statut": "Actif" if service.is_active else "Inactif",
+            "created_at": service.created_at,
+            "updated_at": None,
+        },
+        "manager": manager or {},
+        "members": members,
+        "projects_count": len(projects),
+        "tasks_count": len(tasks),
+        "tasks_in_progress": tasks_in_progress,
+        "tasks_done": tasks_done,
+        "tasks_blocked": tasks_blocked,
+        "tasks_late": tasks_late,
+    }
 
 
 def changer_manager(db: Session, service_id: str, manager_id: str) -> Service:

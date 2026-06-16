@@ -10,6 +10,7 @@ from sqlalchemy import text
 
 from app import models  # noqa: F401
 from app.db.database import Base, engine
+from app.models.task import Task
 from app.routes.subtask_routes import router as subtask_router
 from app.routes.task_routes import legacy_router as legacy_task_router
 from app.routes.task_routes import router as task_router
@@ -32,13 +33,23 @@ def on_startup():
     Base.metadata.create_all(bind=engine)
 
     # create_all ne modifie pas une table deja existante.
-    # Ces ALTER preservent la table sous_taches tout en ajoutant les colonnes necessaires a l'affectation US18.
+    # Ces ALTER preservent la table sous_taches tout en ajoutant les colonnes necessaires a l'affectation.
     inspector = inspect(engine)
 
     def has_column(table_name: str, column_name: str) -> bool:
         return column_name in {column["name"] for column in inspector.get_columns(table_name)}
 
     with engine.begin() as connection:
+        task_model_columns = {column.name for column in Task.__table__.columns}
+
+        for column in inspector.get_columns("taches"):
+            column_name = column["name"]
+            if column_name in task_model_columns or column.get("nullable", True):
+                continue
+            if not column_name.replace("_", "").isalnum():
+                continue
+            connection.execute(text(f'ALTER TABLE taches ALTER COLUMN "{column_name}" DROP NOT NULL'))
+
         if not has_column("sous_taches", "service_id"):
             connection.execute(text("ALTER TABLE sous_taches ADD COLUMN service_id VARCHAR(36)"))
         if not has_column("sous_taches", "assignee_a"):

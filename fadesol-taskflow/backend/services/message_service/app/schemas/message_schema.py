@@ -11,6 +11,7 @@ class MessageBase(BaseModel):
     projet_id: str | None = None
     contenu: str
     est_lu: bool = False
+    date_lecture: datetime | None = None
 
 
 class MessageCreate(MessageBase):
@@ -29,6 +30,7 @@ class MessageUpdate(BaseModel):
 class MessageResponse(MessageBase):
     id: str
     date_creation: datetime
+    # date_lecture inherited from MessageBase
 
     class Config:
         from_attributes = True

@@ -3,7 +3,7 @@
 Le service utilisateur lit les JWT emis par auth_service pour proteger ses routes.
 """
 
-from fastapi import Depends, HTTPException, status
+from fastapi import Depends, Header, HTTPException, status
 from fastapi.security import HTTPAuthorizationCredentials, HTTPBearer
 from jose import JWTError, jwt
 
@@ -71,3 +71,12 @@ def require_roles(allowed_roles: list[str]):
 require_admin_or_manager = require_roles([UserRole.ADMIN.value, UserRole.MANAGER.value])
 
 # Dependency reutilisee par les routes lisibles par Admin et Manager.
+
+
+def require_internal_service(x_internal_service_secret: str | None = Header(default=None)) -> None:
+    """Autorise uniquement les appels inter-services connus."""
+    if x_internal_service_secret != settings.INTERNAL_SERVICE_SECRET:
+        raise HTTPException(
+            status_code=status.HTTP_403_FORBIDDEN,
+            detail="Acces inter-service refuse.",
+        )

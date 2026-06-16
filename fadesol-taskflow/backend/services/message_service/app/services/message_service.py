@@ -1,5 +1,12 @@
+import json
+from urllib.error import HTTPError, URLError
+from urllib.request import Request as UrlRequest
+from urllib.request import urlopen
+
+from fastapi import HTTPException, status
 from sqlalchemy.orm import Session
 
+from app.core.config import settings
 from app.models.message import Message
 from app.schemas.message_schema import (
     ConversationDetail,
@@ -11,16 +18,26 @@ from app.schemas.message_schema import (
 from shared.exceptions import not_found
 
 
-def list_messages(db: Session, skip: int = 0, limit: int = 100) -> list[Message]:
-    return db.query(Message).offset(skip).limit(limit).all()
+def list_messages(db: Session, skip: int = 0, limit: int = 100, authorization: str | None = None) -> list[Message]:
+    profile = _fetch_current_profile(authorization)
+    messages = db.query(Message).order_by(Message.date_creation.desc()).all()
+    visible_messages = [message for message in messages if _message_visible_for_profile(message, profile)]
+
+    return visible_messages[skip : skip + limit]
 
 
 def get_message(db: Session, message_id: str) -> Message | None:
     return db.query(Message).filter(Message.id == message_id).first()
 
 
-def create_message(db: Session, payload: MessageCreate) -> Message:
-    message = Message(**payload.model_dump())
+def create_message(db: Session, payload: MessageCreate, authorization: str | None = None) -> Message:
+    profile = _fetch_current_profile(authorization)
+    data = payload.model_dump()
+
+    if profile.get("uuid"):
+        data["expediteur_id"] = str(profile["uuid"])
+
+    message = Message(**data)
     message.envoyer()
     db.add(message)
     db.commit()
@@ -29,8 +46,13 @@ def create_message(db: Session, payload: MessageCreate) -> Message:
     return message
 
 
-def list_conversations(db: Session) -> list[ConversationSummary]:
-    messages = _list_messages_ordered(db)
+def list_conversations(db: Session, authorization: str | None = None) -> list[ConversationSummary]:
+    profile = _fetch_current_profile(authorization)
+    messages = [
+        message
+        for message in _list_messages_ordered(db)
+        if _message_visible_for_profile(message, profile)
+    ]
     grouped_messages: dict[str, list[Message]] = {}
 
     for message in messages:
@@ -44,11 +66,12 @@ def list_conversations(db: Session) -> list[ConversationSummary]:
     return sorted(conversations, key=lambda conversation: conversation.last_message_at, reverse=True)
 
 
-def get_conversation(db: Session, conversation_id: str) -> ConversationDetail:
+def get_conversation(db: Session, conversation_id: str, authorization: str | None = None) -> ConversationDetail:
+    profile = _fetch_current_profile(authorization)
     conversation_messages = [
         message
         for message in _list_messages_ordered(db)
-        if _conversation_id(message) == conversation_id
+        if _conversation_id(message) == conversation_id and _message_visible_for_profile(message, profile)
     ]
 
     if not conversation_messages:
@@ -75,10 +98,14 @@ def update_message(db: Session, message_id: str, payload: MessageUpdate) -> Mess
     return message
 
 
-def mark_as_read(db: Session, message_id: str) -> Message:
+def mark_as_read(db: Session, message_id: str, authorization: str | None = None) -> Message:
     message = get_message(db, message_id)
 
     if not message:
+        raise not_found("Message introuvable.")
+
+    profile = _fetch_current_profile(authorization)
+    if not _message_visible_for_profile(message, profile):
         raise not_found("Message introuvable.")
 
     message.marquerCommeLu()
@@ -94,6 +121,63 @@ def list_by_field(db: Session, field: str, value: str) -> list[Message]:
 
 def _list_messages_ordered(db: Session) -> list[Message]:
     return db.query(Message).order_by(Message.date_creation.asc()).all()
+
+
+def _fetch_current_profile(authorization: str | None) -> dict:
+    if not authorization:
+        raise HTTPException(status_code=status.HTTP_401_UNAUTHORIZED, detail="Authentification requise.")
+
+    request = UrlRequest(
+        f"{settings.USER_SERVICE_URL.rstrip('/')}/api/users/me/profile",
+        headers={"Authorization": authorization},
+        method="GET",
+    )
+
+    try:
+        with urlopen(request, timeout=10) as response:
+            payload = json.loads(response.read().decode("utf-8"))
+    except HTTPError as exc:
+        raise HTTPException(status_code=exc.code, detail="Utilisateur connecte introuvable.") from exc
+    except (URLError, json.JSONDecodeError, UnicodeDecodeError) as exc:
+        raise HTTPException(
+            status_code=status.HTTP_502_BAD_GATEWAY,
+            detail="User service indisponible pour filtrer la messagerie.",
+        ) from exc
+
+    return payload if isinstance(payload, dict) else {}
+
+
+def _profile_identifiers(profile: dict) -> set[str]:
+    return {
+        str(identifier)
+        for identifier in [profile.get("uuid"), profile.get("id")]
+        if identifier not in {None, ""}
+    }
+
+
+def _profile_service_id(profile: dict) -> str | None:
+    value = profile.get("id_service") or profile.get("service_id")
+    return str(value) if value not in {None, ""} else None
+
+
+def _role(profile: dict) -> str:
+    return str(profile.get("role") or "").lower()
+
+
+def _message_visible_for_profile(message: Message, profile: dict) -> bool:
+    role = _role(profile)
+    identifiers = _profile_identifiers(profile)
+
+    if role in {"admin", "administrateur"}:
+        return True
+
+    if str(message.expediteur_id or "") in identifiers or str(message.destinataire_id or "") in identifiers:
+        return True
+
+    if role == "manager":
+        return bool(_profile_service_id(profile)) and message.service_id == _profile_service_id(profile)
+
+    return False
 
 
 def _conversation_id(message: Message) -> str:

@@ -9,14 +9,27 @@ const itemRoutes = {
   Utilisateurs: "/users",
   Services: "/services",
   Projets: "/projects",
-  Tâches: "/tasks",
-  "Mes tâches": "/my-tasks",
+  Taches: "/tasks",
+  "Mes taches": "/my-tasks",
   Messagerie: "/messages",
-  Paramètres: "/settings",
-  Profile: "/profile",
+  "Parametres systeme": "/system-settings",
+  Permissions: "/permissions",
+  Parametres: "/settings",
 };
 
 function getActiveItem(pathname) {
+  if (pathname.startsWith("/permissions")) {
+    return "Permissions";
+  }
+
+  if (pathname.startsWith("/system-settings")) {
+    return "Parametres systeme";
+  }
+
+  if (pathname.startsWith("/settings")) {
+    return "Parametres";
+  }
+
   const match = Object.entries(itemRoutes).find(([, route]) => pathname.startsWith(route));
 
   return match?.[0] || "Dashboard";
@@ -25,7 +38,7 @@ function getActiveItem(pathname) {
 function DashboardLayout() {
   const location = useLocation();
   const navigate = useNavigate();
-  const { currentUser, logout } = useAuth();
+  const { currentUser } = useAuth();
   const [sidebarCollapsed, setSidebarCollapsed] = useState(false);
   const activeItem = getActiveItem(location.pathname);
 
@@ -41,7 +54,6 @@ function DashboardLayout() {
         collapsed={sidebarCollapsed}
         onSelect={handleSelect}
         onToggleCollapse={() => setSidebarCollapsed((current) => !current)}
-        onLogout={logout}
       />
       <main className="dashboard-main">
         <div className="dashboard-content">

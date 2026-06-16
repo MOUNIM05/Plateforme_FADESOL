@@ -17,13 +17,24 @@ export async function getUserById(userId) {
 }
 
 export async function getMyUserProfile() {
-  const response = await api.get("/users/me/profile");
+  const response = await api.get("/users/me");
+
+  return response.data;
+}
+
+export async function uploadMyPhoto(file) {
+  const formData = new FormData();
+  formData.append("file", file);
+
+  const response = await api.post("/users/me/photo", formData, {
+    headers: { "Content-Type": "multipart/form-data" },
+  });
 
   return response.data;
 }
 
 export async function getPermissionCatalog() {
-  const response = await api.get("/users/permissions");
+  const response = await api.get("/permissions");
 
   return response.data;
 }
@@ -35,13 +46,13 @@ export async function getMyPermissions() {
 }
 
 export async function getUserPermissions(userId) {
-  const response = await api.get(`/users/${userId}/permissions`);
+  const response = await api.get(`/permissions/${userId}`);
 
   return response.data;
 }
 
 export async function updateUserPermissions(userId, permissions) {
-  const response = await api.put(`/users/${userId}/permissions`, { permissions });
+  const response = await api.patch(`/permissions/${userId}`, { permissions });
 
   return response.data;
 }

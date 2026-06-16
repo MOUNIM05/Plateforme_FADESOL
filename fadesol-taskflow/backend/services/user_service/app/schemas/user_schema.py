@@ -20,6 +20,7 @@ class UserBase(BaseModel):
     id_service: str | None = Field(default=None, validation_alias=AliasChoices("id_service", "service_id"))
     service: FadesolService | None = None
     est_actif: bool = Field(default=True, validation_alias=AliasChoices("est_actif", "is_active"))
+    photo_url: str | None = None
 
 
 class UserCreate(UserBase):
@@ -48,3 +49,5 @@ class UserResponse(UserBase):
     id: int
     uuid: str
     date_creation: datetime
+    created_at: datetime | None = None
+    updated_at: datetime | None = None

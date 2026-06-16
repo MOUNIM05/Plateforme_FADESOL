@@ -1,9 +1,10 @@
 """Routes HTTP des taches principales et routes imbriquees des sous-taches."""
 
-from fastapi import APIRouter, Depends, Request
+from fastapi import APIRouter, Depends, File, Request, UploadFile
 from sqlalchemy.orm import Session
 
 from app.db.database import get_db
+from app.schemas.attachment_schema import AttachmentResponse
 from app.schemas.subtask_schema import SubTaskAssign, SubTaskCreate, SubTaskResponse
 from app.schemas.task_schema import (
     TaskAssign,
@@ -12,6 +13,12 @@ from app.schemas.task_schema import (
     TaskResponse,
     TaskStatusUpdate,
     TaskUpdate,
+)
+from app.services.attachment_service import (
+    create_attachment,
+    delete_attachment,
+    list_subtask_attachments,
+    list_task_attachments,
 )
 from app.services.subtask_service import (
     assign_subtask,
@@ -29,6 +36,9 @@ from app.services.task_service import (
     get_task_by_id,
     get_tasks,
     resolve_current_user_uuid,
+    resolve_current_user_profile,
+    scoped_task_filters,
+    can_access_task,
     update_task,
     update_task_status,
 )
@@ -49,17 +59,18 @@ def list_all(
     status: str | None = None,
     priority: str | None = None,
     assigned_to: str | None = None,
+    service_id: str | None = None,
     db: Session = Depends(get_db),
 ):
     """Retourne les taches avec filtres optionnels."""
     # Liste les taches avec filtres optionnels par statut, priorite et utilisateur assigne.
-    assigned_filter = assigned_to
+    assigned_filter, service_filter = scoped_task_filters(
+        request.headers.get("authorization"),
+        assigned_to=assigned_to,
+        service_id=service_id,
+    )
 
-    if assigned_to == "me":
-        # Le filtre "me" est resolu via user_service a partir du token transmis dans les headers.
-        assigned_filter = resolve_current_user_uuid(request.headers.get("authorization"))
-
-    return get_tasks(db, skip=skip, limit=limit, status=status, priority=priority, assigned_to=assigned_filter)
+    return get_tasks(db, skip=skip, limit=limit, status=status, priority=priority, assigned_to=assigned_filter, service_id=service_filter)
 
 
 @router.post("/", response_model=TaskResponse)
@@ -107,13 +118,76 @@ def assign_task_subtask(task_id: str, subtask_id: str, payload: SubTaskAssign, d
     return assign_subtask(db, subtask_id, payload)
 
 
+@router.post("/{task_id}/attachments", response_model=AttachmentResponse)
+def upload_task_attachment(
+    task_id: str,
+    request: Request,
+    file: UploadFile = File(...),
+    db: Session = Depends(get_db),
+):
+    """Ajoute une piece jointe a une tache."""
+    uploaded_by = None
+
+    if request.headers.get("authorization"):
+        uploaded_by = resolve_current_user_uuid(request.headers.get("authorization"))
+
+    return create_attachment(db, file=file, task_id=task_id, uploaded_by=uploaded_by)
+
+
+@router.get("/{task_id}/attachments", response_model=list[AttachmentResponse])
+def get_task_attachments(task_id: str, db: Session = Depends(get_db)):
+    """Liste les pieces jointes d'une tache."""
+    return list_task_attachments(db, task_id)
+
+
+@router.delete("/{task_id}/attachments/{attachment_id}", response_model=MessageResponse)
+def remove_task_attachment(task_id: str, attachment_id: str, db: Session = Depends(get_db)):
+    """Supprime une piece jointe de tache."""
+    delete_attachment(db, task_id=task_id, attachment_id=attachment_id)
+    return {"message": "Piece jointe supprimee avec succes."}
+
+
+@router.post("/{task_id}/subtasks/{subtask_id}/attachments", response_model=AttachmentResponse)
+def upload_subtask_attachment(
+    task_id: str,
+    subtask_id: str,
+    request: Request,
+    file: UploadFile = File(...),
+    db: Session = Depends(get_db),
+):
+    """Ajoute une piece jointe a une sous-tache."""
+    uploaded_by = None
+
+    if request.headers.get("authorization"):
+        uploaded_by = resolve_current_user_uuid(request.headers.get("authorization"))
+
+    return create_attachment(db, file=file, task_id=task_id, subtask_id=subtask_id, uploaded_by=uploaded_by)
+
+
+@router.get("/{task_id}/subtasks/{subtask_id}/attachments", response_model=list[AttachmentResponse])
+def get_subtask_attachments(task_id: str, subtask_id: str, db: Session = Depends(get_db)):
+    """Liste les pieces jointes d'une sous-tache."""
+    return list_subtask_attachments(db, task_id, subtask_id)
+
+
+@router.delete("/{task_id}/subtasks/{subtask_id}/attachments/{attachment_id}", response_model=MessageResponse)
+def remove_subtask_attachment(task_id: str, subtask_id: str, attachment_id: str, db: Session = Depends(get_db)):
+    """Supprime une piece jointe de sous-tache."""
+    delete_attachment(db, task_id=task_id, subtask_id=subtask_id, attachment_id=attachment_id)
+    return {"message": "Piece jointe supprimee avec succes."}
+
+
 @router.get("/{task_id}", response_model=TaskResponse)
-def get_one(task_id: str, db: Session = Depends(get_db)):
+def get_one(task_id: str, request: Request, db: Session = Depends(get_db)):
     """Retourne une tache precise."""
     # Consultation d'une tache precise par son UUID.
     task = get_task_by_id(db, task_id)
 
     if not task:
+        raise not_found("Tache introuvable.")
+
+    profile = resolve_current_user_profile(request.headers.get("authorization"))
+    if not can_access_task(task, profile):
         raise not_found("Tache introuvable.")
 
     return task
@@ -175,9 +249,9 @@ def legacy_create(payload: TaskCreate, db: Session = Depends(get_db)):
 
 
 @legacy_router.get("/{task_id}", response_model=TaskResponse)
-def legacy_get_one(task_id: str, db: Session = Depends(get_db)):
+def legacy_get_one(task_id: str, request: Request, db: Session = Depends(get_db)):
     """Retourne une tache via l'ancienne route /taches."""
-    return get_one(task_id, db)
+    return get_one(task_id, request, db)
 
 
 @legacy_router.put("/{task_id}", response_model=TaskResponse)

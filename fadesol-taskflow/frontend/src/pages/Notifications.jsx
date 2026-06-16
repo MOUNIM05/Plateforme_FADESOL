@@ -1,8 +1,9 @@
-import { Bell, CheckCheck, MessageSquareText, RefreshCw } from "lucide-react";
+import { Bell, CheckCheck, MessageSquareText, RefreshCw, ClipboardList } from "lucide-react";
 import { useEffect, useMemo, useState } from "react";
 import { useNavigate } from "react-router-dom";
 import { useAuth } from "../context/AuthContext";
 import { getMessages, markMessageAsRead } from "../services/messageService";
+import { getTasks } from "../services/taskService";
 import { getMyUserProfile, getUsers } from "../services/userService";
 
 function getUserIdentifiers(user) {
@@ -36,6 +37,7 @@ function Notifications() {
   const navigate = useNavigate();
   const { currentUser } = useAuth();
   const [messages, setMessages] = useState([]);
+  const [tasks, setTasks] = useState([]);
   const [users, setUsers] = useState([]);
   const [profile, setProfile] = useState(null);
   const [loading, setLoading] = useState(true);
@@ -46,6 +48,7 @@ function Notifications() {
     return new Set([...getUserIdentifiers(currentUser), ...getUserIdentifiers(profile)]);
   }, [currentUser, profile]);
 
+
   const userById = useMemo(() => {
     return users.reduce((accumulator, user) => {
       accumulator[String(user.id)] = user;
@@ -54,43 +57,88 @@ function Notifications() {
     }, {});
   }, [users]);
 
-  const unreadMessages = useMemo(() => {
-    return messages
-      .filter((item) => {
-        const recipientId = String(item.destinataire_id || "");
-        const senderId = String(item.expediteur_id || "");
+  const buildNotifications = useMemo(() => {
+    const messageNotifications = (messages || [])
+      .map((m) => ({
+        id: `message-${m.id}`,
+        type: "message",
+        title: "Nouveau message reçu",
+        description: m.contenu || "",
+        date: m.date_creation || m.created_at,
+        unread: !m.est_lu,
+        meta: m,
+      }))
+      .filter(Boolean);
 
-        return !item.est_lu && userIds.has(recipientId) && !userIds.has(senderId);
-      })
-      .sort((a, b) => new Date(b.date_creation) - new Date(a.date_creation));
-  }, [messages, userIds]);
+    const taskNotifications = (tasks || [])
+      .map((t) => ({
+        id: `task-${t.id}`,
+        type: "task",
+        title: "Une tâche vous a été affectée",
+        description: t.title || t.titre || t.name || "Tâche",
+        date: t.created_at || t.date_creation || t.updated_at || t.due_date,
+        unread: false,
+        meta: t,
+      }))
+      .filter(Boolean);
+
+    const all = [...messageNotifications, ...taskNotifications];
+
+    return all.sort((a, b) => new Date(b.date || 0).getTime() - new Date(a.date || 0).getTime());
+  }, [messages, tasks]);
+
+  const unreadMessages = useMemo(() => buildNotifications.filter((n) => n.type === "message" && n.unread), [buildNotifications]);
 
   async function loadNotifications() {
     setLoading(true);
     setError("");
 
-    const [messageResult, userResult, profileResult] = await Promise.allSettled([
-      getMessages(),
-      getUsers(),
-      getMyUserProfile(),
-    ]);
+    try {
+      const profileResult = await getMyUserProfile();
+      setProfile(profileResult || null);
 
-    if (messageResult.status === "fulfilled") {
-      setMessages(Array.isArray(messageResult.value) ? messageResult.value : []);
-    } else {
+      const role = profileResult?.role || currentUser?.role;
+      const isEmployee = role === "Employee" || role === "Employe" || role === "EmployÃ©";
+      const isManager = role === "Manager";
+      const currentServiceId = profileResult?.id_service || profileResult?.service_id || currentUser?.id_service || currentUser?.service_id || "";
+
+      const [messagesResult, tasksResult, usersResult] = await Promise.allSettled([
+        getMessages(),
+        getTasks(isEmployee ? { assigned_to: "me" } : isManager && currentServiceId ? { service_id: currentServiceId } : {}),
+        getUsers(isManager && currentServiceId ? currentServiceId : undefined),
+      ]);
+
+      const rawMessages = messagesResult.status === "fulfilled" && Array.isArray(messagesResult.value) ? messagesResult.value : [];
+      const rawTasks = tasksResult.status === "fulfilled" && Array.isArray(tasksResult.value) ? tasksResult.value : [];
+      const rawUsers = usersResult.status === "fulfilled" && Array.isArray(usersResult.value) ? usersResult.value : [];
+
+      // Determine visible messages using the same rules as the dropdown
+      let visibleMessages = rawMessages;
+
+      if (isEmployee) {
+        const userIdsSet = new Set([...getUserIdentifiers(currentUser), ...getUserIdentifiers(profileResult)]);
+        visibleMessages = rawMessages.filter((message) => userIdsSet.has(String(message.destinataire_id || "")));
+      } else if (isManager && rawUsers.length > 0) {
+        const serviceIds = new Set(rawUsers.flatMap((u) => [String(u.id), String(u.uuid)]));
+        visibleMessages = rawMessages.filter((message) => {
+          const recipientId = String(message.destinataire_id || "");
+          const senderId = String(message.expediteur_id || "");
+          return serviceIds.has(recipientId) || serviceIds.has(senderId);
+        });
+      }
+
+      setMessages(visibleMessages);
+      setTasks(rawTasks);
+      setUsers(rawUsers);
+    } catch (err) {
+      console.error("Load notifications error:", err);
+      setError("Impossible de charger les notifications.");
       setMessages([]);
-      setError("Notifications temporairement indisponibles.");
+      setTasks([]);
+      setUsers([]);
+    } finally {
+      setLoading(false);
     }
-
-    if (userResult.status === "fulfilled") {
-      setUsers(Array.isArray(userResult.value) ? userResult.value : []);
-    }
-
-    if (profileResult.status === "fulfilled") {
-      setProfile(profileResult.value);
-    }
-
-    setLoading(false);
   }
 
   useEffect(() => {
@@ -103,9 +151,7 @@ function Notifications() {
 
     try {
       await markMessageAsRead(messageId);
-      setMessages((current) =>
-        current.map((item) => (item.id === messageId ? { ...item, est_lu: true } : item))
-      );
+      setMessages((current) => current.map((item) => (item.id === messageId ? { ...item, est_lu: true } : item)));
       setMessage("Notification marquée comme lue.");
     } catch (readError) {
       console.error("Mark notification read error:", readError);
@@ -117,7 +163,14 @@ function Notifications() {
     setMessage("");
     setError("");
 
-    const results = await Promise.allSettled(unreadMessages.map((item) => markMessageAsRead(item.id)));
+    const unread = messages.filter((m) => !m.est_lu).map((m) => m.id);
+
+    if (!unread.length) {
+      setMessage("Aucune notification non lue.");
+      return;
+    }
+
+    const results = await Promise.allSettled(unread.map((id) => markMessageAsRead(id)));
 
     if (results.some((result) => result.status === "rejected")) {
       setError("Certaines notifications n'ont pas pu être marquées comme lues.");
@@ -125,11 +178,33 @@ function Notifications() {
       setMessage("Toutes les notifications sont marquées comme lues.");
     }
 
-    setMessages((current) =>
-      current.map((item) =>
-        unreadMessages.some((unread) => unread.id === item.id) ? { ...item, est_lu: true } : item
-      )
-    );
+    setMessages((current) => current.map((item) => (unread.includes(item.id) ? { ...item, est_lu: true } : item)));
+  }
+
+  function handleView(notification) {
+    if (!notification) return;
+
+    if (notification.type === "task") {
+      const taskId = notification.meta?.id || notification.meta?.task_id;
+      if (taskId) {
+        navigate(`/tasks?taskId=${taskId}`);
+      } else {
+        navigate("/tasks");
+      }
+      return;
+    }
+
+    if (notification.type === "message") {
+      const convId = notification.meta?.conversation_id || notification.meta?.conversation || notification.meta?.conversationId;
+      if (convId) {
+        navigate(`/messages?conversationId=${convId}`);
+      } else if (notification.meta?.id) {
+        navigate(`/messages?messageId=${notification.meta.id}`);
+      } else {
+        navigate("/messages");
+      }
+      return;
+    }
   }
 
   return (
@@ -137,7 +212,7 @@ function Notifications() {
       <div className="board-toolbar">
         <div>
           <h2>Notifications</h2>
-          <p>Messages non lus envoyés par d'autres utilisateurs.</p>
+          <p>Activités récentes liées aux tâches et aux messages.</p>
         </div>
         <div className="toolbar-actions">
           <button type="button" className="secondary-action" onClick={loadNotifications}>
@@ -156,45 +231,45 @@ function Notifications() {
 
       <section className="workspace-panel notifications-panel">
         <div className="panel-title">
-          <h3>Messages non lus</h3>
-          <span>{loading ? "Chargement..." : `${unreadMessages.length} notification(s)`}</span>
+          <h3>Notifications</h3>
+          <span>{loading ? "Chargement..." : `${buildNotifications.length} notification(s)`}</span>
         </div>
 
         {loading && <p className="loading-line">Chargement des notifications...</p>}
 
-        {!loading && unreadMessages.length === 0 && (
+        {!loading && buildNotifications.length === 0 && (
           <article className="empty-state-panel notifications-empty">
             <div className="empty-state-icon">
               <Bell size={32} />
             </div>
-            <h3>Aucune notification</h3>
-            <p>Les nouveaux messages envoyés par d'autres utilisateurs apparaîtront ici.</p>
+            <h3>Aucune notification pour le moment.</h3>
+            <p>Les nouvelles tâches et messages pertinents apparaîtront ici.</p>
           </article>
         )}
 
-        {!loading && unreadMessages.length > 0 && (
+        {!loading && buildNotifications.length > 0 && (
           <div className="notifications-list">
-            {unreadMessages.map((item) => {
-              const sender = userById[String(item.expediteur_id)];
-
+            {buildNotifications.map((item) => {
               return (
                 <article key={item.id} className="notification-item">
                   <div className="notification-item__icon">
-                    <MessageSquareText size={19} />
+                    {item.type === "message" ? <MessageSquareText size={19} /> : <ClipboardList size={19} />}
                   </div>
                   <div>
                     <header>
-                      <strong>{getUserName(sender)}</strong>
-                      <time>{formatDate(item.date_creation)}</time>
+                      <strong>{item.title}</strong>
+                      <time>{formatDate(item.date)}</time>
                     </header>
-                    <p>{item.contenu}</p>
+                    <p>{item.description}</p>
                     <footer>
-                      <button type="button" onClick={() => navigate("/messages")}>
-                        Ouvrir messagerie
+                      <button type="button" onClick={() => handleView(item)}>
+                        Voir
                       </button>
-                      <button type="button" onClick={() => markOneAsRead(item.id)}>
-                        Marquer comme lu
-                      </button>
+                      {item.type === "message" && item.unread && (
+                        <button type="button" onClick={() => markOneAsRead(item.meta.id)}>
+                          Marquer comme lu
+                        </button>
+                      )}
                     </footer>
                   </div>
                 </article>

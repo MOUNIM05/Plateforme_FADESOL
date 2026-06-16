@@ -245,8 +245,8 @@ function Settings() {
     <div className="dashboard-page settings-page">
       <div className="board-toolbar">
         <div>
-          <h2>Paramètres</h2>
-          <p>Configuration globale de la plateforme.</p>
+          <h2>Paramètres système</h2>
+          <p>Configuration globale réservée à l'administration.</p>
         </div>
         <div className="toolbar-actions">
           <button type="button" className="secondary-action" onClick={resetSettings}>

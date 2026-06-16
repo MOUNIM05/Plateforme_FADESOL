@@ -100,13 +100,13 @@ function EventCalendar() {
       <div className="card-header">
         <div>
           <h2>Calendrier des événements</h2>
-          <p>{loading ? "Chargement..." : "Rendez-vous et échéances à venir"}</p>
+          <p>{loading ? "Chargement..." : "Rendez-vous et echeances planifies"}</p>
         </div>
       </div>
 
       <div className="event-days">
         {error && <p className="loading-line compact">{error}</p>}
-        {!error && days.length === 0 && <p className="loading-line compact">Aucun événement à venir.</p>}
+        {!error && days.length === 0 && <p className="loading-line compact">Aucun evenement planifie.</p>}
         {!error && days.map((day) => (
           <article key={day.date}>
             <h3>{formatDay(day.date)}</h3>

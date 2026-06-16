@@ -21,6 +21,8 @@ class Settings:
     # URL appelee pour creer, synchroniser ou supprimer le compte de connexion associe a un utilisateur.
     AUTH_SERVICE_URL: str = os.getenv("AUTH_SERVICE_URL", "http://localhost:8001")
     INTERNAL_SERVICE_SECRET: str = os.getenv("INTERNAL_SERVICE_SECRET", "user-service-sync")
+    # Repertoire d'uploads (utilise pour stocker les photos de profil)
+    UPLOAD_DIR: str = os.getenv("UPLOAD_DIR", "/app/uploads")
 
 
 settings = Settings()

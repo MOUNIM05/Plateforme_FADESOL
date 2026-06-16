@@ -1,36 +1,47 @@
 import {
   Building2,
-  CalendarDays,
   CheckCircle2,
   Clock3,
   FolderKanban,
   RefreshCw,
   Settings,
-  UsersRound,
   Workflow,
 } from "lucide-react";
 import { useCallback, useEffect, useMemo, useState } from "react";
+import { useNavigate } from "react-router-dom";
 import EventCalendar from "../components/dashboard/EventCalendar";
+import AccountMenu from "../components/dashboard/AccountMenu";
+import DashboardCharts from "../components/dashboard/DashboardCharts";
 import KpiCard from "../components/dashboard/KpiCard";
 import MembersWorkload from "../components/dashboard/MembersWorkload";
-import NotificationButton from "../components/dashboard/NotificationButton";
+import NotificationDropdown from "../components/dashboard/NotificationDropdown";
 import RealtimeActivity from "../components/dashboard/RealtimeActivity";
 import ServicesOverview from "../components/dashboard/ServicesOverview";
 import TaskEvolutionChart from "../components/dashboard/TaskEvolutionChart";
 import UrgentTasks from "../components/dashboard/UrgentTasks";
-import { getInitials } from "../context/AuthContext";
-import { getDashboardStatistics } from "../services/dashboardService";
+import { getDashboardAnalytics, getDashboardStatistics } from "../services/dashboardService";
 import { DATA_EVENTS, subscribeDataEvents } from "../utils/dataEvents";
 
 const fallbackStatistics = {
-  total_projects: 18,
-  tasks_in_progress: 124,
-  tasks_completed: 87,
-  tasks_late: 9,
-  active_services: 6,
+  total_tasks: 0,
+  total_projects: 0,
+  tasks_in_progress: 0,
+  tasks_completed: 0,
+  tasks_late: 0,
+  tasks_blocked: 0,
+  active_services: 0,
+  active_users: 0,
 };
 
 const kpiDefinitions = [
+  {
+    label: "Total Taches",
+    statKey: "total_tasks",
+    trend: "Portefeuille",
+    icon: Workflow,
+    tone: "green",
+    sparkline: [18, 24, 28, 34, 38, 44, 48],
+  },
   {
     label: "Total Projets",
     statKey: "total_projects",
@@ -64,6 +75,14 @@ const kpiDefinitions = [
     sparkline: [58, 52, 44, 48, 34, 30, 26],
   },
   {
+    label: "Taches Bloquees",
+    statKey: "tasks_blocked",
+    trend: "A debloquer",
+    icon: Clock3,
+    tone: "red",
+    sparkline: [12, 11, 9, 8, 7, 6, 5],
+  },
+  {
     label: "Services Actifs",
     statKey: "active_services",
     trend: "Stable",
@@ -71,11 +90,21 @@ const kpiDefinitions = [
     tone: "orange",
     sparkline: [44, 44, 46, 44, 46, 44, 46],
   },
+  {
+    label: "Utilisateurs Actifs",
+    statKey: "active_users",
+    trend: "Comptes actifs",
+    icon: Building2,
+    tone: "blue",
+    sparkline: [36, 38, 40, 42, 44, 46, 48],
+  },
 ];
 
 function AdminDashboard({ currentUser }) {
+  const navigate = useNavigate();
   const displayName = currentUser?.prenom || currentUser?.first_name || currentUser?.email || "Admin";
   const [statistics, setStatistics] = useState(fallbackStatistics);
+  const [analytics, setAnalytics] = useState(null);
   const [statisticsLoading, setStatisticsLoading] = useState(true);
   const [statisticsWarning, setStatisticsWarning] = useState("");
 
@@ -87,10 +116,13 @@ function AdminDashboard({ currentUser }) {
 
     try {
       const data = await getDashboardStatistics();
-      setStatistics({ ...fallbackStatistics, ...data });
+      const analyticsData = await getDashboardAnalytics();
+      setStatistics({ ...fallbackStatistics, ...data, ...(analyticsData.kpis || {}) });
+      setAnalytics(analyticsData);
     } catch (error) {
       console.error("Dashboard statistics error:", error);
       setStatistics(fallbackStatistics);
+      setAnalytics(null);
       setStatisticsWarning("Statistiques temporairement indisponibles.");
     } finally {
       if (showLoading) {
@@ -134,18 +166,11 @@ function AdminDashboard({ currentUser }) {
             <RefreshCw size={18} />
             <span>{statisticsLoading ? "Actualisation..." : "Actualiser"}</span>
           </button>
-          <button type="button" className="date-selector">
-            <CalendarDays size={18} />
-            <span>Vue organisation</span>
-          </button>
-          <button type="button" className="icon-button" aria-label="Paramètres">
+          <button type="button" className="icon-button" aria-label="Parametres systeme" onClick={() => navigate("/system-settings")}>
             <Settings size={19} />
           </button>
-          <NotificationButton />
-          <div className="header-avatar" aria-label={displayName}>
-            <UsersRound size={16} />
-            <span>{getInitials(currentUser)}</span>
-          </div>
+          <NotificationDropdown />
+          <AccountMenu currentUser={currentUser} compact />
         </div>
       </header>
 
@@ -155,6 +180,18 @@ function AdminDashboard({ currentUser }) {
         {kpis.map((kpi) => (
           <KpiCard key={kpi.label} {...kpi} />
         ))}
+      </section>
+
+      <DashboardCharts analytics={analytics} />
+
+      <section className="workspace-panel global-progress-panel">
+        <div className="panel-title">
+          <h3>Progression globale</h3>
+          <span>{analytics?.global_progress || 0}%</span>
+        </div>
+        <div className="progress-bar" aria-label={`Progression globale ${analytics?.global_progress || 0}%`}>
+          <i style={{ width: `${analytics?.global_progress || 0}%` }} />
+        </div>
       </section>
 
       <ServicesOverview />

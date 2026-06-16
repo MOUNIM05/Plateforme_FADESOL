@@ -10,6 +10,22 @@ class Settings:
 
     # URL de user_service utilisee pour resoudre l'utilisateur courant quand assigned_to=me.
     USER_SERVICE_URL: str = os.getenv("USER_SERVICE_URL", "http://localhost:8002")
+    PROJECT_SERVICE_URL: str = os.getenv("PROJECT_SERVICE_URL", "http://localhost:8004")
+    INTERNAL_SERVICE_SECRET: str = os.getenv("INTERNAL_SERVICE_SECRET", "user-service-sync")
+
+    # Stockage local des pieces jointes du domaine taches.
+    UPLOAD_DIR: str = os.getenv("UPLOAD_DIR", "/app/uploads")
+    MAX_UPLOAD_SIZE_BYTES: int = int(os.getenv("MAX_UPLOAD_SIZE_BYTES", str(10 * 1024 * 1024)))
+    ALLOWED_UPLOAD_EXTENSIONS: set[str] = {
+        "pdf",
+        "doc",
+        "docx",
+        "xls",
+        "xlsx",
+        "png",
+        "jpg",
+        "jpeg",
+    }
 
     # Base de donnees propre au service des taches.
     # Les references aux autres services sont stockees en UUID pour eviter les relations SQL inter-services.
