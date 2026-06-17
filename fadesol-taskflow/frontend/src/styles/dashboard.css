@@ -318,6 +318,120 @@
   gap: 0;
 }
 
+/* Messages page: fix layout and scrolling so only left list and chat body scroll */
+.messages-page {
+  display: flex;
+  flex-direction: column;
+  height: calc(100vh - 120px);
+  min-height: 0;
+  overflow: hidden; /* prevent page-level scrolling */
+  overflow-x: hidden;
+}
+
+.messages-page > .board-toolbar {
+  flex: 0 0 auto; /* toolbar keeps its height */
+}
+
+/* Main messages shell should fill remaining space. Support both .messages-whatsapp-shell and .messages-layout */
+.messages-page .messages-whatsapp-shell,
+.messages-page .messages-layout {
+  flex: 1 1 auto;
+  display: grid;
+  grid-template-columns: minmax(280px, 340px) minmax(0, 1fr);
+  gap: 16px;
+  min-height: 0; /* allow children to clamp and scroll properly */
+  overflow: hidden;
+}
+
+/* Sidebar and chat panels both fill available height and handle internal scrolling */
+.messages-page .messages-sidebar-panel,
+.messages-page .messages-sidebar,
+.messages-page .messages-chat-panel,
+.messages-page .chat-panel {
+  height: 100%;
+  min-height: 0;
+  overflow: hidden;
+}
+
+/* Conversations list should take available space and scroll internally */
+.messages-page .conversations-list,
+.messages-page .conversation-list,
+.messages-page .messages-sidebar-panel .conversations-list {
+  padding: 10px;
+  min-height: 0;
+  overflow-y: auto;
+  overflow-x: hidden;
+}
+
+/* Chat panel: header / history / composer are fixed grid rows; history scrolls */
+.messages-page .messages-chat-panel,
+.messages-page .chat-panel {
+  display: grid;
+  grid-template-rows: auto minmax(0, 1fr) auto;
+  gap: 0;
+}
+
+/* Header stays visible */
+.messages-page .messages-chat-header,
+.messages-page .chat-header {
+  flex-shrink: 0;
+  z-index: 2;
+  background: #fff;
+  padding: 12px 16px;
+  border-bottom: 1px solid #eef2f1;
+}
+
+.messages-page .messages-chat-history,
+.messages-page .chat-messages {
+  min-height: 0;
+  overflow-y: auto;
+  overflow-x: hidden;
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+  padding: 18px;
+}
+
+/* Composer stays at the bottom of the chat panel */
+.messages-page .messages-chat-composer,
+.messages-page .message-composer {
+  flex-shrink: 0;
+  grid-row: 3;
+  border-top: 1px solid #e5e7eb;
+  background: #ffffff;
+  z-index: 5;
+  padding: 10px;
+}
+
+/* Ensure textarea and button layout remain stable and offer requested classnames */
+.messages-page .messages-chat-composer textarea,
+.messages-page .message-composer .message-input,
+.messages-page .message-input,
+.messages-page textarea.message-input {
+  width: 100%;
+  min-height: 44px;
+  max-height: 132px;
+  resize: vertical;
+  box-sizing: border-box;
+}
+
+.messages-page .messages-chat-composer button,
+.messages-page .message-composer .send-button,
+.messages-page .send-button,
+.messages-page button.send-button {
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+  padding: 8px 12px;
+  min-height: 44px;
+  background: #0ea5ff;
+  color: #fff;
+  border: none;
+  border-radius: 8px;
+  cursor: pointer;
+}
+
+
 .users-view {
   gap: 18px;
 }

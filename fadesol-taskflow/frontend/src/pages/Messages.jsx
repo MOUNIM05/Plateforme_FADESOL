@@ -303,11 +303,21 @@ function Messages() {
 
         return `${item.name} ${item.role} ${item.user?.email || ""}`.toLowerCase().includes(normalizedSearch);
       })
-      .sort((firstItem, secondItem) =>
-        firstItem.name.localeCompare(secondItem.name, "fr", {
+      .sort((firstItem, secondItem) => {
+        // Primary sort: last message date (most recent first)
+        const getTime = (it) =>
+          new Date(it.lastMessageAt || it.conversation?.last_message_at || it.conversation?.last_message?.date_creation || 0).getTime();
+
+        const aTime = getTime(firstItem) || 0;
+        const bTime = getTime(secondItem) || 0;
+
+        if (bTime !== aTime) return bTime - aTime;
+
+        // Fallback: alphabetical by displayName
+        return String(firstItem.displayName || firstItem.name || "").localeCompare(String(secondItem.displayName || secondItem.name || ""), "fr", {
           sensitivity: "base",
-        })
-      );
+        });
+      });
   }, [conversationByUserId, conversations, currentUser, currentUserIdentifiers, searchTerm, userById, visibleUsers]);
 
   const selectedThread = useMemo(
@@ -379,6 +389,51 @@ function Messages() {
         const payload = JSON.parse(event.data);
 
         if (payload.type === "message_created") {
+          // optimistic update: move the conversation containing the message to top
+          const msg = payload.message || payload;
+
+          if (msg) {
+            setConversations((current) => {
+              const convs = Array.isArray(current) ? [...current] : [];
+
+              const findById = (c) => String(c.conversation_id || c.conversation || c.id) === String(msg.conversation_id || msg.conversation || "");
+
+              let idx = convs.findIndex(findById);
+
+              if (idx === -1) {
+                // try matching by participants
+                idx = convs.findIndex((c) => {
+                  const a = String(c.expediteur_id || c.expediteur_id || "");
+                  const b = String(c.destinataire_id || c.destinataire || "");
+                  return (
+                    (a && b) &&
+                    ((a === String(msg.expediteur_id) && b === String(msg.destinataire_id)) || (a === String(msg.destinataire_id) && b === String(msg.expediteur_id)))
+                  );
+                });
+              }
+
+              const now = msg.date_creation || new Date().toISOString();
+
+              if (idx !== -1) {
+                const updated = { ...convs[idx], last_message: msg.contenu || msg.body || msg.content, last_message_at: now };
+                convs.splice(idx, 1);
+                convs.unshift(updated);
+              } else {
+                const newConv = {
+                  conversation_id: msg.conversation_id || msg.conversation || `direct--${msg.expediteur_id}--${msg.destinataire_id}`,
+                  last_message: msg.contenu || msg.body || msg.content,
+                  last_message_at: now,
+                  expediteur_id: msg.expediteur_id,
+                  destinataire_id: msg.destinataire_id,
+                  unread_count: 0,
+                };
+                convs.unshift(newConv);
+              }
+
+              return convs;
+            });
+          }
+
           await refreshMessaging(false);
           dispatchDataChanged(DATA_EVENTS.MESSAGES_CHANGED);
         }
@@ -503,7 +558,16 @@ function Messages() {
       ]);
 
       if (conversationsData.status === "fulfilled") {
-        setConversations(Array.isArray(conversationsData.value) ? conversationsData.value : []);
+        // Sort conversations by last message date (most recent first) to ensure
+        // the conversation with the latest activity appears first in the list.
+        const convs = Array.isArray(conversationsData.value) ? conversationsData.value : [];
+        convs.sort((a, b) => {
+          const dateA = new Date(a.last_message_at || a.last_message?.date_creation || a.updated_at || a.created_at || 0).getTime();
+          const dateB = new Date(b.last_message_at || b.last_message?.date_creation || b.updated_at || b.created_at || 0).getTime();
+          return dateB - dateA;
+        });
+
+        setConversations(convs);
       } else {
         // fallback: try loading raw messages and build conversation summaries client-side
         try {
@@ -549,6 +613,13 @@ function Messages() {
                 tache_id: first.tache_id,
                 projet_id: first.projet_id,
               };
+            });
+
+            // sort fallback conversations by last_message_at as well
+            convs.sort((a, b) => {
+              const dateA = new Date(a.last_message_at || a.lastMessage?.created_at || a.updated_at || a.created_at || 0).getTime();
+              const dateB = new Date(b.last_message_at || b.lastMessage?.created_at || b.updated_at || b.created_at || 0).getTime();
+              return dateB - dateA;
             });
 
             setConversations(convs);
@@ -627,6 +698,47 @@ function Messages() {
       setMessages((current) => [...current, createdMessage]);
       setDraftMessage("");
       setNotice("");
+      // Optimistically update conversations list so the active conversation
+      // with the newly sent message appears first immediately.
+      setConversations((current) => {
+        const convs = Array.isArray(current) ? [...current] : [];
+
+        const findById = (c) => String(c.conversation_id || c.conversation || c.id) === String(createdMessage.conversation_id || createdMessage.conversation || "");
+
+        let idx = convs.findIndex(findById);
+
+        if (idx === -1) {
+          idx = convs.findIndex((c) => {
+            const a = String(c.expediteur_id || "");
+            const b = String(c.destinataire_id || "");
+            return (
+              (a && b) &&
+              ((a === String(createdMessage.expediteur_id) && b === String(createdMessage.destinataire_id)) || (a === String(createdMessage.destinataire_id) && b === String(createdMessage.expediteur_id)))
+            );
+          });
+        }
+
+        const now = createdMessage.date_creation || new Date().toISOString();
+
+        if (idx !== -1) {
+          const updated = { ...convs[idx], last_message: createdMessage.contenu, last_message_at: now };
+          convs.splice(idx, 1);
+          convs.unshift(updated);
+        } else {
+          const newConv = {
+            conversation_id: createdMessage.conversation_id || createdMessage.conversation || `direct--${createdMessage.expediteur_id}--${createdMessage.destinataire_id}`,
+            last_message: createdMessage.contenu,
+            last_message_at: now,
+            expediteur_id: createdMessage.expediteur_id,
+            destinataire_id: createdMessage.destinataire_id,
+            unread_count: 0,
+          };
+          convs.unshift(newConv);
+        }
+
+        return convs;
+      });
+
       await loadMessagingData(false);
       dispatchDataChanged(DATA_EVENTS.MESSAGES_CHANGED);
     } catch (sendError) {
