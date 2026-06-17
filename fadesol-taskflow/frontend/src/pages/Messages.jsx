@@ -117,6 +117,30 @@ function Messages() {
   const currentServiceId = myProfile?.id_service || myProfile?.service_id || currentUser?.id_service || currentUser?.service_id || "";
   const currentRole = currentUser?.role;
   const isAdmin = currentRole === "Admin" || currentRole === "Administrateur";
+  
+  function computeDisplayName(name, conversation) {
+    // Prefer a readable name for Employees: user name when available,
+    // otherwise a short, safe "Conversation" label. Never show a full UUID.
+    if (!name) return "Conversation";
+
+    const isEmployee = currentRole && String(currentRole).toLowerCase().includes("employee") ||
+      String(currentRole).toLowerCase().includes("employe");
+
+    if (!isEmployee) {
+      return name.length > 40 ? `${name.slice(0, 37)}...` : name;
+    }
+
+    // Employee view: hide long technical ids and prefer a short label
+    const techPattern = /--|^direct--|^general--|^tache--|^projet--|^service--|[0-9a-fA-F]{8,}/i;
+
+    if (techPattern.test(name) || name.length > 30) {
+      const idMatch = String(name).match(/[0-9a-fA-F]{4,}/);
+      const short = idMatch ? `${idMatch[0].slice(0, 8)}...` : `${String(name).slice(0, 12)}...`;
+      return `Conversation ${short}`;
+    }
+
+    return name.length > 28 ? `${name.slice(0, 25)}...` : name;
+  }
 
   const userById = useMemo(() => {
     return users.reduce((accumulator, user) => {
@@ -228,6 +252,7 @@ function Messages() {
 
       const conversation = conversationByUserId[userId] || null;
       const name = getUserName(user);
+      const displayName = computeDisplayName(name, conversation);
 
       itemsById[userId] = {
         id: userId,
@@ -235,6 +260,7 @@ function Messages() {
         user,
         conversation,
         name,
+        displayName,
         role: getConversationRole(conversation, user),
         lastMessage: conversation?.last_message || "Aucun message pour le moment.",
         lastMessageAt: conversation?.last_message_at || null,
@@ -251,12 +277,15 @@ function Messages() {
         return;
       }
 
+      const displayName = computeDisplayName(name, conversation);
+
       itemsById[userId] = {
         id: userId,
         userId,
         user,
         conversation,
         name,
+        displayName,
         role: getConversationRole(conversation, user),
         lastMessage: conversation.last_message,
         lastMessageAt: conversation.last_message_at,
@@ -697,12 +726,12 @@ function Messages() {
                           onClick={() => setSelectedThreadId(thread.id)}
                         >
                           <div className="message-avatar">
-                            {getNameInitials(thread.name)}
+                            {getNameInitials(thread.user ? getUserName(thread.user) : thread.displayName)}
                             <span className={`presence-dot ${presence[thread.userId]?.is_online ? "is-online" : "is-offline"}`} />
                           </div>
                           <div>
                             <header>
-                              <strong>{thread.name}</strong>
+                              <strong>{thread.displayName}</strong>
                               <time>{formatDate(thread.lastMessageAt)}</time>
                             </header>
                             <p>{thread.lastMessage}</p>
@@ -728,9 +757,9 @@ function Messages() {
           ) : (
             <>
               <header className="messages-chat-header">
-                <div className="message-avatar">{getNameInitials(selectedThread.name)}</div>
+                <div className="message-avatar">{getNameInitials(selectedThread.user ? getUserName(selectedThread.user) : selectedThread.displayName)}</div>
                 <div>
-                  <h3>{selectedThread.name}</h3>
+                  <h3>{selectedThread.displayName}</h3>
                   <span>{selectedThread.user?.email || selectedThread.role || "Conversation"}</span>
                   <small className="presence-text">{presenceLabel(presence[selectedThread.userId])}</small>
                 </div>

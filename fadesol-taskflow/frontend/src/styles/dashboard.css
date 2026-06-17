@@ -2801,8 +2801,13 @@
   font-weight: 700;
   line-height: 1.45;
   overflow: hidden;
-  white-space: nowrap;
+  /* Allow 1-2 lines for the last message with ellipsis, avoid letter-by-letter wrapping */
+  display: -webkit-box;
+  -webkit-line-clamp: 2;
+  -webkit-box-orient: vertical;
   text-overflow: ellipsis;
+  white-space: normal;
+  overflow-wrap: anywhere;
 }
 
 .conversation-item footer {
