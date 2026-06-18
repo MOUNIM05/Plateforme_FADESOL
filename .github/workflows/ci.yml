@@ -55,10 +55,27 @@ jobs:
     name: Docker Compose Config Check
     runs-on: ubuntu-latest
 
+    defaults:
+      run:
+        working-directory: fadesol-taskflow
+
     steps:
       - name: Checkout code
         uses: actions/checkout@v4
 
+      - name: Create CI env file
+        run: |
+          cat > .env << 'EOF'
+          POSTGRES_USER=postgres
+          POSTGRES_PASSWORD=postgres
+          POSTGRES_DB=postgres
+          PGADMIN_DEFAULT_EMAIL=admin@fadesol.local
+          PGADMIN_DEFAULT_PASSWORD=admin123
+          JWT_SECRET_KEY=ci-secret-key
+          SECRET_KEY=ci-secret-key
+          ACCESS_TOKEN_EXPIRE_MINUTES=60
+          ENVIRONMENT=ci
+          EOF
+
       - name: Check Docker Compose config
-        working-directory: fadesol-taskflow
         run: docker compose config
