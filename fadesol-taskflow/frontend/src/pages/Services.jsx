@@ -1,3 +1,4 @@
+// Page Services : referentiel Fadesol, details, membres et indicateurs par service.
 import { useEffect, useMemo, useState } from "react";
 import {
   Building2,
@@ -52,6 +53,7 @@ const hiddenServiceNames = new Set([
 ]);
 
 function isVisibleService(service) {
+  // Certains services internes sont masques de la vue operationnelle.
   const serviceId = String(service.service_id || service.id || "").trim().toLowerCase();
   const serviceName = String(service.service_name || service.name || "").trim().toLowerCase();
 
@@ -63,6 +65,7 @@ function clampProgress(value) {
 }
 
 function normalizeServiceRecord(service) {
+  // Harmonise les champs venant du dashboard et du service referentiel.
   return {
     ...service,
     id: service.id || service.service_id,
@@ -82,6 +85,7 @@ function getMemberName(member) {
 }
 
 function splitMembers(members = []) {
+  // Separe les membres par role pour afficher Manager et Employee clairement.
   return members.reduce(
     (groups, member) => {
       const role = normalizeRole(member.role);
@@ -131,6 +135,7 @@ function formatDate(value) {
 }
 
 function Services() {
+  // Les droits utilisateur pilotent l'affichage, la creation et la suppression de services.
   const { hasPermission } = useAuth();
   const canCreateServices = hasPermission("services.create");
   const canDeleteServices = hasPermission("services.delete");
@@ -153,6 +158,7 @@ function Services() {
   });
 
   async function loadServices() {
+    // Charge les services depuis le dashboard, puis complete avec les details et managers.
     setLoading(true);
     setWarning("");
 

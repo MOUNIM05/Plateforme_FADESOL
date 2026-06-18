@@ -79,6 +79,8 @@ def get_my_profile(claims: dict = Depends(get_current_claims), db: Session = Dep
 
 @router.get("/me/permissions", response_model=UserPermissionsResponse)
 def get_my_permissions(claims: dict = Depends(get_current_claims), db: Session = Depends(get_db)):
+    """Retourne les permissions effectives de l'utilisateur connecte."""
+    # Les permissions sont rattachees au profil metier identifie par le JWT.
     user_id = claims.get("user_id")
 
     if not user_id:
@@ -91,6 +93,8 @@ def get_my_permissions(claims: dict = Depends(get_current_claims), db: Session =
 
 @router.get("/permissions", response_model=list[PermissionGroup], dependencies=[Depends(require_admin)])
 def permissions_catalog():
+    """Expose le catalogue des permissions configurables."""
+    # Catalogue reserve a l'Admin pour construire l'ecran de gestion des droits.
     return list_permission_groups()
 
 
@@ -107,6 +111,7 @@ def get_by_uuid_internal(user_uuid: str, db: Session = Depends(get_db)):
 
 @router.get("/me", response_model=UserResponse)
 def get_me(claims: dict = Depends(get_current_claims), db: Session = Depends(get_db)):
+    """Alias court du profil courant utilise par certains clients."""
     return get_my_profile(claims, db)
 
 
@@ -116,6 +121,7 @@ async def upload_my_photo(
     claims: dict = Depends(get_current_claims),
     db: Session = Depends(get_db),
 ):
+    """Controle et enregistre la photo de profil de l'utilisateur connecte."""
     user_id = claims.get("user_id")
 
     if not user_id:
@@ -123,20 +129,23 @@ async def upload_my_photo(
 
     extension = Path(file.filename or "").suffix.lower().lstrip(".")
 
+    # Seuls les formats image attendus sont acceptes pour eviter les uploads dangereux.
     if extension not in ALLOWED_PHOTO_EXTENSIONS:
         raise bad_request("Format photo non pris en charge.")
 
+    # Le nom genere evite les collisions et masque le nom de fichier original.
     UPLOAD_ROOT.mkdir(parents=True, exist_ok=True)
     filename = f"user_{user_id}_{uuid4().hex}.{extension}"
     destination = UPLOAD_ROOT / filename
     content = await file.read()
 
+    # Limite volontaire pour garder le stockage local sous controle.
     if len(content) > MAX_PHOTO_SIZE_BYTES:
         raise bad_request("La photo ne doit pas depasser 3 Mo.")
 
     destination.write_bytes(content)
 
-    # Return a browser-usable URL proxied by the API gateway
+    # URL publique servie via l'API gateway pour affichage dans le navigateur.
     photo_path = f"/api/users/uploads/profile_photos/{filename}"
 
     return update_user_photo(db, int(user_id), photo_path)
@@ -144,17 +153,20 @@ async def upload_my_photo(
 
 @router.get("/uploads/profile_photos/{filename}")
 def get_profile_photo(filename: str):
+    """Sert une photo de profil stockee localement."""
+    # Path(filename).name empeche les chemins relatifs dans le nom demande.
     file_path = UPLOAD_ROOT / Path(filename).name
 
     if not file_path.exists():
         raise not_found("Photo introuvable.")
 
-    # Serve file response; FastAPI will set appropriate headers
+    # FastAPI ajoute les en-tetes de fichier adaptes a la reponse.
     return FileResponse(file_path)
 
 
 @router.get("/{user_id}/permissions", response_model=UserPermissionsResponse, dependencies=[Depends(require_admin)])
 def get_permissions_for_user(user_id: int, db: Session = Depends(get_db)):
+    """Retourne les permissions d'un utilisateur pour l'administration."""
     user = get_user_or_404(db, user_id)
 
     return get_user_permissions_response(db, user)
@@ -166,6 +178,7 @@ def update_permissions_for_user(
     payload: UserPermissionsUpdate,
     db: Session = Depends(get_db),
 ):
+    """Remplace les permissions configurees pour un utilisateur."""
     user = get_user_or_404(db, user_id)
 
     return update_user_permissions(db, user, payload)
@@ -177,6 +190,7 @@ def patch_permissions_for_user(
     payload: UserPermissionsUpdate,
     db: Session = Depends(get_db),
 ):
+    """Met a jour les permissions d'un utilisateur avec le meme service metier."""
     user = get_user_or_404(db, user_id)
 
     return update_user_permissions(db, user, payload)

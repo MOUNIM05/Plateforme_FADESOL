@@ -1,3 +1,4 @@
+// Page d'administration des utilisateurs : creation, edition, suppression et details.
 import { useEffect, useMemo, useState } from "react";
 import {
   CheckCircle2,
@@ -48,6 +49,7 @@ const serviceOptions = [
 ];
 
 function normalizePayload(formData, includePassword = true) {
+  // Convertit le formulaire React en payload attendu par user_service.
   const payload = {
     prenom: formData.prenom.trim(),
     nom: formData.nom.trim(),
@@ -66,6 +68,7 @@ function normalizePayload(formData, includePassword = true) {
 }
 
 function getUserFullName(user) {
+  // Construit un nom affichable, avec fallback sur l'email.
   const name = `${user?.prenom || user?.first_name || ""} ${user?.nom || user?.last_name || ""}`.trim();
 
   return name || user?.email || "Utilisateur";
@@ -104,6 +107,7 @@ function getFieldValue(...values) {
 }
 
 function Users() {
+  // Les permissions fines pilotent le mode lecture seule ou administration complete.
   const { currentUser, hasPermission, logout } = useAuth();
   const [users, setUsers] = useState([]);
   const [formData, setFormData] = useState(emptyForm);
@@ -127,6 +131,7 @@ function Users() {
   const canManageUsers = canCreateUsers || canUpdateUsers || canDeleteUsers;
 
   async function loadUsers({ showLoading = true } = {}) {
+    // Recharge la liste des utilisateurs et selectionne un profil par defaut.
     setError("");
     setMessage("");
     if (showLoading) {
@@ -153,6 +158,7 @@ function Users() {
   }
 
   useEffect(() => {
+    // Chargement initial de la liste au montage de la page.
     let isMounted = true;
 
     getUsers()
@@ -189,6 +195,7 @@ function Users() {
   }, []);
 
   const filteredUsers = useMemo(() => {
+    // Applique les filtres de recherche, role et service sans modifier la liste source.
     return users.filter((user) => {
       const fullName = `${user.prenom || user.first_name || ""} ${user.nom || user.last_name || ""}`;
       const searchable = `${fullName} ${user.email || ""}`.toLowerCase();
@@ -203,6 +210,7 @@ function Users() {
   }, [users, roleFilter, serviceFilter, searchQuery]);
 
   const userStats = useMemo(() => {
+    // Calcule les compteurs affiches en haut de page.
     return {
       total: users.length,
       admins: users.filter((user) => normalizeRole(user.role) === ROLES.ADMIN).length,
@@ -212,6 +220,7 @@ function Users() {
   }, [users]);
 
   function handleChange(event) {
+    // Met a jour le formulaire utilisateur, y compris le toggle actif/inactif.
     const { name, value, type, checked } = event.target;
 
     setFormData((current) => ({
@@ -221,6 +230,7 @@ function Users() {
   }
 
   function startEdit(user) {
+    // Pre-remplit le formulaire avec le profil selectionne.
     setSelectedUser(user);
     setEditingUserId(user.id);
     setMessage("");
@@ -242,6 +252,7 @@ function Users() {
   }
 
   async function openUserDetails(user) {
+    // Ouvre la modale et charge en parallele les details et permissions.
     setSelectedUser(user);
     setDetailsUser(user);
     setDetailsPermissions({});
@@ -278,6 +289,7 @@ function Users() {
   }
 
   function editDetailsUser() {
+    // Bascule depuis la modale vers le formulaire d'edition.
     if (!detailsUser || !canUpdateUsers) {
       return;
     }
@@ -287,6 +299,7 @@ function Users() {
   }
 
   async function deleteDetailsUser() {
+    // Supprime depuis la modale puis la ferme si l'operation reussit.
     if (!detailsUser || !canDeleteUsers) {
       return;
     }
@@ -299,6 +312,7 @@ function Users() {
   }
 
   async function handleSubmit(event) {
+    // Cree ou modifie un utilisateur selon le mode du formulaire.
     event.preventDefault();
 
     if ((editingUserId && !canUpdateUsers) || (!editingUserId && !canCreateUsers)) {
@@ -335,6 +349,7 @@ function Users() {
   }
 
   async function handleDelete(userId) {
+    // Suppression protegee par permission et confirmation explicite.
     if (!canDeleteUsers) {
       setError("Accès refusé : vous n'avez pas l'autorisation de supprimer un utilisateur.");
       return false;
@@ -374,6 +389,7 @@ function Users() {
   }
 
   const permissionEntries = Object.entries(detailsPermissions);
+  // Nombre de permissions actives affiche dans la modale de details.
   const allowedPermissionsCount = permissionEntries.filter(([, allowed]) => allowed).length;
 
   return (

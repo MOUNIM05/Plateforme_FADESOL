@@ -1,5 +1,7 @@
+// Client HTTP centralise pour toutes les communications avec l'API Gateway.
 import axios from "axios";
 
+// L'URL API peut venir de Vite ou retomber sur le gateway local en developpement.
 const apiBaseUrl =
   import.meta.env.VITE_API_BASE_URL || import.meta.env.VITE_API_URL || "http://localhost:8000/api";
 
@@ -7,6 +9,7 @@ export const API_BASE_URL = apiBaseUrl.replace(/\/$/, "");
 export const API_BASE_WITH_PREFIX = API_BASE_URL.endsWith("/api") ? API_BASE_URL : `${API_BASE_URL}/api`;
 
 export function resolveApiUrl(path = "") {
+  // Construit une URL absolue fiable pour les logs et les appels hors instance Axios.
   const normalizedPath = String(path).replace(/^\//, "");
 
   if (!API_BASE_WITH_PREFIX) {
@@ -25,6 +28,7 @@ const api = axios.create({
 });
 
 api.interceptors.request.use((config) => {
+  // Ajoute automatiquement le JWT aux requetes authentifiees.
   const token = localStorage.getItem("access_token");
 
   if (token) {
@@ -37,6 +41,7 @@ api.interceptors.request.use((config) => {
 api.interceptors.response.use(
   (response) => response,
   (error) => {
+    // Journalise les erreurs API avec une URL lisible pour faciliter le diagnostic.
     const isLoginRequest = error.config?.url?.includes("/auth/login");
     const failedUrl = resolveApiUrl(error.config?.url || "");
     const status = error.response?.status || "NETWORK_ERROR";
@@ -49,6 +54,7 @@ api.interceptors.response.use(
     });
 
     if (error.response?.status === 401 && !isLoginRequest) {
+      // Une session expiree est nettoyee puis renvoyee vers la page de connexion.
       localStorage.removeItem("access_token");
 
       if (window.location.pathname !== "/login") {

@@ -1,3 +1,4 @@
+// Page personnelle des taches affectees a l'utilisateur connecte.
 import { useEffect, useMemo, useState } from "react";
 import { useSearchParams } from "react-router-dom";
 import { useAuth } from "../context/AuthContext";
@@ -41,6 +42,7 @@ function formatDate(value) {
 }
 
 function MyTasks() {
+  // Vue employee/individuelle : les donnees sont filtrees avec assigned_to=me.
   const { hasPermission } = useAuth();
   const canUpdateTasks = hasPermission("tasks.update");
 
@@ -57,6 +59,7 @@ function MyTasks() {
   const [error, setError] = useState("");
 
   const filters = useMemo(
+    // Filtres envoyes au backend pour ne recuperer que les taches utiles.
     () => ({
       assigned_to: "me",
       status: statusFilter,
@@ -68,7 +71,7 @@ function MyTasks() {
   const [searchParams] = useSearchParams();
 
   useEffect(() => {
-    // If a taskId is present in query params, open the modal for that task after load
+    // Si taskId est present dans l'URL, ouvre la modale apres chargement.
     const taskId = searchParams.get("taskId");
 
     if (taskId && tasks.length) {
@@ -81,6 +84,7 @@ function MyTasks() {
   }, [searchParams, tasks]);
 
   useEffect(() => {
+    // Recharge les taches personnelles quand les filtres changent.
     let isMounted = true;
 
     async function loadMyTasks() {
@@ -114,6 +118,7 @@ function MyTasks() {
   }, [filters]);
 
   async function handleStatusChange(taskId, status) {
+    // Permet a l'utilisateur autorise de mettre a jour rapidement le statut.
     setError("");
     setMessage("");
     setUpdatingStatusTaskId(taskId);
@@ -136,6 +141,7 @@ function MyTasks() {
   }
 
   async function openTaskDetails(task) {
+    // Charge le detail, les sous-taches et les pieces jointes en parallele.
     setSelectedTask(task);
     setSelectedSubtasks([]);
     setSelectedAttachments([]);

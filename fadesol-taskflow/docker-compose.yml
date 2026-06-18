@@ -1,4 +1,5 @@
 services:
+  # Base PostgreSQL partagee par les bases logiques des microservices.
   postgres_db:
     image: postgres:16
     container_name: postgres_db
@@ -20,6 +21,7 @@ services:
       retries: 5
       start_period: 10s
 
+  # Interface d'administration PostgreSQL disponible en local.
   pgadmin:
     image: dpage/pgadmin4:8
     container_name: pgadmin
@@ -40,6 +42,7 @@ services:
       retries: 3
       start_period: 15s
 
+  # Point d'entree unique appele par le frontend.
   api_gateway:
     build:
       context: ./backend
@@ -79,6 +82,7 @@ services:
       retries: 3
       start_period: 20s
 
+  # Service responsable du login, des JWT et des comptes d'authentification.
   auth_service:
     build:
       context: ./backend
@@ -108,6 +112,7 @@ services:
       retries: 3
       start_period: 15s
 
+  # Service des profils utilisateurs, roles, permissions et photos.
   user_service:
     build:
       context: ./backend
@@ -138,6 +143,7 @@ services:
     volumes:
       - ./backend/uploads:/app/uploads
 
+  # Referentiel des services internes Fadesol.
   service_fadesol_service:
     build:
       context: ./backend
@@ -160,6 +166,7 @@ services:
       retries: 3
       start_period: 15s
 
+  # Service de gestion des projets.
   project_service:
     build:
       context: ./backend
@@ -183,6 +190,7 @@ services:
       retries: 3
       start_period: 15s
 
+  # Service des taches, sous-taches et pieces jointes.
   task_service:
     build:
       context: ./backend
@@ -211,6 +219,7 @@ services:
       retries: 3
       start_period: 15s
 
+  # Service de messagerie et conversations internes.
   message_service:
     build:
       context: ./backend
@@ -234,6 +243,7 @@ services:
       retries: 3
       start_period: 15s
 
+  # Service d'agregation des indicateurs dashboard.
   dashboard_service:
     build:
       context: ./backend
@@ -255,6 +265,7 @@ services:
       retries: 3
       start_period: 15s
 
+  # Application React/Vite exposee pour l'interface utilisateur.
   frontend:
     build:
       context: ./frontend
@@ -270,4 +281,5 @@ services:
         condition: service_healthy
 
 volumes:
+  # Volume persistant pour conserver les donnees PostgreSQL entre redemarrages.
   postgres_data:

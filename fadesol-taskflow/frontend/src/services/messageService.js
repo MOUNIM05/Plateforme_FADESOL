@@ -1,6 +1,8 @@
+// Service API de la messagerie : conversations, messages, lecture et WebSocket.
 import api, { API_BASE_URL } from "./api";
 
 export function getMessagesWebSocketUrl() {
+  // Construit l'URL WebSocket a partir de l'URL API pour fonctionner en local et en production.
   const configuredUrl = import.meta.env.VITE_WS_URL || import.meta.env.VITE_MESSAGES_WS_URL;
 
   if (configuredUrl) {
@@ -14,7 +16,7 @@ export function getMessagesWebSocketUrl() {
   apiUrl.search = "";
   apiUrl.hash = "";
 
-  // attach current auth token as a query param so the backend can identify the user
+  // Ajoute le token en query param car les WebSockets ne permettent pas toujours les headers custom.
   try {
     const token = localStorage.getItem("access_token");
 
@@ -23,7 +25,7 @@ export function getMessagesWebSocketUrl() {
       apiUrl.search = `${apiUrl.search}${sep}authorization=${encodeURIComponent("Bearer " + token)}`;
     }
   } catch (e) {
-    // ignore
+    // Ignore : l'absence de localStorage ne doit pas bloquer la construction de l'URL.
   }
 
   return apiUrl.toString();
@@ -48,6 +50,7 @@ export async function getConversation(conversationId) {
 }
 
 export async function getConversationMessages(conversationId) {
+  // Alias conserve pour les composants qui nomment explicitement les messages d'une conversation.
   return getConversation(conversationId);
 }
 
@@ -64,6 +67,7 @@ export async function createMessage(messageData) {
 }
 
 export async function sendMessage(messageData) {
+  // Alias lisible cote composants pour l'envoi de message.
   return createMessage(messageData);
 }
 

@@ -1,3 +1,4 @@
+// Page Notifications : agrège les messages non lus et les taches affectees.
 import { Bell, CheckCheck, MessageSquareText, RefreshCw, ClipboardList } from "lucide-react";
 import { useEffect, useMemo, useState } from "react";
 import { useNavigate } from "react-router-dom";
@@ -7,6 +8,7 @@ import { getTasks } from "../services/taskService";
 import { getMyUserProfile, getUsers } from "../services/userService";
 
 function getUserIdentifiers(user) {
+  // Regroupe les identifiants possibles pour reconnaitre le compte courant.
   return new Set(
     [user?.uuid, user?.id, user?.user_id]
       .filter((value) => value !== undefined && value !== null && value !== "")
@@ -34,6 +36,7 @@ function formatDate(value) {
 }
 
 function Notifications() {
+  // Les notifications sont construites cote frontend a partir des services messages et taches.
   const navigate = useNavigate();
   const { currentUser } = useAuth();
   const [messages, setMessages] = useState([]);
@@ -45,6 +48,7 @@ function Notifications() {
   const [error, setError] = useState("");
 
   const userIds = useMemo(() => {
+    // Fusionne les ids du contexte auth et du profil metier charge.
     return new Set([...getUserIdentifiers(currentUser), ...getUserIdentifiers(profile)]);
   }, [currentUser, profile]);
 
@@ -58,6 +62,7 @@ function Notifications() {
   }, [users]);
 
   const buildNotifications = useMemo(() => {
+    // Transforme messages et taches en une liste unique triee par date.
     const messageNotifications = (messages || [])
       .map((m) => ({
         id: `message-${m.id}`,
@@ -90,6 +95,7 @@ function Notifications() {
   const unreadMessages = useMemo(() => buildNotifications.filter((n) => n.type === "message" && n.unread), [buildNotifications]);
 
   async function loadNotifications() {
+    // Charge les donnees utiles puis applique les regles de visibilite par role.
     setLoading(true);
     setError("");
 
@@ -112,7 +118,7 @@ function Notifications() {
       const rawTasks = tasksResult.status === "fulfilled" && Array.isArray(tasksResult.value) ? tasksResult.value : [];
       const rawUsers = usersResult.status === "fulfilled" && Array.isArray(usersResult.value) ? usersResult.value : [];
 
-      // Determine visible messages using the same rules as the dropdown
+      // Applique les memes regles de visibilite que le menu de notifications.
       let visibleMessages = rawMessages;
 
       if (isEmployee) {
@@ -146,6 +152,7 @@ function Notifications() {
   }, []);
 
   async function markOneAsRead(messageId) {
+    // Marque une notification message comme lue.
     setMessage("");
     setError("");
 
@@ -160,6 +167,7 @@ function Notifications() {
   }
 
   async function markAllAsRead() {
+    // Marque toutes les notifications message non lues comme lues.
     setMessage("");
     setError("");
 
@@ -182,6 +190,7 @@ function Notifications() {
   }
 
   function handleView(notification) {
+    // Redirige vers la page metier correspondant a la notification.
     if (!notification) return;
 
     if (notification.type === "task") {

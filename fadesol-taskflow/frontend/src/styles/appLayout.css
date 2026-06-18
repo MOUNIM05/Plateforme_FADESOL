@@ -1,3 +1,4 @@
+/* Layout alternatif de workspace : navigation iconique, panneau de module et contenu. */
 .tf-app-layout {
   min-height: 100vh;
   display: grid;
@@ -7,6 +8,7 @@
   overflow: hidden;
 }
 
+/* Barre verticale d'icones pour acceder rapidement aux modules. */
 .tf-icon-sidebar {
   background: linear-gradient(180deg, #151b35, #17122f);
   border-right: 1px solid #2b3040;
@@ -88,6 +90,7 @@
   box-shadow: 0 12px 26px rgba(22, 163, 74, 0.22);
 }
 
+/* Sidebar de contexte : selection du workspace et navigation secondaire. */
 .tf-workspace-sidebar {
   min-width: 0;
   background: #181b22;

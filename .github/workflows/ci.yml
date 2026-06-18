@@ -13,6 +13,7 @@ on:
 
 jobs:
   frontend-build:
+    # Verifie que l'application React/Vite compile correctement.
     name: Frontend Build
     runs-on: ubuntu-latest
 
@@ -36,6 +37,7 @@ jobs:
         run: npm run build
 
   backend-compile:
+    # Compile les services Python pour detecter les erreurs de syntaxe backend.
     name: Backend Compile Check
     runs-on: ubuntu-latest
 
@@ -52,6 +54,7 @@ jobs:
         run: python -m compileall fadesol-taskflow/backend/services
 
   docker-compose-check:
+    # Valide la configuration Docker Compose avec un .env temporaire de CI.
     name: Docker Compose Config Check
     runs-on: ubuntu-latest
 
@@ -65,6 +68,7 @@ jobs:
 
       - name: Create CI env file
         run: |
+          # Fichier .env ephemere : il existe seulement dans le runner GitHub Actions.
           cat > .env << 'EOF'
           POSTGRES_USER=postgres
           POSTGRES_PASSWORD=postgres

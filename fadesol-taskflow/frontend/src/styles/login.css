@@ -1,5 +1,6 @@
 @import url("https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&display=swap");
 
+/* Page de connexion plein ecran avec image de fond et carte centrale. */
 .ft-login-page {
   width: 100vw;
   height: 100vh;
@@ -16,6 +17,7 @@
   font-family: Inter, system-ui, sans-serif;
 }
 
+/* Voile visuel pour garder la lisibilite du formulaire sur l'image. */
 .ft-login-overlay {
   position: absolute;
   inset: 0;
@@ -25,6 +27,7 @@
   pointer-events: none;
 }
 
+/* Carte du formulaire de connexion. */
 .ft-login-card {
   width: min(500px, calc(100vw - 40px));
   position: relative;
@@ -67,6 +70,7 @@
   line-height: 1.5;
 }
 
+/* Champs du formulaire : icone, saisie et action secondaire. */
 .ft-login-form,
 .ft-field {
   display: grid;

@@ -1,3 +1,9 @@
+"""Logique metier du referentiel des services Fadesol.
+
+Ce module centralise la creation, la consultation, les statistiques et les
+verifications de dependances avant suppression d'un service.
+"""
+
 import json
 from datetime import date
 from urllib.parse import quote
@@ -34,25 +40,31 @@ SERVICE_DELETE_BLOCKED_MESSAGE = (
 
 
 def list_services(db: Session, skip: int = 0, limit: int = 100) -> list[Service]:
+    """Liste les services avec pagination."""
     return get_services(db, skip, limit)
 
 
 def create_service(db: Session, payload: ServiceCreate) -> Service:
+    """Cree un service via la couche CRUD."""
     return crud_create_service(db, payload)
 
 
 def update_service(db: Session, service_id: str, payload: ServiceUpdate) -> Service:
+    """Met a jour un service via la couche CRUD."""
     return crud_update_service(db, service_id, payload)
 
 
 def delete_service(db: Session, service_id: str, authorization: str | None = None) -> None:
+    """Supprime un service apres controle des dependances."""
     service = get_service(db, service_id)
 
+    # Evite de supprimer un service encore utilise par des utilisateurs, projets ou taches.
     ensure_service_has_no_dependencies(service, authorization)
     crud_delete_service(db, service_id)
 
 
 def get_service(db: Session, service_id: str) -> Service:
+    """Retourne un service ou une erreur 404 metier."""
     service = get_service_by_id(db, service_id)
 
     if not service:
@@ -62,6 +74,7 @@ def get_service(db: Session, service_id: str) -> Service:
 
 
 def fetch_users_from_user_service(authorization: str | None) -> list[dict]:
+    """Charge les utilisateurs pour calculer les membres d'un service."""
     if not authorization:
         raise HTTPException(
             status_code=status.HTTP_401_UNAUTHORIZED,
@@ -95,6 +108,7 @@ def fetch_users_from_user_service(authorization: str | None) -> list[dict]:
 
 
 def fetch_remote_list(target_url: str, authorization: str | None, service_name: str) -> list[dict]:
+    """Recupere une liste depuis un autre microservice."""
     headers = {"Authorization": authorization} if authorization else {}
     request = UrlRequest(target_url, headers=headers, method="GET")
 
@@ -119,6 +133,7 @@ def fetch_remote_list(target_url: str, authorization: str | None, service_name: 
 
 
 def ensure_service_has_no_dependencies(service: Service, authorization: str | None) -> None:
+    """Bloque la suppression d'un service encore reference."""
     users = fetch_users_from_user_service(authorization)
     members = crud_get_service_members(service, users)
 
@@ -131,6 +146,7 @@ def ensure_service_has_no_dependencies(service: Service, authorization: str | No
 
     projects = fetch_remote_list(projects_url, authorization, "Project service")
     tasks = fetch_remote_list(task_url, authorization, "Task service")
+    # Les taches peuvent referencer le service par identifiant ou par nom selon les donnees historiques.
     linked_tasks = [
         task
         for task in tasks
@@ -146,6 +162,7 @@ def get_service_members(
     service_id: str,
     authorization: str | None,
 ) -> ServiceMembersResponse:
+    """Retourne les membres associes a un service."""
     service = get_service(db, service_id)
     users = fetch_users_from_user_service(authorization)
     members = crud_get_service_members(service, users)
@@ -163,6 +180,7 @@ def get_service_statistics(
     service_id: str,
     authorization: str | None,
 ) -> ServiceStatisticsResponse:
+    """Calcule les indicateurs simples d'un service."""
     service = get_service(db, service_id)
     users = fetch_users_from_user_service(authorization)
     members = crud_get_service_members(service, users)
@@ -207,6 +225,7 @@ def _is_in_progress_status(status: str | None) -> bool:
 
 
 def get_service_details(db: Session, service_id: str, authorization: str | None) -> dict:
+    """Agrege le service, son manager, ses membres, projets et taches."""
     service = get_service(db, service_id)
     users = fetch_users_from_user_service(authorization)
     members = crud_get_service_members(service, users)
@@ -220,6 +239,7 @@ def get_service_details(db: Session, service_id: str, authorization: str | None)
         None,
     )
 
+    # Les projets et taches sont lus via les services proprietaires pour respecter l'architecture microservices.
     encoded_service_id = quote(service.id)
     projects_url = f"{settings.PROJECT_SERVICE_URL.rstrip('/')}/api/projects/?service_id={encoded_service_id}&limit=1000"
     tasks_url = f"{settings.TASK_SERVICE_URL.rstrip('/')}/api/tasks/?limit=1000"
@@ -266,4 +286,5 @@ def get_service_details(db: Session, service_id: str, authorization: str | None)
 
 
 def changer_manager(db: Session, service_id: str, manager_id: str) -> Service:
+    """Met a jour le manager d'un service."""
     return update_service(db, service_id, ServiceUpdate(manager_id=manager_id))

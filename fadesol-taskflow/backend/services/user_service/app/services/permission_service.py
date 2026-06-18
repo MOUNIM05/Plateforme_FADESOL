@@ -70,12 +70,14 @@ AVAILABLE_PERMISSION_GROUPS = [
     },
 ]
 
+# Liste aplatie utilisee pour valider les permissions recues depuis l'interface Admin.
 ALL_PERMISSION_KEYS = [
     permission["key"]
     for group in AVAILABLE_PERMISSION_GROUPS
     for permission in group["permissions"]
 ]
 
+# Permissions par defaut appliquees selon le role avant les eventuelles surcharges utilisateur.
 ROLE_DEFAULT_PERMISSIONS = {
     UserRole.ADMIN.value: set(ALL_PERMISSION_KEYS),
     UserRole.MANAGER.value: {
@@ -101,14 +103,18 @@ ROLE_DEFAULT_PERMISSIONS = {
 
 
 def list_permission_groups() -> list[PermissionGroup]:
+    """Retourne le catalogue de permissions regroupe par module."""
     return [PermissionGroup(**group) for group in AVAILABLE_PERMISSION_GROUPS]
 
 
 def get_user_permissions(db: Session, user: User) -> dict[str, bool]:
+    """Calcule les permissions finales d'un utilisateur."""
+    # Les droits partent du role, puis les surcharges stockees en base prennent le dessus.
     defaults = ROLE_DEFAULT_PERMISSIONS.get(user.role, set())
     permissions = {key: key in defaults for key in ALL_PERMISSION_KEYS}
 
     if user.role == UserRole.ADMIN.value:
+        # L'administrateur conserve toujours l'ensemble des permissions.
         return {key: True for key in ALL_PERMISSION_KEYS}
 
     overrides = db.query(UserPermission).filter(UserPermission.user_id == user.id).all()
@@ -121,16 +127,20 @@ def get_user_permissions(db: Session, user: User) -> dict[str, bool]:
 
 
 def get_user_permissions_response(db: Session, user: User) -> UserPermissionsResponse:
+    """Construit la reponse API des permissions utilisateur."""
     return UserPermissionsResponse(user_id=user.id, permissions=get_user_permissions(db, user))
 
 
 def update_user_permissions(db: Session, user: User, payload: UserPermissionsUpdate) -> UserPermissionsResponse:
+    """Enregistre les surcharges de permissions pour un utilisateur."""
+    # Indexe les permissions existantes afin de mettre a jour sans doublons.
     existing = {
         permission.permission_key: permission
         for permission in db.query(UserPermission).filter(UserPermission.user_id == user.id).all()
     }
 
     for key, is_allowed in payload.permissions.items():
+        # Ignore silencieusement les cles inconnues pour garder un catalogue maitrise.
         if key not in ALL_PERMISSION_KEYS:
             continue
 
@@ -147,6 +157,7 @@ def update_user_permissions(db: Session, user: User, payload: UserPermissionsUpd
 
 
 def get_user_or_404(db: Session, user_id: int) -> User:
+    """Recupere un utilisateur ou leve une erreur lisible pour l'API."""
     user = db.query(User).filter(User.id == user_id).first()
 
     if not user:

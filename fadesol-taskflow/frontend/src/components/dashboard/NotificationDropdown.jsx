@@ -1,3 +1,4 @@
+// Menu de notifications affiche dans la barre superieure du dashboard.
 import { Bell } from "lucide-react";
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { useNavigate } from "react-router-dom";
@@ -8,6 +9,7 @@ import { getMyUserProfile, getUsers } from "../../services/userService";
 import { DATA_EVENTS, subscribeDataEvents } from "../../utils/dataEvents";
 
 function getUserIdentifiers(user) {
+  // Regroupe les identifiants possibles pour reconnaitre les messages du compte courant.
   return new Set(
     [user?.uuid, user?.id, user?.user_id]
       .filter((value) => value !== undefined && value !== null && value !== "")
@@ -16,6 +18,7 @@ function getUserIdentifiers(user) {
 }
 
 function NotificationDropdown() {
+  // Le menu agrege messages et taches, puis se met a jour via evenements et WebSocket.
   const navigate = useNavigate();
   const { currentUser } = useAuth();
   const [messages, setMessages] = useState([]);
@@ -37,6 +40,7 @@ function NotificationDropdown() {
   }, [currentUser, profile]);
 
   const loadNotifications = useCallback(async () => {
+    // Recharge messages et taches en appliquant les filtres du role courant.
     try {
       const taskFilters = isEmployee ? { assigned_to: "me" } : isManager && currentServiceId ? { service_id: currentServiceId } : {};
 
@@ -45,7 +49,7 @@ function NotificationDropdown() {
       const rawMessages = messagesData.status === "fulfilled" && Array.isArray(messagesData.value) ? messagesData.value : [];
       const rawTasks = tasksData.status === "fulfilled" && Array.isArray(tasksData.value) ? tasksData.value : [];
 
-      // Filter messages by role
+      // Filtre les messages par role : employee direct, manager service, admin global.
       let visibleMessages = rawMessages;
 
       if (isEmployee) {
@@ -72,6 +76,7 @@ function NotificationDropdown() {
   }, [isEmployee, isManager, currentServiceId, serviceUsers, userIds]);
 
   useEffect(() => {
+    // Ferme le menu au clic en dehors.
     function handleDocumentClick(event) {
       if (dropdownRef.current && !dropdownRef.current.contains(event.target)) {
         setOpen(false);
@@ -83,6 +88,7 @@ function NotificationDropdown() {
   }, []);
 
   useEffect(() => {
+    // Recupere le profil metier pour connaitre le service courant.
     let isMounted = true;
 
     getMyUserProfile()
@@ -101,6 +107,7 @@ function NotificationDropdown() {
   }, []);
 
   useEffect(() => {
+    // Pour un manager, charge les membres de son service afin de filtrer les messages.
     if (isManager && currentServiceId) {
       getUsers(currentServiceId)
         .then((data) => setServiceUsers(Array.isArray(data) ? data : []))
@@ -113,10 +120,12 @@ function NotificationDropdown() {
   }, [loadNotifications]);
 
   useEffect(() => {
+    // Synchronise le badge quand d'autres pages modifient messages ou taches.
     return subscribeDataEvents([DATA_EVENTS.MESSAGES_CHANGED, DATA_EVENTS.TASKS_CHANGED], loadNotifications);
   }, [loadNotifications]);
 
   useEffect(() => {
+    // WebSocket leger pour rafraichir le badge au moment des messages.
     const websocket = new WebSocket(getMessagesWebSocketUrl());
 
     websocket.onmessage = (event) => {
@@ -139,6 +148,7 @@ function NotificationDropdown() {
   }, [loadNotifications]);
 
   const unreadCount = messages.filter((message) => {
+    // Compte seulement les messages recus et pas encore lus.
     const recipientId = String(message.destinataire_id || "");
     const senderId = String(message.expediteur_id || "");
 
@@ -146,6 +156,7 @@ function NotificationDropdown() {
   }).length;
 
   const notificationItems = useMemo(() => {
+    // Prepare une liste courte pour le menu deroulant.
     const messageNotifications = messages
       .slice(0, 3)
       .map((message) => ({

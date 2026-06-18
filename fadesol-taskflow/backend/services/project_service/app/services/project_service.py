@@ -1,3 +1,9 @@
+"""Logique metier du service projets.
+
+Les fonctions manipulent les projets locaux : creation, mise a jour,
+affectation du responsable, changement de statut et archivage.
+"""
+
 from sqlalchemy.orm import Session
 
 from app.models.project import Projet
@@ -13,6 +19,7 @@ def list_projects(
     service_id: str | None = None,
     status: str | None = None,
 ) -> list[Projet]:
+    """Liste les projets avec filtres optionnels par service et statut."""
     query = db.query(Projet)
 
     if service_id:
@@ -25,10 +32,12 @@ def list_projects(
 
 
 def get_project(db: Session, project_id: str) -> Projet | None:
+    """Retourne un projet par UUID."""
     return db.query(Projet).filter(Projet.id == project_id).first()
 
 
 def create_project(db: Session, payload: ProjetCreate) -> Projet:
+    """Cree un projet en normalisant les enums Pydantic."""
     data = payload.model_dump()
     data["statut"] = payload.statut.value
     data["priorite"] = payload.priorite.value
@@ -41,6 +50,7 @@ def create_project(db: Session, payload: ProjetCreate) -> Projet:
 
 
 def update_project(db: Session, project_id: str, payload: ProjetUpdate) -> Projet:
+    """Met a jour uniquement les champs envoyes."""
     project = get_project(db, project_id)
 
     if not project:
@@ -58,6 +68,7 @@ def update_project(db: Session, project_id: str, payload: ProjetUpdate) -> Proje
 
 
 def delete_project(db: Session, project_id: str) -> None:
+    """Supprime un projet existant."""
     project = get_project(db, project_id)
 
     if not project:
@@ -68,6 +79,7 @@ def delete_project(db: Session, project_id: str) -> None:
 
 
 def assigner_responsable(db: Session, project_id: str, utilisateur_id: str) -> Projet:
+    """Affecte un responsable au projet."""
     project = get_project(db, project_id)
 
     if not project:
@@ -81,6 +93,7 @@ def assigner_responsable(db: Session, project_id: str, utilisateur_id: str) -> P
 
 
 def changer_statut(db: Session, project_id: str, statut: StatutProjet) -> Projet:
+    """Change le statut fonctionnel d'un projet."""
     project = get_project(db, project_id)
 
     if not project:
@@ -94,6 +107,7 @@ def changer_statut(db: Session, project_id: str, statut: StatutProjet) -> Projet
 
 
 def archiver_project(db: Session, project_id: str) -> Projet:
+    """Archive un projet sans le supprimer de la base."""
     project = get_project(db, project_id)
 
     if not project:

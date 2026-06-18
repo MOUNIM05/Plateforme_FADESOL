@@ -1,3 +1,4 @@
+// Layout principal de l'espace connecte : sidebar, contenu et routage interne.
 import { useState } from "react";
 import { Outlet, useLocation, useNavigate } from "react-router-dom";
 import MainSidebar from "../components/dashboard/MainSidebar";
@@ -18,6 +19,7 @@ const itemRoutes = {
 };
 
 function getActiveItem(pathname) {
+  // Determine l'element actif de la sidebar a partir de l'URL courante.
   if (pathname.startsWith("/permissions")) {
     return "Permissions";
   }
@@ -36,6 +38,7 @@ function getActiveItem(pathname) {
 }
 
 function DashboardLayout() {
+  // La sidebar reste locale au layout pour conserver son etat entre les pages.
   const location = useLocation();
   const navigate = useNavigate();
   const { currentUser } = useAuth();
@@ -43,6 +46,7 @@ function DashboardLayout() {
   const activeItem = getActiveItem(location.pathname);
 
   function handleSelect(itemLabel) {
+    // Convertit un libelle de menu en route React.
     navigate(itemRoutes[itemLabel] || "/dashboard");
   }
 

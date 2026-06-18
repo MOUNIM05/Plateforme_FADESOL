@@ -1,3 +1,4 @@
+// Definition centrale des routes React et des protections d'acces.
 import { BrowserRouter, Navigate, Route, Routes } from "react-router-dom";
 import { AuthProvider, ROLES, useAuth } from "./context/AuthContext";
 import DashboardLayout from "./layouts/DashboardLayout";
@@ -19,6 +20,7 @@ import ProtectedRoute from "./routes/ProtectedRoute";
 import RoleRoute from "./routes/RoleRoute";
 
 function AuthRedirect() {
+  // Redirige la racine selon l'etat de session courant.
   const { isAuthenticated, loading } = useAuth();
 
   if (loading) {
@@ -36,6 +38,7 @@ function AuthRedirect() {
 }
 
 function AppRoutes() {
+  // Les routes sensibles sont encapsulees par ProtectedRoute puis RoleRoute si necessaire.
   return (
     <Routes>
       <Route path="/login" element={<Login />} />
@@ -90,6 +93,7 @@ function AppRoutes() {
 }
 
 function App() {
+  // BrowserRouter fournit la navigation, AuthProvider fournit la session a toute l'application.
   return (
     <BrowserRouter>
       <AuthProvider>

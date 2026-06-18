@@ -1,3 +1,4 @@
+// Page Messagerie : conversations internes, presence utilisateur et WebSocket temps reel.
 import { useEffect, useMemo, useRef, useState } from "react";
 import { useSearchParams } from "react-router-dom";
 import { Inbox, MessageCircle, Radio, Search, Send, UsersRound } from "lucide-react";
@@ -17,6 +18,7 @@ import {
 import { DATA_EVENTS, dispatchDataChanged } from "../utils/dataEvents";
 
 function getUserId(user) {
+  // Normalise l'identifiant utilisateur venant de plusieurs microservices.
   return String(user?.uuid || user?.id || user?.user_id || "");
 }
 
@@ -64,6 +66,7 @@ function formatTime(value) {
 }
 
 function presenceLabel(info) {
+  // Convertit l'etat de presence technique en libelle lisible.
   if (!info) return "";
   if (info.is_online) return "En ligne";
   if (info.last_seen) {
@@ -75,6 +78,7 @@ function presenceLabel(info) {
 }
 
 function Messages() {
+  // Les permissions determinent si l'utilisateur peut envoyer des messages.
   const { currentUser, hasPermission } = useAuth();
   const canSendMessages = hasPermission("messages.send");
   const [conversations, setConversations] = useState([]);
@@ -99,6 +103,7 @@ function Messages() {
   const chatHistoryRef = useRef(null);
 
   const currentUserIdentifiers = useMemo(() => {
+    // Regroupe tous les identifiants possibles du compte courant pour comparer les messages.
     return new Set(
       [
         myProfile?.uuid,
@@ -119,8 +124,7 @@ function Messages() {
   const isAdmin = currentRole === "Admin" || currentRole === "Administrateur";
   
   function computeDisplayName(name, conversation) {
-    // Prefer a readable name for Employees: user name when available,
-    // otherwise a short, safe "Conversation" label. Never show a full UUID.
+    // Pour les employes, privilegie un nom lisible et evite d'afficher un UUID complet.
     if (!name) return "Conversation";
 
     const isEmployee = currentRole && String(currentRole).toLowerCase().includes("employee") ||
@@ -130,7 +134,7 @@ function Messages() {
       return name.length > 40 ? `${name.slice(0, 37)}...` : name;
     }
 
-    // Employee view: hide long technical ids and prefer a short label
+    // Vue Employee : masque les identifiants techniques trop longs.
     const techPattern = /--|^direct--|^general--|^tache--|^projet--|^service--|[0-9a-fA-F]{8,}/i;
 
     if (techPattern.test(name) || name.length > 30) {
@@ -151,6 +155,7 @@ function Messages() {
   }, [users]);
 
   const visibleUsers = useMemo(() => {
+    // Admin voit tout; les autres utilisateurs restent limites a leur service.
     if (isAdmin || !currentServiceId) {
       return users;
     }
@@ -229,6 +234,7 @@ function Messages() {
   }
 
   const conversationByUserId = useMemo(() => {
+    // Indexe les conversations existantes par interlocuteur pour fusionner users + conversations.
     return conversations.reduce((accumulator, conversation) => {
       const userId = getConversationUserId(conversation);
 
@@ -241,6 +247,7 @@ function Messages() {
   }, [conversations, currentUserIdentifiers, userById]);
 
   const threadItems = useMemo(() => {
+    // Construit la liste laterale a partir des utilisateurs visibles et des conversations existantes.
     const itemsById = {};
 
     visibleUsers.forEach((user) => {
@@ -269,6 +276,7 @@ function Messages() {
     });
 
     conversations.forEach((conversation) => {
+      // Ajoute aussi les conversations dont l'utilisateur n'est pas encore dans la liste chargee.
       const userId = getConversationUserId(conversation);
       const user = userById[userId];
       const name = user ? getUserName(user) : getConversationTitle(conversation);
@@ -304,7 +312,7 @@ function Messages() {
         return `${item.name} ${item.role} ${item.user?.email || ""}`.toLowerCase().includes(normalizedSearch);
       })
       .sort((firstItem, secondItem) => {
-        // Primary sort: last message date (most recent first)
+        // Tri principal : derniere activite en premier.
         const getTime = (it) =>
           new Date(it.lastMessageAt || it.conversation?.last_message_at || it.conversation?.last_message?.date_creation || 0).getTime();
 
@@ -313,7 +321,7 @@ function Messages() {
 
         if (bTime !== aTime) return bTime - aTime;
 
-        // Fallback: alphabetical by displayName
+        // Fallback : ordre alphabetique stable.
         return String(firstItem.displayName || firstItem.name || "").localeCompare(String(secondItem.displayName || secondItem.name || ""), "fr", {
           sensitivity: "base",
         });
@@ -329,7 +337,7 @@ function Messages() {
     loadMessagingData();
   }, []);
 
-  // Handle query params to open a conversation or message
+  // Parametres d'URL permettant d'ouvrir directement une conversation ou un message.
   const [searchParams] = useSearchParams();
 
   useEffect(() => {
@@ -337,7 +345,7 @@ function Messages() {
     const messageId = searchParams.get("messageId");
 
     if (conversationId) {
-      // ensure data loaded then open conversation
+      // Charge les donnees puis ouvre la conversation cible.
       (async () => {
         await loadMessagingData(false);
         setSelectedThreadId(String(conversationId));
@@ -347,7 +355,7 @@ function Messages() {
     }
 
     if (messageId) {
-      // Try to fetch messages and find the conversation containing this message
+      // Retrouve la conversation qui contient le message demande.
       (async () => {
         try {
           const data = await getMessages();
@@ -378,6 +386,7 @@ function Messages() {
   }, [selectedConversation?.conversation_id]);
 
   useEffect(() => {
+    // Connexion WebSocket pour recevoir les nouveaux messages et les changements de presence.
     const websocket = new WebSocket(getMessagesWebSocketUrl());
 
     websocket.onopen = () => {
@@ -389,7 +398,7 @@ function Messages() {
         const payload = JSON.parse(event.data);
 
         if (payload.type === "message_created") {
-          // optimistic update: move the conversation containing the message to top
+          // Mise a jour optimiste : la conversation active remonte immediatement.
           const msg = payload.message || payload;
 
           if (msg) {
@@ -401,7 +410,7 @@ function Messages() {
               let idx = convs.findIndex(findById);
 
               if (idx === -1) {
-                // try matching by participants
+                // Fallback : rapprochement par participants si l'id de conversation manque.
                 idx = convs.findIndex((c) => {
                   const a = String(c.expediteur_id || c.expediteur_id || "");
                   const b = String(c.destinataire_id || c.destinataire || "");
@@ -470,6 +479,7 @@ function Messages() {
   }, []);
 
   useEffect(() => {
+    // Si le WebSocket n'est pas connecte, un polling REST garde l'interface synchronisee.
     if (realtimeStatus === "connected") {
       return undefined;
     }
@@ -484,6 +494,7 @@ function Messages() {
   }, [realtimeStatus]);
 
   useEffect(() => {
+    // Charge l'historique quand l'utilisateur selectionne une conversation.
     if (!selectedThread) {
       setSelectedConversation(null);
       setMessages([]);
@@ -500,6 +511,7 @@ function Messages() {
   }, [selectedThread?.conversation?.conversation_id, selectedThread?.id]);
 
   useEffect(() => {
+    // Scroll automatique en bas du fil apres chargement ou nouveau message.
     if (!chatHistoryRef.current) {
       return;
     }
@@ -508,6 +520,7 @@ function Messages() {
   }, [messages, selectedThreadId, conversationLoading]);
 
   async function refreshMessaging(showLoader = false) {
+    // Recharge la liste et, si besoin, la conversation ouverte.
     await loadMessagingData(showLoader);
 
     if (selectedConversationIdRef.current) {
@@ -516,6 +529,7 @@ function Messages() {
   }
 
   async function loadConversation(conversationId, showLoader = true) {
+    // Charge l'historique d'une conversation et marque les messages visibles comme lus.
     if (showLoader) {
       setConversationLoading(true);
     }
@@ -541,6 +555,7 @@ function Messages() {
   }
 
   async function loadMessagingData(showLoader = true) {
+    // Charge en parallele conversations, utilisateurs, profil, services, projets et presence.
     if (showLoader) {
       setLoading(true);
     }
@@ -558,8 +573,7 @@ function Messages() {
       ]);
 
       if (conversationsData.status === "fulfilled") {
-        // Sort conversations by last message date (most recent first) to ensure
-        // the conversation with the latest activity appears first in the list.
+        // Les conversations recentes doivent apparaitre en premier dans la liste.
         const convs = Array.isArray(conversationsData.value) ? conversationsData.value : [];
         convs.sort((a, b) => {
           const dateA = new Date(a.last_message_at || a.last_message?.date_creation || a.updated_at || a.created_at || 0).getTime();
@@ -569,7 +583,7 @@ function Messages() {
 
         setConversations(convs);
       } else {
-        // fallback: try loading raw messages and build conversation summaries client-side
+        // Fallback : reconstruit les conversations cote client depuis les messages bruts.
         try {
           const raw = await getMessages();
 
@@ -615,7 +629,7 @@ function Messages() {
               };
             });
 
-            // sort fallback conversations by last_message_at as well
+            // Le fallback garde le meme tri que l'API principale.
             convs.sort((a, b) => {
               const dateA = new Date(a.last_message_at || a.lastMessage?.created_at || a.updated_at || a.created_at || 0).getTime();
               const dateB = new Date(b.last_message_at || b.lastMessage?.created_at || b.updated_at || b.created_at || 0).getTime();
@@ -625,7 +639,7 @@ function Messages() {
             setConversations(convs);
           }
         } catch (fallbackError) {
-          // if fallback also fails, surface a single informative error
+          // Une seule erreur lisible suffit si l'API principale et le fallback echouent.
           setError("Conversations temporairement indisponibles.");
         }
       }
@@ -647,7 +661,7 @@ function Messages() {
       }
 
       if (onlineData.status === "fulfilled") {
-        // onlineData.value expected as { user_id: { is_online: bool, last_seen: string } }
+        // Format attendu : { user_id: { is_online: bool, last_seen: string } }.
         setPresence(typeof onlineData.value === "object" && onlineData.value ? onlineData.value : {});
       }
 
@@ -662,6 +676,7 @@ function Messages() {
   }
 
   async function handleSendMessage(event) {
+    // Envoie un message direct a l'interlocuteur selectionne.
     event.preventDefault();
     setNotice("");
     setError("");
@@ -698,8 +713,7 @@ function Messages() {
       setMessages((current) => [...current, createdMessage]);
       setDraftMessage("");
       setNotice("");
-      // Optimistically update conversations list so the active conversation
-      // with the newly sent message appears first immediately.
+      // Mise a jour optimiste pour remonter la conversation sans attendre le WebSocket.
       setConversations((current) => {
         const convs = Array.isArray(current) ? [...current] : [];
 
@@ -750,6 +764,7 @@ function Messages() {
   }
 
   function handleComposerKeyDown(event) {
+    // Entree envoie le message; Shift+Entree garde le retour a la ligne.
     if (event.key === "Enter" && !event.shiftKey) {
       event.preventDefault();
       event.currentTarget.form?.requestSubmit();
@@ -757,6 +772,7 @@ function Messages() {
   }
 
   async function markVisibleMessagesAsRead(messageList) {
+    // Marque comme lus uniquement les messages recus par l'utilisateur courant.
     const unreadMessages = messageList.filter(
       (message) =>
         !message.est_lu &&

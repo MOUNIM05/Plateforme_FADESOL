@@ -1,3 +1,9 @@
+"""Logique metier du service de messagerie.
+
+Ce module filtre les messages selon le profil connecte, construit les
+conversations et applique les operations d'envoi, lecture et mise a jour.
+"""
+
 import json
 from urllib.error import HTTPError, URLError
 from urllib.request import Request as UrlRequest
@@ -19,6 +25,8 @@ from shared.exceptions import not_found
 
 
 def list_messages(db: Session, skip: int = 0, limit: int = 100, authorization: str | None = None) -> list[Message]:
+    """Liste les messages visibles avec pagination."""
+    # La visibilite est calculee en memoire pour croiser role, service et destinataire.
     profile = _fetch_current_profile(authorization)
     messages = db.query(Message).order_by(Message.date_creation.desc()).all()
     visible_messages = [message for message in messages if _message_visible_for_profile(message, profile)]
@@ -27,13 +35,16 @@ def list_messages(db: Session, skip: int = 0, limit: int = 100, authorization: s
 
 
 def get_message(db: Session, message_id: str) -> Message | None:
+    """Retourne un message par UUID."""
     return db.query(Message).filter(Message.id == message_id).first()
 
 
 def create_message(db: Session, payload: MessageCreate, authorization: str | None = None) -> Message:
+    """Cree un message et force l'expediteur depuis le profil connecte."""
     profile = _fetch_current_profile(authorization)
     data = payload.model_dump()
 
+    # Evite qu'un client puisse usurper l'expediteur dans le payload.
     if profile.get("uuid"):
         data["expediteur_id"] = str(profile["uuid"])
 
@@ -47,6 +58,7 @@ def create_message(db: Session, payload: MessageCreate, authorization: str | Non
 
 
 def list_conversations(db: Session, authorization: str | None = None) -> list[ConversationSummary]:
+    """Regroupe les messages visibles en conversations."""
     profile = _fetch_current_profile(authorization)
     messages = [
         message
@@ -67,6 +79,7 @@ def list_conversations(db: Session, authorization: str | None = None) -> list[Co
 
 
 def get_conversation(db: Session, conversation_id: str, authorization: str | None = None) -> ConversationDetail:
+    """Retourne les messages d'une conversation accessible."""
     profile = _fetch_current_profile(authorization)
     conversation_messages = [
         message
@@ -84,6 +97,7 @@ def get_conversation(db: Session, conversation_id: str, authorization: str | Non
 
 
 def update_message(db: Session, message_id: str, payload: MessageUpdate) -> Message:
+    """Met a jour les champs envoyes pour un message."""
     message = get_message(db, message_id)
 
     if not message:
@@ -99,12 +113,14 @@ def update_message(db: Session, message_id: str, payload: MessageUpdate) -> Mess
 
 
 def mark_as_read(db: Session, message_id: str, authorization: str | None = None) -> Message:
+    """Marque un message comme lu apres verification de visibilite."""
     message = get_message(db, message_id)
 
     if not message:
         raise not_found("Message introuvable.")
 
     profile = _fetch_current_profile(authorization)
+    # Un utilisateur ne peut marquer comme lu qu'un message qu'il a le droit de voir.
     if not _message_visible_for_profile(message, profile):
         raise not_found("Message introuvable.")
 
@@ -116,6 +132,7 @@ def mark_as_read(db: Session, message_id: str, authorization: str | None = None)
 
 
 def list_by_field(db: Session, field: str, value: str) -> list[Message]:
+    """Filtre les messages sur une colonne simple."""
     return db.query(Message).filter(getattr(Message, field) == value).all()
 
 
@@ -124,6 +141,7 @@ def _list_messages_ordered(db: Session) -> list[Message]:
 
 
 def _fetch_current_profile(authorization: str | None) -> dict:
+    """Recupere le profil courant via user_service."""
     if not authorization:
         raise HTTPException(status_code=status.HTTP_401_UNAUTHORIZED, detail="Authentification requise.")
 
@@ -165,15 +183,18 @@ def _role(profile: dict) -> str:
 
 
 def _message_visible_for_profile(message: Message, profile: dict) -> bool:
+    """Applique les regles de visibilite de la messagerie."""
     role = _role(profile)
     identifiers = _profile_identifiers(profile)
 
     if role in {"admin", "administrateur"}:
         return True
 
+    # L'expediteur et le destinataire voient toujours leurs messages directs.
     if str(message.expediteur_id or "") in identifiers or str(message.destinataire_id or "") in identifiers:
         return True
 
+    # Un manager voit les messages rattaches a son service.
     if role == "manager":
         return bool(_profile_service_id(profile)) and message.service_id == _profile_service_id(profile)
 
@@ -181,6 +202,7 @@ def _message_visible_for_profile(message: Message, profile: dict) -> bool:
 
 
 def _conversation_id(message: Message) -> str:
+    """Construit un identifiant stable pour regrouper les messages."""
     if message.tache_id:
         return f"tache--{message.tache_id}"
 
@@ -198,6 +220,7 @@ def _conversation_id(message: Message) -> str:
 
 
 def _build_conversation_summary(conversation_id: str, messages: list[Message]) -> ConversationSummary:
+    """Resume une conversation pour la liste laterale du frontend."""
     last_message = messages[-1]
     first_message = messages[0]
     conversation_type = conversation_id.split("--", 1)[0]

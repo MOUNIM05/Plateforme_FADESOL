@@ -1,4 +1,5 @@
 /* eslint-disable react-refresh/only-export-components */
+// Contexte d'authentification global : session, profil utilisateur, roles et permissions.
 import { createContext, useCallback, useContext, useEffect, useMemo, useState } from "react";
 import { getCurrentUser, loginUser } from "../services/authService";
 import { getMyPermissions, getMyUserProfile } from "../services/userService";
@@ -11,6 +12,7 @@ export const ROLES = {
 };
 
 const roleAliases = {
+  // Normalise les variantes venant du backend ou des anciennes donnees.
   Admin: ROLES.ADMIN,
   admin: ROLES.ADMIN,
   ADMIN: ROLES.ADMIN,
@@ -34,6 +36,7 @@ const roleLabels = {
 const AuthContext = createContext(null);
 
 export function normalizeRole(role) {
+  // Convertit un role brut en role applicatif standard.
   return roleAliases[role] || role;
 }
 
@@ -42,6 +45,7 @@ export function getRoleLabel(role) {
 }
 
 export function getInitials(user) {
+  // Genere les initiales affichees dans la barre de navigation et les menus.
   const source =
     [user?.prenom || user?.first_name, user?.nom || user?.last_name].filter(Boolean).join(" ") ||
     user?.email ||
@@ -60,6 +64,7 @@ export function getDashboardPath() {
 }
 
 async function getCurrentUserWithPermissions() {
+  // Charge le compte auth, le profil metier et les permissions effectives.
   const authUser = await getCurrentUser();
   let profile = {};
 
@@ -79,6 +84,7 @@ async function getCurrentUserWithPermissions() {
 }
 
 export function AuthProvider({ children }) {
+  // Le token est initialise depuis localStorage pour conserver la session au refresh.
   const [token, setToken] = useState(() => localStorage.getItem("access_token"));
   const [currentUser, setCurrentUser] = useState(() => {
     try {
@@ -90,6 +96,7 @@ export function AuthProvider({ children }) {
   const [loading, setLoading] = useState(Boolean(localStorage.getItem("access_token")));
 
   const refreshCurrentUser = useCallback(async () => {
+    // Recharge le profil et les permissions apres modification des droits ou du profil.
     const storedToken = localStorage.getItem("access_token");
 
     if (!storedToken) {
@@ -104,7 +111,7 @@ export function AuthProvider({ children }) {
     try {
       const user = await getCurrentUserWithPermissions();
       setCurrentUser(user);
-      // Persist a concise current user object for components that read localStorage directly
+      // Persiste le profil pour les composants qui lisent encore localStorage directement.
       const toStore = user;
       localStorage.setItem("current_user", JSON.stringify(toStore));
       localStorage.setItem("user", JSON.stringify(toStore));
@@ -124,6 +131,7 @@ export function AuthProvider({ children }) {
   }, []);
 
   useEffect(() => {
+    // Au montage, restaure la session si un token est deja stocke.
     let isMounted = true;
     const storedToken = localStorage.getItem("access_token");
 
@@ -164,17 +172,19 @@ export function AuthProvider({ children }) {
   }, []);
 
   useEffect(() => {
+    // Les ecrans d'administration peuvent declencher un rafraichissement des permissions.
     return subscribeDataEvents([DATA_EVENTS.PERMISSIONS_CHANGED], () => {
       refreshCurrentUser();
     });
   }, [refreshCurrentUser]);
 
   async function login(email, password) {
+    // Connecte l'utilisateur puis charge son profil complet.
     const data = await loginUser(email, password);
     localStorage.setItem("access_token", data.access_token);
     setToken(data.access_token);
 
-    // The JWT must be stored before /auth/me so Axios can attach Bearer auth.
+    // Le JWT doit etre stocke avant /auth/me pour qu'Axios ajoute le Bearer.
     try {
       const user = await getCurrentUserWithPermissions();
       setCurrentUser(user);
@@ -192,6 +202,7 @@ export function AuthProvider({ children }) {
   }
 
   function logout() {
+    // Nettoie toutes les traces de session cote navigateur.
     localStorage.removeItem("access_token");
     localStorage.removeItem("current_user");
     localStorage.removeItem("user");
@@ -211,6 +222,7 @@ export function AuthProvider({ children }) {
 
   const hasPermission = useCallback(
     (permissionKey) => {
+      // L'admin possede toujours tous les droits fonctionnels.
       if (normalizeRole(currentUser?.role) === ROLES.ADMIN) {
         return true;
       }
@@ -226,6 +238,7 @@ export function AuthProvider({ children }) {
   );
 
   const value = useMemo(
+    // Memoise l'API du contexte pour limiter les rerenders des pages.
     () => ({
       currentUser,
       token,

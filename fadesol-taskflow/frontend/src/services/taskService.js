@@ -1,3 +1,4 @@
+// Service API des taches : encapsule les appels REST vers task_service via l'API Gateway.
 import api from "./api";
 
 export async function createTask(taskData) {
@@ -7,6 +8,7 @@ export async function createTask(taskData) {
 }
 
 export async function getTasks(filters = {}) {
+  // Supprime les filtres vides pour ne pas envoyer de query params inutiles au backend.
   const params = Object.fromEntries(
     Object.entries(filters).filter(([, value]) => value !== undefined && value !== null && value !== "")
   );
@@ -80,6 +82,7 @@ export async function getTaskAttachments(taskId) {
 }
 
 export async function uploadTaskAttachment(taskId, file) {
+  // Les pieces jointes utilisent FormData pour transmettre le fichier brut.
   const formData = new FormData();
   formData.append("file", file);
   const response = await api.post(`/tasks/${taskId}/attachments`, formData, {
@@ -102,6 +105,7 @@ export async function getSubtaskAttachments(taskId, subtaskId) {
 }
 
 export async function uploadSubtaskAttachment(taskId, subtaskId, file) {
+  // Upload d'un fichier rattache a une sous-tache precise.
   const formData = new FormData();
   formData.append("file", file);
   const response = await api.post(`/tasks/${taskId}/subtasks/${subtaskId}/attachments`, formData, {

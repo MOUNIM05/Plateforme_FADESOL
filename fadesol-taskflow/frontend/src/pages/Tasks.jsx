@@ -1,3 +1,4 @@
+// Page de gestion des taches : creation, affectation, sous-taches, pieces jointes et suivi.
 import { Fragment, useEffect, useMemo, useState } from "react";
 import { useNavigate, useSearchParams } from "react-router-dom";
 import { ClipboardList, Edit3, Eye, GitBranch, PlusCircle, Trash2, X } from "lucide-react";
@@ -68,6 +69,7 @@ const priorityOptions = [
 ];
 
 function normalizeTaskPayload(formData) {
+  // Nettoie le formulaire avant envoi pour eviter les chaines vides en base.
   return {
     title: formData.title.trim(),
     description: formData.description.trim() || null,
@@ -81,6 +83,7 @@ function normalizeTaskPayload(formData) {
 }
 
 function normalizeSubtaskPayload(formData) {
+  // Prepare les donnees d'une sous-tache avant creation dans l'API.
   return {
     title: formData.title.trim(),
     description: formData.description.trim() || null,
@@ -117,6 +120,7 @@ function toDateInputValue(value) {
 }
 
 function Tasks() {
+  // Les droits du contexte Auth pilotent l'affichage et les actions disponibles.
   const { currentUser, hasPermission } = useAuth();
   const navigate = useNavigate();
   const canCreateTasks = hasPermission("tasks.create");
@@ -131,6 +135,7 @@ function Tasks() {
   const isAdmin = role === "Admin" || role === "Administrateur";
 
   const currentUserIds = useMemo(() => {
+    // Plusieurs identifiants peuvent exister selon les services; on les regroupe pour comparer les affectations.
     return new Set(
       [currentUser?.uuid, currentUser?.id, currentUser?.user_id]
         .filter(Boolean)
@@ -170,6 +175,7 @@ function Tasks() {
   const [error, setError] = useState("");
 
   async function loadTasks({ showLoading = true } = {}) {
+    // Charge les taches selon le role : Employee = ses taches, Manager = son service, Admin = tout.
     setError("");
     if (showLoading) {
       setLoading(true);
@@ -183,7 +189,7 @@ function Tasks() {
       const data = await getTasks(filters);
       let taskData = Array.isArray(data) ? data : [];
 
-      // For managers, exclude tasks that are assigned directly to the manager
+      // Pour un manager, on exclut les taches qui lui sont affectees personnellement.
       if (isManager && currentUserIds && currentUserIds.size) {
         taskData = taskData.filter((t) => {
           const assignedTo = String(t.assigned_to || t.assignee || t.assigned_user || t.assignee_id || "");
@@ -209,6 +215,7 @@ function Tasks() {
   }
 
   async function loadUsers() {
+    // Charge les utilisateurs affectables aux taches.
     setUsersLoading(true);
 
     try {
@@ -223,6 +230,7 @@ function Tasks() {
   }
 
   async function loadProjects() {
+    // Charge les projets disponibles pour rattacher une tache.
     setProjectsLoading(true);
 
     try {
@@ -237,6 +245,7 @@ function Tasks() {
   }
 
   async function loadServices() {
+    // Charge les services, puis limite la liste au service du manager si besoin.
     setServicesLoading(true);
 
     try {
@@ -256,9 +265,9 @@ function Tasks() {
   }
 
   useEffect(() => {
-    // Redirect employees to their personal tasks page
+    // Les employes utilisent la page dediee "Mes taches".
     if (isEmployee) {
-      // If a taskId param exists, prefer opening MyTasks with the taskId
+      // Si un taskId est fourni, on conserve le contexte lors de la redirection.
       const taskIdFromUrl = searchParams.get("taskId");
       if (taskIdFromUrl) {
         navigate(`/my-tasks?taskId=${taskIdFromUrl}`, { replace: true });
@@ -283,12 +292,12 @@ function Tasks() {
       return;
     }
 
-    // Employees are redirected to /my-tasks earlier
+    // Les employes sont deja rediriges vers /my-tasks.
     if (isEmployee) {
       return;
     }
 
-    // If the task is already in the loaded list, open it
+    // Si la tache est deja chargee, on ouvre directement la modale.
     const found = tasks.find((t) => String(t.id) === String(taskId));
 
     if (found) {
@@ -296,7 +305,7 @@ function Tasks() {
       return;
     }
 
-    // Otherwise fetch the single task and open it if authorized
+    // Sinon on charge la tache seule et on verifie le perimetre avant affichage.
     let isMounted = true;
 
     (async () => {
@@ -346,6 +355,7 @@ function Tasks() {
   const recentTasks = useMemo(() => tasks.slice(0, 8), [tasks]);
 
   useEffect(() => {
+    // Calcule la progression des taches visibles a partir de leurs sous-taches.
     let isMounted = true;
 
     async function loadTaskProgressions() {
@@ -409,6 +419,7 @@ function Tasks() {
   }, [serviceOptions]);
 
   const formAssignableUsers = useMemo(() => {
+    // La liste d'affectation depend du service selectionne dans le formulaire.
     const serviceId = formData.service_id.trim();
     const serviceName = serviceById[serviceId];
 
@@ -482,6 +493,7 @@ function Tasks() {
   }
 
   function handleChange(event) {
+    // Quand le service change, l'utilisateur affecte est reinitialise pour eviter une incoherence.
     const { name, value } = event.target;
 
     setFormData((current) => ({
@@ -498,6 +510,7 @@ function Tasks() {
   }
 
   async function openTaskDetails(task) {
+    // Recharge le detail depuis l'API afin d'afficher l'etat le plus recent.
     setTaskDetailsLoading(true);
     setSelectedTask(task);
     setError("");
@@ -514,6 +527,7 @@ function Tasks() {
   }
 
   function startEditTask(task) {
+    // Pre-remplit le formulaire avec les donnees de la tache a modifier.
     if (!canUpdateTasks) {
       setError("Vous n'avez pas l'autorisation de modifier les taches.");
       return;
@@ -536,6 +550,7 @@ function Tasks() {
   }
 
   async function handleDeleteTask(task) {
+    // Suppression protegee par permission et confirmation utilisateur.
     if (!canDeleteTasks) {
       setError("Vous n'avez pas l'autorisation de supprimer les taches.");
       return;
@@ -566,6 +581,7 @@ function Tasks() {
   }
 
   async function handleSubmit(event) {
+    // Creation ou mise a jour selon la presence d'un identifiant d'edition.
     event.preventDefault();
     setError("");
     setMessage("");
@@ -611,6 +627,7 @@ function Tasks() {
   }
 
   async function handleAssignTask(taskId, assignedTo) {
+    // Affecte rapidement une tache depuis la ligne du tableau.
     if (!assignedTo) {
       return;
     }
@@ -633,6 +650,7 @@ function Tasks() {
   }
 
   async function handleStatusChange(taskId, status) {
+    // Mise a jour rapide du statut sans ouvrir le formulaire complet.
     setError("");
     setMessage("");
     setUpdatingStatusTaskId(taskId);
@@ -651,6 +669,7 @@ function Tasks() {
   }
 
   function handleSubtaskChange(taskId, event) {
+    // Stocke un formulaire independant pour chaque tache developpee.
     const { name, value } = event.target;
 
     setSubtaskForms((current) => ({
@@ -663,6 +682,7 @@ function Tasks() {
   }
 
   async function loadSubtasks(taskId) {
+    // Charge les sous-taches et leurs pieces jointes pour le panneau ouvert.
     setLoadingSubtasksTaskId(taskId);
 
     try {
@@ -672,6 +692,7 @@ function Tasks() {
         [taskId]: data,
       }));
       setSubtaskAssignForms((current) => {
+        // Initialise les formulaires d'affectation des sous-taches deja existantes.
         const next = { ...current };
 
         data.forEach((subtask) => {
@@ -700,6 +721,7 @@ function Tasks() {
   }
 
   async function loadTaskAttachments(taskId) {
+    // Charge les pieces jointes d'une tache principale.
     try {
       const data = await getTaskAttachments(taskId);
       setAttachmentsByTask((current) => ({
@@ -713,6 +735,7 @@ function Tasks() {
   }
 
   async function handleToggleSubtasks(taskId) {
+    // Ouvre ou ferme le panneau details : sous-taches + pieces jointes.
     setError("");
     setMessage("");
 
@@ -734,6 +757,7 @@ function Tasks() {
   }
 
   async function handleUploadTaskAttachment(taskId, event) {
+    // Upload d'une piece jointe liee directement a la tache.
     const file = event.target.files?.[0];
 
     if (!file) {
@@ -761,6 +785,7 @@ function Tasks() {
   }
 
   async function handleUploadSubtaskAttachment(taskId, subtaskId, event) {
+    // Upload d'une piece jointe rattachee a une sous-tache.
     const file = event.target.files?.[0];
 
     if (!file) {
@@ -788,6 +813,7 @@ function Tasks() {
   }
 
   async function handleDeleteTaskAttachment(taskId, attachmentId) {
+    // Supprime une piece jointe de tache et met a jour l'etat local.
     setError("");
     setMessage("");
     setDeletingAttachmentId(attachmentId);
@@ -808,6 +834,7 @@ function Tasks() {
   }
 
   async function handleDeleteSubtaskAttachment(taskId, subtaskId, attachmentId) {
+    // Supprime une piece jointe de sous-tache.
     setError("");
     setMessage("");
     setDeletingAttachmentId(attachmentId);
@@ -828,6 +855,7 @@ function Tasks() {
   }
 
   async function handleCreateSubtask(event, taskId) {
+    // Cree une sous-tache puis recalcule la progression de la tache parente.
     event.preventDefault();
     setError("");
     setMessage("");
@@ -868,6 +896,7 @@ function Tasks() {
   }
 
   async function loadMembersForService(serviceId) {
+    // Charge a la demande les membres d'un service pour l'affectation de sous-tache.
     if (!serviceId || subtaskMembersByService[serviceId]) {
       return;
     }
@@ -885,6 +914,7 @@ function Tasks() {
   }
 
   async function handleSubtaskAssignChange(subtask, event) {
+    // Change le service ou le membre affecte a une sous-tache.
     const { name, value } = event.target;
 
     setSubtaskAssignForms((current) => ({
@@ -902,6 +932,7 @@ function Tasks() {
   }
 
   async function handleAssignSubtask(taskId, subtask) {
+    // Persiste l'affectation service/utilisateur d'une sous-tache.
     const form = getSubtaskAssignForm(subtask);
     setError("");
     setMessage("");

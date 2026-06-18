@@ -1,3 +1,4 @@
+// Page Projets : gestion du portefeuille, filtres, affectation et suivi d'avancement.
 import { useEffect, useMemo, useState } from "react";
 import { Edit3, Eye, FolderKanban, Plus, RefreshCw, Search, Trash2, X } from "lucide-react";
 import {
@@ -38,6 +39,7 @@ const statusOptions = [
 ];
 
 function getLoadErrorMessage(error, fallback) {
+  // Traduit les erreurs API frequentes en messages comprehensibles pour l'utilisateur.
   const status = error?.response?.status;
 
   if (!error?.response) {
@@ -56,6 +58,7 @@ function getLoadErrorMessage(error, fallback) {
 }
 
 function normalizeProjectPayload(formData) {
+  // Prepare le formulaire projet avant l'appel API.
   return {
     titre: formData.titre.trim(),
     description: formData.description.trim() || null,
@@ -137,6 +140,7 @@ function formatDate(value) {
 }
 
 function Projects() {
+  // Les permissions definissent les actions disponibles sur les projets.
   const { hasPermission } = useAuth();
   const canCreateProjects = hasPermission("projects.create");
   const canUpdateProjects = hasPermission("projects.update");
@@ -158,6 +162,7 @@ function Projects() {
   const [warning, setWarning] = useState("");
 
   async function loadData({ showLoading = true } = {}) {
+    // Charge en parallele projets, services et utilisateurs pour alimenter la page.
     if (showLoading) {
       setLoading(true);
     }
@@ -221,10 +226,12 @@ function Projects() {
   }
 
   useEffect(() => {
+    // Rechargement initial et rechargement quand les filtres serveur changent.
     loadData();
   }, [serviceFilter, statusFilter]);
 
   useEffect(() => {
+    // Les changements de services ou utilisateurs dans d'autres pages rafraichissent les listes.
     return subscribeDataEvents([DATA_EVENTS.SERVICES_CHANGED, DATA_EVENTS.USERS_CHANGED], () => {
       loadData({ showLoading: false });
     });
@@ -238,6 +245,7 @@ function Projects() {
   }, [services]);
 
   const filteredProjects = useMemo(() => {
+    // Filtrage local par recherche texte, en complement des filtres envoyes a l'API.
     const query = searchQuery.trim().toLowerCase();
 
     return projects.filter((project) => {
@@ -259,6 +267,7 @@ function Projects() {
   }, [projects, searchQuery, serviceById, users]);
 
   function handleChange(event) {
+    // Met a jour le formulaire projet champ par champ.
     const { name, value } = event.target;
 
     setFormData((current) => ({
@@ -268,6 +277,7 @@ function Projects() {
   }
 
   function resetForm() {
+    // Revient en mode creation avec un service par defaut si disponible.
     setShowProjectDetails(false);
     setEditingProjectId(null);
     setFormData({
@@ -277,6 +287,7 @@ function Projects() {
   }
 
   function viewProject(project) {
+    // Ouvre la modale de consultation d'un projet.
     setSelectedProject(project);
     setShowProjectDetails(true);
     setMessage("");
@@ -284,6 +295,7 @@ function Projects() {
   }
 
   function startEdit(project) {
+    // Passe en mode edition apres controle de permission.
     if (!canUpdateProjects) {
       setError("Vous n'avez pas l'autorisation de modifier les projets.");
       return;

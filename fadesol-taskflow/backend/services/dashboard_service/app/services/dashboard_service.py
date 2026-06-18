@@ -1,3 +1,9 @@
+"""Calculs et agregations du tableau de bord.
+
+Le dashboard consolide les donnees provenant des microservices utilisateurs,
+services, projets et taches afin de produire les KPI et graphiques du frontend.
+"""
+
 from datetime import date
 from json import JSONDecodeError
 from urllib.error import HTTPError, URLError
@@ -28,14 +34,18 @@ FALLBACK_STATISTICS = DashboardStatisticsResponse()
 
 
 def get_dashboard_statistics() -> StatistiquesTableauBord:
+    """Retourne les statistiques historiques du tableau de bord."""
     stats = StatistiquesTableauBord()
     stats.taux_avancement_global = stats.calculerTauxAvancementGlobal()
     return stats
 
 
 def get_global_dashboard_statistics(authorization: str | None = None) -> DashboardStatisticsResponse:
+    """Calcule les KPI globaux visibles par l'utilisateur connecte."""
+    # Les donnees sont d'abord recuperees depuis les autres microservices.
     profile = _fetch_current_profile(authorization)
     services, users, projects, tasks = _fetch_dashboard_sources(authorization, profile)
+    # Le filtrage applique les droits : Admin voit tout, Manager voit son service, Employee ses taches.
     visible_services = _visible_services(profile, services)
     tasks = _filter_tasks_for_profile(tasks, visible_services, profile)
     projects = _filter_records_for_services(projects, visible_services, profile)
@@ -52,6 +62,7 @@ def get_global_dashboard_statistics(authorization: str | None = None) -> Dashboa
 
 
 def get_dashboard_analytics(authorization: str | None = None) -> dict:
+    """Construit les donnees analytiques utilisees par les graphiques."""
     profile = _fetch_current_profile(authorization)
     services, users, projects, tasks = _fetch_dashboard_sources(authorization, profile)
     visible_services = _visible_services(profile, services)
@@ -93,6 +104,7 @@ def get_dashboard_analytics(authorization: str | None = None) -> dict:
 
 
 def get_services_overview(authorization: str | None = None) -> list[DashboardServiceOverviewItem]:
+    """Produit une vue synthetique par service."""
     profile = _fetch_current_profile(authorization)
     services, users, projects, tasks = _fetch_dashboard_sources(authorization, profile)
     services = _visible_services(profile, services)
@@ -107,11 +119,13 @@ def get_services_overview(authorization: str | None = None) -> list[DashboardSer
 
 
 def get_service_dashboard(service_id: str, authorization: str | None = None) -> DashboardServiceDetail:
+    """Retourne le detail d'un service avec ses membres et KPI."""
     profile = _fetch_current_profile(authorization)
     services, users, projects, tasks = _fetch_dashboard_sources(authorization, profile)
     visible_services = _visible_services(profile, services)
     service = _find_service(visible_services, service_id)
 
+    # Un utilisateur non admin ne peut consulter que les services visibles pour son profil.
     if not _is_admin(profile) and not any(str(service.get("id")) in _service_identifiers(item) for item in visible_services):
         raise HTTPException(status_code=status.HTTP_403_FORBIDDEN, detail="Dashboard service non autorise.")
 
@@ -137,6 +151,7 @@ def get_members_workload(
     service_id: str | None = None,
     search: str | None = None,
 ) -> list[DashboardMemberWorkloadItem]:
+    """Calcule la charge de travail par membre."""
     profile = _fetch_current_profile(authorization)
     services, users, _, tasks = _fetch_dashboard_sources(authorization, profile)
     visible_services = _visible_services(profile, services)
@@ -169,6 +184,8 @@ def _fetch_dashboard_sources(
     authorization: str | None,
     profile: dict | None = None,
 ) -> tuple[list[dict], list[dict], list[dict], list[dict]]:
+    """Recupere les donnees necessaires depuis les microservices."""
+    # Les appels sont tolerants aux indisponibilites pour eviter de bloquer tout le dashboard.
     services = _safe_fetch_list(settings.SERVICE_FADESOL_URL, "/api/services/", authorization) or _fallback_services()
     users = _safe_fetch_list(settings.USER_SERVICE_URL, "/api/users/", authorization)
     projects = _safe_fetch_list(settings.PROJECT_SERVICE_URL, "/api/projects/", authorization)
@@ -181,6 +198,7 @@ def _fetch_dashboard_sources(
 
 
 def _safe_fetch_list(base_url: str, path: str, authorization: str | None) -> list[dict]:
+    """Retourne une liste vide si un microservice ne repond pas correctement."""
     try:
         return _fetch_list(base_url, path, authorization)
     except (HTTPError, URLError, JSONDecodeError, TimeoutError, ValueError):
@@ -210,6 +228,7 @@ def _fetch_list(base_url: str, path: str, authorization: str | None) -> list[dic
 
 
 def _fetch_current_profile(authorization: str | None) -> dict | None:
+    """Recupere le profil courant pour appliquer les filtres de role."""
     if not authorization:
         return None
 
@@ -239,6 +258,7 @@ def _fetch_json(base_url: str, path: str, authorization: str | None) -> dict | l
 
 
 def _fallback_services() -> list[dict]:
+    """Services de secours pour garder le dashboard lisible hors base complete."""
     return [
         {"id": "commercial", "name": "Commercial", "is_active": True},
         {"id": "technique", "name": "Technique", "is_active": True},
@@ -296,6 +316,7 @@ def _is_employee(profile: dict | None) -> bool:
 
 
 def _visible_services(profile: dict | None, services: list[dict]) -> list[dict]:
+    """Filtre les services selon le role de l'utilisateur."""
     if not profile or _is_admin(profile):
         return services
 
@@ -322,6 +343,7 @@ def _filter_records_for_services(records: list[dict], services: list[dict], prof
 
 
 def _filter_tasks_for_profile(tasks: list[dict], services: list[dict], profile: dict | None) -> list[dict]:
+    """Filtre les taches selon le role et le service de l'utilisateur."""
     if not profile or _is_admin(profile):
         return tasks
 
@@ -332,6 +354,7 @@ def _filter_tasks_for_profile(tasks: list[dict], services: list[dict], profile: 
     ]
 
     if _is_employee(profile):
+        # Un employe voit prioritairement les taches qui lui sont affectees.
         member_ids = _member_identifiers(profile)
         return [
             task
@@ -349,6 +372,7 @@ def _build_service_overview_item(
     projects: list[dict],
     tasks: list[dict],
 ) -> DashboardServiceOverviewItem:
+    """Calcule les KPI d'un service pour la carte de synthese."""
     service_tasks = [task for task in tasks if _record_belongs_to_service(task, service)]
     completed_tasks = _count_tasks_completed(service_tasks)
 
@@ -390,6 +414,7 @@ def _build_member_workload(
     tasks: list[dict],
     selected_service: dict | None = None,
 ) -> DashboardMemberWorkloadItem:
+    """Calcule les indicateurs de charge pour un membre."""
     user_tasks = [
         task
         for task in tasks
@@ -519,6 +544,7 @@ def _count_tasks_blocked(tasks: list[dict]) -> int:
 
 
 def _count_tasks_late(tasks: list[dict]) -> int:
+    """Compte les taches non terminees dont la date limite est depassee."""
     today = date.today()
     late_count = 0
 
@@ -558,6 +584,7 @@ def _group_tasks_by_field(tasks: list[dict], *fields: str) -> list[dict]:
 
 
 def _tasks_by_status(tasks: list[dict]) -> list[dict]:
+    """Regroupe les taches par statut normalise pour les graphiques."""
     counters = {
         "À faire": 0,
         "En cours": 0,
@@ -582,6 +609,7 @@ def _tasks_by_status(tasks: list[dict]) -> list[dict]:
 
 
 def _tasks_by_priority(tasks: list[dict]) -> list[dict]:
+    """Regroupe les taches par priorite normalisee."""
     counters = {"Basse": 0, "Moyenne": 0, "Haute": 0}
 
     for task in tasks:

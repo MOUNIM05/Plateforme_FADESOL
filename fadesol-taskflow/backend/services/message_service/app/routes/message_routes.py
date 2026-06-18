@@ -1,3 +1,9 @@
+"""Routes HTTP et WebSocket du service de messagerie.
+
+Ce fichier expose les conversations, l'envoi de messages, la lecture et la
+connexion temps reel utilisee par l'interface de messagerie.
+"""
+
 import asyncio
 from fastapi import APIRouter, Depends, Request, WebSocket, WebSocketDisconnect
 from sqlalchemy.orm import Session
@@ -24,14 +30,19 @@ router = APIRouter(prefix="/messages", tags=["Messages"])
 
 @router.get("/", response_model=list[MessageResponse])
 def list_all(request: Request, skip: int = 0, limit: int = 100, db: Session = Depends(get_db)):
+    """Liste les messages visibles pour l'utilisateur connecte."""
+    # Le service applique ensuite les regles de visibilite selon le role et le service.
     return list_messages(db, skip, limit, request.headers.get("authorization"))
 
 
 @router.post("/", response_model=MessageResponse)
 async def send(payload: MessageCreate, request: Request, db: Session = Depends(get_db)):
+    """Envoie un message et notifie les clients connectes."""
+    # Le profil courant determine automatiquement l'expediteur du message.
     message = create_message(db, payload, request.headers.get("authorization"))
     response = MessageResponse.model_validate(message)
 
+    # Diffusion temps reel pour rafraichir les conversations sans recharger la page.
     await message_ws_manager.broadcast(
         {
             "type": "message_created",
@@ -44,36 +55,44 @@ async def send(payload: MessageCreate, request: Request, db: Session = Depends(g
 
 @router.get("/conversations", response_model=list[ConversationSummary])
 def conversations(request: Request, db: Session = Depends(get_db)):
+    """Retourne la liste des conversations agregees."""
+    # Les messages sont regroupes par tache, projet, service ou discussion directe.
     return list_conversations(db, request.headers.get("authorization"))
 
 
 @router.get("/conversations/{conversation_id}", response_model=ConversationDetail)
 def conversation_detail(conversation_id: str, request: Request, db: Session = Depends(get_db)):
+    """Retourne le detail d'une conversation accessible."""
     return get_conversation(db, conversation_id, request.headers.get("authorization"))
 
 
 @router.get("/utilisateur/{utilisateur_id}", response_model=list[MessageResponse])
 def by_user(utilisateur_id: str, db: Session = Depends(get_db)):
+    """Filtre les messages par destinataire utilisateur."""
     return list_by_field(db, "destinataire_id", utilisateur_id)
 
 
 @router.get("/service/{service_id}", response_model=list[MessageResponse])
 def by_service(service_id: str, db: Session = Depends(get_db)):
+    """Filtre les messages lies a un service."""
     return list_by_field(db, "service_id", service_id)
 
 
 @router.get("/tache/{tache_id}", response_model=list[MessageResponse])
 def by_task(tache_id: str, db: Session = Depends(get_db)):
+    """Filtre les messages lies a une tache."""
     return list_by_field(db, "tache_id", tache_id)
 
 
 @router.get("/projet/{projet_id}", response_model=list[MessageResponse])
 def by_project(projet_id: str, db: Session = Depends(get_db)):
+    """Filtre les messages lies a un projet."""
     return list_by_field(db, "projet_id", projet_id)
 
 
 @router.get("/{message_id}", response_model=MessageResponse)
 def get_one(message_id: str, db: Session = Depends(get_db)):
+    """Retourne un message precis."""
     message = get_message(db, message_id)
 
     if not message:
@@ -84,15 +103,17 @@ def get_one(message_id: str, db: Session = Depends(get_db)):
 
 @router.put("/{message_id}", response_model=MessageResponse)
 def update(message_id: str, payload: MessageUpdate, db: Session = Depends(get_db)):
+    """Met a jour le contenu ou les metadonnees d'un message."""
     return update_message(db, message_id, payload)
 
 
 @router.patch("/{message_id}/lu", response_model=MessageResponse)
 async def read(message_id: str, request: Request, db: Session = Depends(get_db)):
+    """Marque un message comme lu et diffuse l'information en temps reel."""
     message = mark_as_read(db, message_id, request.headers.get("authorization"))
     response = MessageResponse.model_validate(message)
 
-    # try to get reader identity for payload
+    # Identifie le lecteur pour que le frontend sache quel utilisateur a lu le message.
     reader_id = None
     try:
         reader_profile = _fetch_current_profile(request.headers.get("authorization"))
@@ -100,7 +121,7 @@ async def read(message_id: str, request: Request, db: Session = Depends(get_db))
     except Exception:
         reader_id = None
 
-    # compute conversation id for convenience
+    # Reconstruit l'identifiant de conversation pour cibler la mise a jour cote client.
     conv_id = None
     if getattr(response, "tache_id", None):
         conv_id = f"tache--{response.tache_id}"
@@ -129,10 +150,11 @@ async def read(message_id: str, request: Request, db: Session = Depends(get_db))
 
 @router.websocket("/ws/messages")
 async def messages_websocket(websocket: WebSocket):
-    # attempt to identify user from Authorization header
+    """Maintient une connexion WebSocket pour les notifications de messagerie."""
+    # Tente d'identifier l'utilisateur depuis l'en-tete Authorization.
     auth = websocket.headers.get("authorization")
     if not auth:
-        # try query params (client may pass token as ?authorization=Bearer%20...)
+        # Fallback pour les clients WebSocket qui passent le token en query string.
         try:
             auth = websocket.query_params.get("authorization") or websocket.query_params.get("token")
         except Exception:
@@ -152,7 +174,7 @@ async def messages_websocket(websocket: WebSocket):
         await websocket.send_json({"type": "connected", "message": "Messagerie temps réel connectée."})
 
         while True:
-            # keep the connection alive; clients may send pings
+            # Garde la connexion active; le client peut envoyer des pings texte.
             try:
                 await websocket.receive_text()
             except Exception:
@@ -163,4 +185,5 @@ async def messages_websocket(websocket: WebSocket):
 
 @router.get("/online-users")
 def online_users():
+    """Retourne les utilisateurs actuellement connectes au WebSocket."""
     return message_ws_manager.get_online_users()

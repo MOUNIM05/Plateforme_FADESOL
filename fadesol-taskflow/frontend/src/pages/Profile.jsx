@@ -1,3 +1,4 @@
+// Page Profil : informations du compte connecte, photo de profil et actions personnelles.
 import { Camera, KeyRound, LogOut, Mail, Settings, ShieldCheck, UserRound, UsersRound } from "lucide-react";
 import { useEffect, useMemo, useState } from "react";
 import { useNavigate } from "react-router-dom";
@@ -31,6 +32,7 @@ function getFullName(user) {
 }
 
 function resolvePhotoUrl(photoUrl) {
+  // Convertit le chemin photo renvoye par l'API en URL exploitable par le navigateur.
   if (!photoUrl) {
     return "";
   }
@@ -44,6 +46,7 @@ function resolvePhotoUrl(photoUrl) {
 }
 
 function Profile() {
+  // Le profil detaille complete les donnees deja presentes dans AuthContext.
   const { currentUser, logout, refreshCurrentUser } = useAuth();
   const navigate = useNavigate();
   const [profile, setProfile] = useState(null);
@@ -56,6 +59,7 @@ function Profile() {
   const photoUrl = resolvePhotoUrl(user?.photo_url);
 
   useEffect(() => {
+    // Recharge le profil metier courant depuis user_service.
     let isMounted = true;
 
     getMyUserProfile()
@@ -77,6 +81,7 @@ function Profile() {
   }, [currentUser]);
 
   const accountRows = useMemo(
+    // Lignes affichees dans la section details du compte.
     () => [
       ["Email", user?.email || "Non renseigne"],
       ["Role", getRoleLabel(user?.role)],
@@ -89,6 +94,7 @@ function Profile() {
   );
 
   async function handlePhotoChange(event) {
+    // Controle l'upload photo via user_service puis rafraichit le contexte global.
     const file = event.target.files?.[0];
 
     if (!file) {
@@ -102,14 +108,14 @@ function Profile() {
     try {
       const updatedProfile = await uploadMyPhoto(file);
 
-      // updatedProfile is expected to be the full user object
+      // Le backend renvoie normalement le profil complet mis a jour.
       setProfile(updatedProfile);
 
-      // Update AuthContext current user cache and localStorage
+      // Met a jour le cache AuthContext et localStorage pour synchroniser toute l'interface.
       try {
         await refreshCurrentUser();
       } catch (e) {
-        // Fallback: if refresh fails, merge the returned profile into local current user
+        // Fallback : si le refresh echoue, on fusionne le profil retourne localement.
         const stored = JSON.parse(localStorage.getItem("current_user") || localStorage.getItem("user") || "null");
 
         if (stored) {
@@ -129,6 +135,7 @@ function Profile() {
   }
 
   function handleLogout() {
+    // Ferme la session puis renvoie vers la page de connexion.
     logout();
     navigate("/login", { replace: true });
   }

@@ -1,3 +1,4 @@
+// Evenements frontend utilises pour synchroniser les pages sans store global lourd.
 export const DATA_EVENTS = {
   DATA_CHANGED: "fadesol:data-changed",
   SERVICES_CHANGED: "fadesol:services-changed",
@@ -11,6 +12,7 @@ export const DATA_EVENTS = {
 const DATA_EVENT_BROADCAST_KEY = "fadesol:data-event";
 
 export function dispatchDataChanged(...eventNames) {
+  // Diffuse un changement de donnees dans l'onglet courant et les autres onglets.
   if (typeof window === "undefined") {
     return;
   }
@@ -31,11 +33,12 @@ export function dispatchDataChanged(...eventNames) {
       })
     );
   } catch {
-    // LocalStorage can be unavailable in private contexts; same-tab events still work.
+    // LocalStorage peut etre indisponible; les evenements de l'onglet courant fonctionnent encore.
   }
 }
 
 export function subscribeDataEvents(eventNames, handler) {
+  // Ecoute les evenements locaux et les notifications inter-onglets via localStorage.
   if (typeof window === "undefined") {
     return () => {};
   }
@@ -43,6 +46,7 @@ export function subscribeDataEvents(eventNames, handler) {
   let pendingRefresh = null;
   const names = [...new Set(eventNames.filter(Boolean))];
   const refresh = () => {
+    // Debounce minimal pour regrouper plusieurs evenements emis au meme moment.
     if (pendingRefresh) {
       window.clearTimeout(pendingRefresh);
     }

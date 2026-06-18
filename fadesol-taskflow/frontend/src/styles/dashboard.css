@@ -1,5 +1,6 @@
 @import url("https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&display=swap");
 
+/* Layout principal du dashboard : sidebar fixe et zone de contenu scrollable. */
 .dashboard-shell {
   --sidebar-width: 280px;
   height: 100vh;
@@ -34,6 +35,7 @@
   margin: 0 auto;
 }
 
+/* Sidebar applicative : navigation par modules et profil utilisateur. */
 .main-sidebar {
   width: var(--sidebar-width);
   height: 100vh;
@@ -142,6 +144,7 @@
   scrollbar-color: #cbd5e1 transparent;
 }
 
+/* Groupes de navigation et etats actifs de la sidebar. */
 .sidebar-section {
   margin-bottom: 14px;
 }

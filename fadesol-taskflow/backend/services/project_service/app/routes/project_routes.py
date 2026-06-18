@@ -1,3 +1,9 @@
+"""Routes HTTP du service projets.
+
+Ce fichier expose les anciennes routes francaises et les routes modernes
+anglaises, avec filtrage des projets selon le role de l'utilisateur.
+"""
+
 import json
 from urllib.error import HTTPError, URLError
 from urllib.request import Request as UrlRequest
@@ -34,6 +40,7 @@ projects_router = APIRouter(
 
 
 def _fetch_current_profile(authorization: str | None) -> dict:
+    """Recupere le profil courant depuis user_service pour filtrer les projets."""
     if not authorization:
         raise HTTPException(status_code=status.HTTP_401_UNAUTHORIZED, detail="Authentification requise.")
 
@@ -71,6 +78,7 @@ def _manager_service_id(profile: dict) -> str | None:
 
 
 def _ensure_project_scope(project, profile: dict):
+    """Verifie qu'un manager reste limite aux projets de son service."""
     if _is_manager(profile) and project.service_id != _manager_service_id(profile):
         raise not_found("Projet introuvable.")
 
@@ -85,16 +93,19 @@ def list_all(
     status: str | None = None,
     db: Session = Depends(get_db),
 ):
+    """Liste les projets via l'ancienne route /projets."""
     return list_projects(db, skip, limit, service_id, status)
 
 
 @router.post("/", response_model=ProjetResponse)
 def create(payload: ProjetCreate, db: Session = Depends(get_db)):
+    """Cree un projet via l'ancienne route /projets."""
     return create_project(db, payload)
 
 
 @router.get("/{project_id}", response_model=ProjetResponse)
 def get_one(project_id: str, db: Session = Depends(get_db)):
+    """Retourne un projet via son identifiant."""
     project = get_project(db, project_id)
 
     if not project:
@@ -105,6 +116,7 @@ def get_one(project_id: str, db: Session = Depends(get_db)):
 
 @router.put("/{project_id}", response_model=ProjetResponse)
 def update(project_id: str, payload: ProjetUpdate, db: Session = Depends(get_db)):
+    """Met a jour un projet existant."""
     return update_project(db, project_id, payload)
 
 
@@ -138,7 +150,9 @@ def list_projects_en(
     status: str | None = None,
     db: Session = Depends(get_db),
 ):
+    """Liste les projets visibles sur la route moderne /projects."""
     profile = _fetch_current_profile(request.headers.get("authorization"))
+    # Un manager ne consulte que les projets rattaches a son service.
     if _is_manager(profile):
         service_id = _manager_service_id(profile)
 
@@ -147,7 +161,9 @@ def list_projects_en(
 
 @projects_router.post("/", response_model=ProjetResponse)
 def create_project_en(payload: ProjetCreate, request: Request, db: Session = Depends(get_db)):
+    """Cree un projet en appliquant le service du manager si necessaire."""
     profile = _fetch_current_profile(request.headers.get("authorization"))
+    # Le manager cree automatiquement dans son propre perimetre de service.
     if _is_manager(profile):
         payload.service_id = _manager_service_id(profile)
 
@@ -156,6 +172,7 @@ def create_project_en(payload: ProjetCreate, request: Request, db: Session = Dep
 
 @projects_router.get("/{project_id}", response_model=ProjetResponse)
 def get_project_en(project_id: str, request: Request, db: Session = Depends(get_db)):
+    """Retourne un projet apres controle du perimetre."""
     project = get_project(db, project_id)
 
     if not project:
@@ -167,6 +184,7 @@ def get_project_en(project_id: str, request: Request, db: Session = Depends(get_
 
 @projects_router.put("/{project_id}", response_model=ProjetResponse)
 def update_project_en(project_id: str, payload: ProjetUpdate, request: Request, db: Session = Depends(get_db)):
+    """Met a jour un projet dans le perimetre autorise."""
     profile = _fetch_current_profile(request.headers.get("authorization"))
     project = get_project(db, project_id)
 
@@ -176,6 +194,7 @@ def update_project_en(project_id: str, payload: ProjetUpdate, request: Request, 
     _ensure_project_scope(project, profile)
 
     if _is_manager(profile):
+        # Un manager ne peut pas deplacer un projet vers un autre service.
         payload.service_id = _manager_service_id(profile)
 
     return update_project(db, project_id, payload)
@@ -183,6 +202,7 @@ def update_project_en(project_id: str, payload: ProjetUpdate, request: Request, 
 
 @projects_router.delete("/{project_id}", response_model=MessageResponse)
 def delete_project_en(project_id: str, request: Request, db: Session = Depends(get_db)):
+    """Supprime un projet apres verification du perimetre utilisateur."""
     profile = _fetch_current_profile(request.headers.get("authorization"))
     project = get_project(db, project_id)
 

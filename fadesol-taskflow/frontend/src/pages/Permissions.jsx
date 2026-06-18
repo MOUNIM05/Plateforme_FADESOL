@@ -1,3 +1,4 @@
+// Page d'administration des permissions fines par utilisateur.
 import { CheckCircle2, KeyRound, Save, Search, ShieldCheck, UsersRound } from "lucide-react";
 import { useEffect, useMemo, useState } from "react";
 import { useAuth } from "../context/AuthContext";
@@ -18,10 +19,12 @@ function getUserService(user) {
 }
 
 function countEnabledPermissions(permissions) {
+  // Compte les droits actifs pour afficher un resume rapide.
   return Object.values(permissions || {}).filter(Boolean).length;
 }
 
 function Permissions() {
+  // Cette page modifie les surcharges de permissions puis rafraichit le contexte Auth.
   const { currentUser, refreshCurrentUser } = useAuth();
   const [users, setUsers] = useState([]);
   const [permissionCatalog, setPermissionCatalog] = useState([]);
@@ -34,6 +37,7 @@ function Permissions() {
   const [error, setError] = useState("");
 
   useEffect(() => {
+    // Charge le catalogue de permissions et la liste des utilisateurs.
     let isMounted = true;
 
     async function loadPermissionsPage() {
@@ -70,6 +74,7 @@ function Permissions() {
   }, []);
 
   useEffect(() => {
+    // Recharge les permissions quand l'admin selectionne un autre utilisateur.
     if (!selectedUserId) {
       setSelectedPermissions({});
       return;
@@ -106,6 +111,7 @@ function Permissions() {
   }, [selectedUserId]);
 
   const filteredUsers = useMemo(() => {
+    // Filtre les utilisateurs par nom, email, role ou service.
     const term = search.trim().toLowerCase();
 
     if (!term) {
@@ -132,6 +138,7 @@ function Permissions() {
   );
 
   function togglePermission(permissionKey) {
+    // Inverse localement un droit avant sauvegarde.
     setSelectedPermissions((current) => ({
       ...current,
       [permissionKey]: !current[permissionKey],
