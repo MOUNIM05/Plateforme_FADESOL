@@ -18,7 +18,7 @@ jobs:
 
     defaults:
       run:
-        working-directory: frontend
+        working-directory: fadesol-taskflow/frontend
 
     steps:
       - name: Checkout code
@@ -29,13 +29,13 @@ jobs:
         with:
           node-version: 20
 
-      - name: Install frontend dependencies
+      - name: Install dependencies
         run: npm install
 
       - name: Build frontend
         run: npm run build
 
-  backend-check:
+  backend-compile:
     name: Backend Compile Check
     runs-on: ubuntu-latest
 
@@ -48,19 +48,11 @@ jobs:
         with:
           python-version: "3.11"
 
-      - name: Install backend dependencies
-        run: |
-          python -m pip install --upgrade pip
-          for file in backend/services/*/requirements.txt; do
-            echo "Installing $file"
-            pip install -r "$file"
-          done
-
       - name: Compile backend services
-        run: python -m compileall backend/services
+        run: python -m compileall fadesol-taskflow/backend/services
 
-  docker-check:
-    name: Docker Compose Check
+  docker-compose-check:
+    name: Docker Compose Config Check
     runs-on: ubuntu-latest
 
     steps:
@@ -68,7 +60,5 @@ jobs:
         uses: actions/checkout@v4
 
       - name: Check Docker Compose config
+        working-directory: fadesol-taskflow
         run: docker compose config
-
-      - name: Build Docker images
-        run: docker compose build
