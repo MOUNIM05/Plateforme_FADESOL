@@ -11,6 +11,7 @@ class Settings:
     JWT_SECRET_KEY: str = os.getenv("SECRET_KEY") or os.getenv("JWT_SECRET_KEY", "change_this_long_random_secret")
     JWT_ALGORITHM: str = os.getenv("ALGORITHM") or os.getenv("JWT_ALGORITHM", "HS256")
     USER_SERVICE_URL: str = os.getenv("USER_SERVICE_URL", "http://localhost:8002")
+    SERVICE_FADESOL_URL: str = os.getenv("SERVICE_FADESOL_URL", "http://localhost:8003")
 
 
 settings = Settings()

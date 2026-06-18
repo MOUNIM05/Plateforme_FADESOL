@@ -109,6 +109,31 @@ function getServiceValue(service) {
   return getFadesolServiceValue(service);
 }
 
+function normalizeServiceKey(value) {
+  return String(value || "")
+    .normalize("NFD")
+    .replace(/[\u0300-\u036f]/g, "")
+    .replace(/[^a-zA-Z0-9]/g, "")
+    .toLowerCase();
+}
+
+function serviceMatchesManager(service, managerServiceValue) {
+  const managerKey = normalizeServiceKey(managerServiceValue);
+
+  if (!managerKey) {
+    return false;
+  }
+
+  return [
+    service?.id,
+    service?.uuid,
+    service?.name,
+    service?.nom,
+    service?.nom_service,
+    service?.libelle,
+  ].some((value) => normalizeServiceKey(value) === managerKey);
+}
+
 function getUserDisplayName(user) {
   const fullName = [user.prenom || user.first_name, user.nom || user.last_name].filter(Boolean).join(" ");
 
@@ -129,19 +154,17 @@ function Tasks() {
   const role = currentUser?.role;
   const isManager = role === "Manager";
   const isEmployee = role === "Employee" || role === "Employe" || role === "EmployÃ©";
-  const currentServiceId = currentUser?.id_service || currentUser?.service_id || "";
+  const currentServiceId =
+    currentUser?.id_service ||
+    currentUser?.service_id ||
+    currentUser?.service ||
+    currentUser?.service_name ||
+    currentUser?.nom_service ||
+    "";
   const [searchParams] = useSearchParams();
 
   const isAdmin = role === "Admin" || role === "Administrateur";
 
-  const currentUserIds = useMemo(() => {
-    // Plusieurs identifiants peuvent exister selon les services; on les regroupe pour comparer les affectations.
-    return new Set(
-      [currentUser?.uuid, currentUser?.id, currentUser?.user_id]
-        .filter(Boolean)
-        .map(String)
-    );
-  }, [currentUser]);
   const [tasks, setTasks] = useState([]);
   const [users, setUsers] = useState([]);
   const [projects, setProjects] = useState([]);
@@ -188,14 +211,6 @@ function Tasks() {
       };
       const data = await getTasks(filters);
       let taskData = Array.isArray(data) ? data : [];
-
-      // Pour un manager, on exclut les taches qui lui sont affectees personnellement.
-      if (isManager && currentUserIds && currentUserIds.size) {
-        taskData = taskData.filter((t) => {
-          const assignedTo = String(t.assigned_to || t.assignee || t.assigned_user || t.assignee_id || "");
-          return !currentUserIds.has(assignedTo);
-        });
-      }
 
       setTasks(
         [...taskData].sort((firstTask, secondTask) => {
@@ -253,7 +268,7 @@ function Tasks() {
       const serviceData = Array.isArray(data) ? data : [];
       setServices(
         isManager && currentServiceId
-          ? serviceData.filter((service) => String(service.id || service.uuid || "") === String(currentServiceId))
+          ? serviceData.filter((service) => serviceMatchesManager(service, currentServiceId))
           : serviceData
       );
     } catch (err) {
@@ -282,7 +297,7 @@ function Tasks() {
     loadUsers();
     loadProjects();
     loadServices();
-  }, [isEmployee]);
+  }, [isEmployee, isManager, currentServiceId]);
 
 
   useEffect(() => {
@@ -317,12 +332,7 @@ function Tasks() {
 
         if (!isMounted) return;
 
-        const assignedTo = String(taskData.assigned_to || taskData.assignee || taskData.assigned_user || "");
-
-        if (
-          isAdmin ||
-          (isManager && (String(taskData.service_id) === String(currentServiceId) || currentUserIds.has(assignedTo)))
-        ) {
+        if (isAdmin || isManager) {
           setSelectedTask(taskData);
         } else {
           setError("Élément introuvable ou non autorisé.");
@@ -338,7 +348,7 @@ function Tasks() {
     return () => {
       isMounted = false;
     };
-  }, [searchParams, tasks, isEmployee, isManager, isAdmin, currentServiceId, currentUserIds]);
+  }, [searchParams, tasks, isEmployee, isManager, isAdmin, currentServiceId]);
 
   useEffect(() => {
     return subscribeDataEvents([DATA_EVENTS.PROJECTS_CHANGED], loadProjects);

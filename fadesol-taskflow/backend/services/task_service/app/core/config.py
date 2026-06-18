@@ -11,6 +11,7 @@ class Settings:
     # URL de user_service utilisee pour resoudre l'utilisateur courant quand assigned_to=me.
     USER_SERVICE_URL: str = os.getenv("USER_SERVICE_URL", "http://localhost:8002")
     PROJECT_SERVICE_URL: str = os.getenv("PROJECT_SERVICE_URL", "http://localhost:8004")
+    SERVICE_FADESOL_URL: str = os.getenv("SERVICE_FADESOL_URL", "http://localhost:8003")
     INTERNAL_SERVICE_SECRET: str = os.getenv("INTERNAL_SERVICE_SECRET", "user-service-sync")
 
     # Stockage local des pieces jointes du domaine taches.

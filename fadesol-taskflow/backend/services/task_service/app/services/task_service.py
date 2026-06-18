@@ -1,6 +1,7 @@
 """Logique metier des taches principales."""
 
 import json
+import unicodedata
 from datetime import datetime, timezone
 from urllib.error import HTTPError, URLError
 from urllib.request import Request as UrlRequest
@@ -49,7 +50,7 @@ def get_tasks(
     status: str | None = None,
     priority: str | None = None,
     assigned_to: str | None = None,
-    service_id: str | None = None,
+    service_id: str | list[str] | tuple[str, ...] | set[str] | None = None,
 ) -> list[Task]:
     """Liste les taches avec pagination et filtres."""
     # Requete principale de consultation avec filtres par statut, priorite et utilisateur assigne.
@@ -64,7 +65,12 @@ def get_tasks(
     if assigned_to:
         query = query.filter(Task.assigned_to == assigned_to)
 
-    if service_id:
+    if isinstance(service_id, (list, tuple, set)):
+        service_values = [str(value) for value in service_id if value not in {None, ""}]
+        if not service_values:
+            return []
+        query = query.filter(Task.service_id.in_(service_values))
+    elif service_id:
         query = query.filter(Task.service_id == service_id)
 
     return query.order_by(Task.created_at.desc()).offset(skip).limit(limit).all()
@@ -155,12 +161,66 @@ def _profile_service_id(profile: dict | None) -> str | None:
     return str(value) if value not in {None, ""} else None
 
 
-def can_access_task(task: Task, profile: dict | None) -> bool:
+def _normalize_service_key(value: str | None) -> str:
+    normalized = unicodedata.normalize("NFD", str(value or ""))
+    without_accents = "".join(char for char in normalized if unicodedata.category(char) != "Mn")
+    return "".join(char for char in without_accents.lower() if char.isalnum())
+
+
+def _fetch_services(authorization_header: str | None) -> list[dict]:
+    if not authorization_header:
+        return []
+
+    request = UrlRequest(
+        f"{settings.SERVICE_FADESOL_URL.rstrip('/')}/api/services-fadesol/",
+        headers={"Authorization": authorization_header},
+        method="GET",
+    )
+
+    try:
+        with urlopen(request, timeout=5) as response:
+            payload = json.loads(response.read().decode("utf-8"))
+    except (HTTPError, URLError, json.JSONDecodeError, UnicodeDecodeError, TimeoutError):
+        return []
+
+    return payload if isinstance(payload, list) else []
+
+
+def _profile_service_scope(profile: dict | None, authorization_header: str | None = None) -> list[str]:
+    raw_values = [
+        (profile or {}).get("id_service"),
+        (profile or {}).get("service_id"),
+        (profile or {}).get("service"),
+        (profile or {}).get("service_name"),
+        (profile or {}).get("nom_service"),
+    ]
+    service_keys = {_normalize_service_key(value) for value in raw_values if value not in {None, ""}}
+    scope = []
+
+    for service in _fetch_services(authorization_header):
+        candidates = [
+            service.get("id"),
+            service.get("uuid"),
+            service.get("name"),
+            service.get("nom"),
+            service.get("nom_service"),
+        ]
+
+        if service_keys.intersection({_normalize_service_key(candidate) for candidate in candidates if candidate}):
+            service_id = service.get("id") or service.get("uuid")
+            if service_id:
+                scope.append(str(service_id))
+
+    scope.extend(str(value) for value in raw_values if value not in {None, ""})
+    return list(dict.fromkeys(scope))
+
+
+def can_access_task(task: Task, profile: dict | None, authorization_header: str | None = None) -> bool:
     if not profile or _is_admin(profile):
         return True
 
     if _is_manager(profile):
-        return bool(_profile_service_id(profile)) and task.service_id == _profile_service_id(profile)
+        return bool(_profile_service_id(profile)) and task.service_id in _profile_service_scope(profile, authorization_header)
 
     if _is_employee(profile):
         return task.assigned_to == str(profile.get("uuid") or "")
@@ -172,7 +232,7 @@ def scoped_task_filters(
     authorization_header: str | None,
     assigned_to: str | None = None,
     service_id: str | None = None,
-) -> tuple[str | None, str | None]:
+) -> tuple[str | None, str | list[str] | None]:
     profile = resolve_current_user_profile(authorization_header)
     resolved_assigned_to = str(profile.get("uuid") or "") if assigned_to == "me" else assigned_to
 
@@ -180,10 +240,10 @@ def scoped_task_filters(
         return resolved_assigned_to, service_id
 
     if _is_manager(profile):
-        return resolved_assigned_to, _profile_service_id(profile)
+        return resolved_assigned_to, _profile_service_scope(profile, authorization_header)
 
     if _is_employee(profile):
-        return str(profile.get("uuid") or ""), _profile_service_id(profile)
+        return str(profile.get("uuid") or ""), None
 
     return resolved_assigned_to, service_id
 

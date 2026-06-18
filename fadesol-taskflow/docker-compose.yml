@@ -180,6 +180,7 @@ services:
       DATABASE_URL: postgresql://postgres:${POSTGRES_PASSWORD}@postgres_db:5432/project_db
       PROJECT_DATABASE_URL: postgresql://postgres:${POSTGRES_PASSWORD}@postgres_db:5432/project_db
       USER_SERVICE_URL: http://user_service:8002
+      SERVICE_FADESOL_URL: http://service_fadesol_service:8003
     depends_on:
       postgres_db:
         condition: service_healthy
@@ -205,6 +206,7 @@ services:
       TASK_DATABASE_URL: postgresql://postgres:${POSTGRES_PASSWORD}@postgres_db:5432/task_db
       USER_SERVICE_URL: http://user_service:8002
       PROJECT_SERVICE_URL: http://project_service:8004
+      SERVICE_FADESOL_URL: http://service_fadesol_service:8003
       INTERNAL_SERVICE_SECRET: ${INTERNAL_SERVICE_SECRET:-user-service-sync}
       UPLOAD_DIR: /app/uploads
     volumes:

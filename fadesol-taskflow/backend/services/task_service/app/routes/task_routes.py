@@ -187,7 +187,7 @@ def get_one(task_id: str, request: Request, db: Session = Depends(get_db)):
         raise not_found("Tache introuvable.")
 
     profile = resolve_current_user_profile(request.headers.get("authorization"))
-    if not can_access_task(task, profile):
+    if not can_access_task(task, profile, request.headers.get("authorization")):
         raise not_found("Tache introuvable.")
 
     return task

@@ -18,11 +18,17 @@ def list_projects(
     limit: int = 100,
     service_id: str | None = None,
     status: str | None = None,
+    service_ids: list[str] | None = None,
 ) -> list[Projet]:
     """Liste les projets avec filtres optionnels par service et statut."""
     query = db.query(Projet)
 
-    if service_id:
+    if service_ids is not None:
+        service_values = [str(value) for value in service_ids if value not in {None, ""}]
+        if not service_values:
+            return []
+        query = query.filter(Projet.service_id.in_(service_values))
+    elif service_id:
         query = query.filter(Projet.service_id == service_id)
 
     if status:

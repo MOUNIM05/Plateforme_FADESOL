@@ -78,6 +78,37 @@ function getServiceName(services, serviceId) {
   return service ? getFadesolServiceLabel(service) : serviceId || "Non affecte";
 }
 
+function normalizeServiceKey(value) {
+  return String(value || "")
+    .normalize("NFD")
+    .replace(/[\u0300-\u036f]/g, "")
+    .replace(/[^a-zA-Z0-9]/g, "")
+    .toLowerCase();
+}
+
+function getUserServiceValues(user) {
+  return [
+    user?.id_service,
+    user?.service_id,
+    user?.service,
+    user?.service_name,
+    user?.nom_service,
+  ].filter((value) => value !== undefined && value !== null && value !== "");
+}
+
+function serviceMatchesManager(service, managerServiceValues) {
+  const managerKeys = new Set(managerServiceValues.map(normalizeServiceKey));
+
+  return [
+    service?.id,
+    service?.uuid,
+    service?.name,
+    service?.nom,
+    service?.nom_service,
+    service?.libelle,
+  ].some((value) => managerKeys.has(normalizeServiceKey(value)));
+}
+
 function getStatusLabel(statusValue) {
   return statusOptions.find((status) => status.value === statusValue)?.label || statusValue || "Non défini";
 }
@@ -141,7 +172,9 @@ function formatDate(value) {
 
 function Projects() {
   // Les permissions definissent les actions disponibles sur les projets.
-  const { hasPermission } = useAuth();
+  const { currentUser, hasPermission } = useAuth();
+  const isManager = currentUser?.role === "Manager";
+  const managerServiceValues = useMemo(() => getUserServiceValues(currentUser), [currentUser]);
   const canCreateProjects = hasPermission("projects.create");
   const canUpdateProjects = hasPermission("projects.update");
   const canDeleteProjects = hasPermission("projects.delete");
@@ -195,10 +228,13 @@ function Projects() {
 
     if (serviceResult.status === "fulfilled") {
       const serviceData = Array.isArray(serviceResult.value) ? serviceResult.value : [];
-      setServices(serviceData);
+      const visibleServices = isManager
+        ? serviceData.filter((service) => serviceMatchesManager(service, managerServiceValues))
+        : serviceData;
+      setServices(visibleServices);
       setFormData((current) => ({
         ...current,
-        service_id: current.service_id || getFadesolServiceValue(serviceData[0]) || "",
+        service_id: current.service_id || getFadesolServiceValue(visibleServices[0]) || "",
       }));
     } else {
       console.error("Load services error:", serviceResult.reason);
@@ -211,7 +247,15 @@ function Projects() {
     }
 
     if (userResult.status === "fulfilled") {
-      setUsers(Array.isArray(userResult.value) ? userResult.value : []);
+      const userData = Array.isArray(userResult.value) ? userResult.value : [];
+      setUsers(
+        isManager
+          ? userData.filter((user) => {
+              const userServiceKeys = getUserServiceValues(user).map(normalizeServiceKey);
+              return managerServiceValues.map(normalizeServiceKey).some((serviceKey) => userServiceKeys.includes(serviceKey));
+            })
+          : userData
+      );
     } else {
       console.error("Load users error:", userResult.reason);
       setUsers([]);
@@ -228,14 +272,14 @@ function Projects() {
   useEffect(() => {
     // Rechargement initial et rechargement quand les filtres serveur changent.
     loadData();
-  }, [serviceFilter, statusFilter]);
+  }, [serviceFilter, statusFilter, isManager, managerServiceValues]);
 
   useEffect(() => {
     // Les changements de services ou utilisateurs dans d'autres pages rafraichissent les listes.
     return subscribeDataEvents([DATA_EVENTS.SERVICES_CHANGED, DATA_EVENTS.USERS_CHANGED], () => {
       loadData({ showLoading: false });
     });
-  }, [serviceFilter, statusFilter]);
+  }, [serviceFilter, statusFilter, isManager, managerServiceValues]);
 
   const serviceById = useMemo(() => {
     return services.reduce((acc, service) => {
@@ -247,9 +291,25 @@ function Projects() {
   const filteredProjects = useMemo(() => {
     // Filtrage local par recherche texte, en complement des filtres envoyes a l'API.
     const query = searchQuery.trim().toLowerCase();
+    const managerServiceKeys = managerServiceValues.map(normalizeServiceKey);
 
     return projects.filter((project) => {
       const serviceName = serviceById[project.service_id] || project.service_id || "";
+      const projectServiceKeys = [
+        project.service_id,
+        project.id_service,
+        project.service?.id,
+        project.service?.uuid,
+        project.service,
+        project.nom_service,
+        project.service_name,
+        serviceName,
+      ].map(normalizeServiceKey);
+
+      if (isManager && !managerServiceKeys.some((serviceKey) => projectServiceKeys.includes(serviceKey))) {
+        return false;
+      }
+
       const responsibleName = getResponsibleName(users, project.responsable_id);
       const searchable = [
         project.titre,
@@ -264,7 +324,7 @@ function Projects() {
 
       return query === "" || searchable.includes(query);
     });
-  }, [projects, searchQuery, serviceById, users]);
+  }, [isManager, managerServiceValues, projects, searchQuery, serviceById, users]);
 
   function handleChange(event) {
     // Met a jour le formulaire projet champ par champ.

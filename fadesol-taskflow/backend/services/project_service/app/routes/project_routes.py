@@ -5,6 +5,7 @@ anglaises, avec filtrage des projets selon le role de l'utilisateur.
 """
 
 import json
+import unicodedata
 from urllib.error import HTTPError, URLError
 from urllib.request import Request as UrlRequest
 from urllib.request import urlopen
@@ -72,17 +73,70 @@ def _is_manager(profile: dict) -> bool:
     return _role(profile) == "manager"
 
 
-def _manager_service_id(profile: dict) -> str | None:
-    value = profile.get("id_service") or profile.get("service_id")
-    return str(value) if value not in {None, ""} else None
+def _normalize_service_key(value: str | None) -> str:
+    """Normalise un nom ou identifiant de service pour les comparaisons."""
+    normalized = unicodedata.normalize("NFD", str(value or ""))
+    without_accents = "".join(char for char in normalized if unicodedata.category(char) != "Mn")
+    return "".join(char for char in without_accents.lower() if char.isalnum())
 
 
-def _ensure_project_scope(project, profile: dict):
-    """Verifie qu'un manager reste limite aux projets de son service."""
-    if _is_manager(profile) and project.service_id != _manager_service_id(profile):
-        raise not_found("Projet introuvable.")
+def _fetch_services(authorization: str | None) -> list[dict]:
+    """Recupere le referentiel des services pour traduire nom de service vers UUID."""
+    if not authorization:
+        return []
 
-    return project
+    request = UrlRequest(
+        f"{settings.SERVICE_FADESOL_URL.rstrip('/')}/api/services-fadesol/",
+        headers={"Authorization": authorization},
+        method="GET",
+    )
+
+    try:
+        with urlopen(request, timeout=5) as response:
+            payload = json.loads(response.read().decode("utf-8"))
+    except (HTTPError, URLError, json.JSONDecodeError, UnicodeDecodeError, TimeoutError):
+        return []
+
+    return payload if isinstance(payload, list) else []
+
+
+def _manager_service_scope(profile: dict, authorization: str | None) -> list[str]:
+    """Retourne les valeurs de service acceptables pour un manager.
+
+    Les anciens profils peuvent contenir "Commercial" alors que les projets
+    stockent l'UUID du service. On conserve donc les deux valeurs.
+    """
+    raw_values = [
+        profile.get("id_service"),
+        profile.get("service_id"),
+        profile.get("service"),
+        profile.get("service_name"),
+        profile.get("nom_service"),
+    ]
+    service_keys = {_normalize_service_key(value) for value in raw_values if value not in {None, ""}}
+    scope = []
+
+    for service in _fetch_services(authorization):
+        candidates = [
+            service.get("id"),
+            service.get("uuid"),
+            service.get("name"),
+            service.get("nom"),
+            service.get("nom_service"),
+        ]
+
+        if service_keys.intersection({_normalize_service_key(candidate) for candidate in candidates if candidate}):
+            service_id = service.get("id") or service.get("uuid")
+            if service_id:
+                scope.append(str(service_id))
+
+    scope.extend(str(value) for value in raw_values if value not in {None, ""})
+    return list(dict.fromkeys(scope))
+
+
+def _manager_primary_service_id(profile: dict, authorization: str | None) -> str | None:
+    scope = _manager_service_scope(profile, authorization)
+    return scope[0] if scope else None
 
 
 @router.get("/", response_model=list[ProjetResponse])
@@ -154,7 +208,13 @@ def list_projects_en(
     profile = _fetch_current_profile(request.headers.get("authorization"))
     # Un manager ne consulte que les projets rattaches a son service.
     if _is_manager(profile):
-        service_id = _manager_service_id(profile)
+        return list_projects(
+            db,
+            skip,
+            limit,
+            service_ids=_manager_service_scope(profile, request.headers.get("authorization")),
+            status=status,
+        )
 
     return list_projects(db, skip, limit, service_id, status)
 
@@ -165,7 +225,7 @@ def create_project_en(payload: ProjetCreate, request: Request, db: Session = Dep
     profile = _fetch_current_profile(request.headers.get("authorization"))
     # Le manager cree automatiquement dans son propre perimetre de service.
     if _is_manager(profile):
-        payload.service_id = _manager_service_id(profile)
+        payload.service_id = _manager_primary_service_id(profile, request.headers.get("authorization"))
 
     return create_project(db, payload)
 
@@ -179,7 +239,10 @@ def get_project_en(project_id: str, request: Request, db: Session = Depends(get_
         raise not_found("Projet introuvable.")
 
     profile = _fetch_current_profile(request.headers.get("authorization"))
-    return _ensure_project_scope(project, profile)
+    if _is_manager(profile) and project.service_id not in _manager_service_scope(profile, request.headers.get("authorization")):
+        raise not_found("Projet introuvable.")
+
+    return project
 
 
 @projects_router.put("/{project_id}", response_model=ProjetResponse)
@@ -191,11 +254,12 @@ def update_project_en(project_id: str, payload: ProjetUpdate, request: Request, 
     if not project:
         raise not_found("Projet introuvable.")
 
-    _ensure_project_scope(project, profile)
+    if _is_manager(profile) and project.service_id not in _manager_service_scope(profile, request.headers.get("authorization")):
+        raise not_found("Projet introuvable.")
 
     if _is_manager(profile):
         # Un manager ne peut pas deplacer un projet vers un autre service.
-        payload.service_id = _manager_service_id(profile)
+        payload.service_id = _manager_primary_service_id(profile, request.headers.get("authorization"))
 
     return update_project(db, project_id, payload)
 
@@ -209,6 +273,7 @@ def delete_project_en(project_id: str, request: Request, db: Session = Depends(g
     if not project:
         raise not_found("Projet introuvable.")
 
-    _ensure_project_scope(project, profile)
+    if _is_manager(profile) and project.service_id not in _manager_service_scope(profile, request.headers.get("authorization")):
+        raise not_found("Projet introuvable.")
     delete_project(db, project_id)
     return {"message": "Projet supprime avec succes."}
