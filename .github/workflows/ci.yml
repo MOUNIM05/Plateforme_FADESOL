@@ -1,0 +1,64 @@
+name: Fadesol TaskFlow CI
+
+on:
+  push:
+    branches:
+      - main
+      - mouhcine
+      - MOUNIM
+      - test
+  pull_request:
+    branches:
+      - main
+
+jobs:
+  frontend-build:
+    name: Frontend Build
+    runs-on: ubuntu-latest
+
+    defaults:
+      run:
+        working-directory: fadesol-taskflow/frontend
+
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+
+      - name: Setup Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: 20
+
+      - name: Install frontend dependencies
+        run: npm install
+
+      - name: Build frontend
+        run: npm run build
+
+  backend-compile:
+    name: Backend Compile Check
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+
+      - name: Setup Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: "3.11"
+
+      - name: Compile backend services
+        run: python -m compileall fadesol-taskflow/backend/services
+
+  docker-compose-check:
+    name: Docker Compose Config Check
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+
+      - name: Check Docker Compose config
+        working-directory: fadesol-taskflow
+        run: docker compose config
