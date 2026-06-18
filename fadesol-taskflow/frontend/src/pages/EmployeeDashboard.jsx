@@ -4,7 +4,7 @@ import AccountMenu from "../components/dashboard/AccountMenu";
 import DashboardCharts from "../components/dashboard/DashboardCharts";
 import KpiCard from "../components/dashboard/KpiCard";
 import NotificationDropdown from "../components/dashboard/NotificationDropdown";
-import { getDashboardAnalytics, getDashboardStatistics } from "../services/dashboardService";
+import { getTasks } from "../services/taskService";
 import { DATA_EVENTS, subscribeDataEvents } from "../utils/dataEvents";
 
 const fallbackStatistics = {
@@ -50,6 +50,132 @@ const employeeKpiDefinitions = [
   },
 ];
 
+const inProgressStatuses = new Set(["encours", "inprogress", "enprogress"]);
+const completedStatuses = new Set(["termine", "terminee", "done", "completed", "validee"]);
+const blockedStatuses = new Set(["bloque", "blocked"]);
+
+function normalizeText(value) {
+  return String(value || "")
+    .normalize("NFD")
+    .replace(/[\u0300-\u036f]/g, "")
+    .replace(/[^a-zA-Z0-9]/g, "")
+    .toLowerCase();
+}
+
+function getTaskStatus(task) {
+  return task?.status ?? task?.statut ?? "";
+}
+
+function getTaskPriority(task) {
+  return task?.priority ?? task?.priorite ?? "Non definie";
+}
+
+function getTaskDueDate(task) {
+  return task?.due_date ?? task?.date_echeance ?? task?.deadline ?? task?.date_limite ?? null;
+}
+
+function getAssignedValues(task) {
+  return [
+    task?.assigned_to,
+    task?.assigned_user_id,
+    task?.assignee_id,
+    task?.user_id,
+    task?.responsable_id,
+    task?.assignee_a,
+  ]
+    .filter((value) => value !== undefined && value !== null && value !== "")
+    .map(String);
+}
+
+function buildCurrentUserIds(currentUser) {
+  return new Set(
+    [
+      currentUser?.id,
+      currentUser?.uuid,
+      currentUser?.user_id,
+      currentUser?.email,
+    ]
+      .filter((value) => value !== undefined && value !== null && value !== "")
+      .map(String)
+  );
+}
+
+function isTaskAssignedToCurrentUser(task, currentUserIds) {
+  if (!currentUserIds.size) {
+    return false;
+  }
+
+  return getAssignedValues(task).some((value) => currentUserIds.has(value));
+}
+
+function isInProgressTask(task) {
+  const status = normalizeText(getTaskStatus(task));
+  return inProgressStatuses.has(status) || status.includes("encours") || status.includes("inprogress");
+}
+
+function isCompletedTask(task) {
+  const status = normalizeText(getTaskStatus(task));
+  return completedStatuses.has(status) || status.startsWith("termin") || status.includes("done") || status.includes("completed");
+}
+
+function isBlockedTask(task) {
+  const status = normalizeText(getTaskStatus(task));
+  return blockedStatuses.has(status) || status.includes("bloqu") || status.includes("blocked");
+}
+
+function isLateTask(task) {
+  if (isCompletedTask(task)) {
+    return false;
+  }
+
+  const dueDate = getTaskDueDate(task);
+
+  if (!dueDate) {
+    return false;
+  }
+
+  const parsedDate = new Date(String(dueDate).slice(0, 10));
+
+  if (Number.isNaN(parsedDate.getTime())) {
+    return false;
+  }
+
+  const today = new Date();
+  today.setHours(0, 0, 0, 0);
+  parsedDate.setHours(0, 0, 0, 0);
+
+  return parsedDate < today;
+}
+
+function groupTasksBy(tasks, getLabel) {
+  const counters = tasks.reduce((accumulator, task) => {
+    const label = getLabel(task) || "Non renseigne";
+    accumulator[label] = (accumulator[label] || 0) + 1;
+    return accumulator;
+  }, {});
+
+  return Object.entries(counters).map(([label, value]) => ({ label, value }));
+}
+
+function buildEmployeeStatistics(tasks) {
+  return {
+    total_tasks: tasks.length,
+    tasks_in_progress: tasks.filter(isInProgressTask).length,
+    tasks_completed: tasks.filter(isCompletedTask).length,
+    tasks_late: tasks.filter(isLateTask).length,
+    tasks_blocked: tasks.filter(isBlockedTask).length,
+  };
+}
+
+function buildEmployeeAnalytics(tasks, displayName) {
+  return {
+    tasks_by_status: groupTasksBy(tasks, (task) => getTaskStatus(task) || "Non defini"),
+    tasks_by_service: [{ label: "Mes taches", value: tasks.length }],
+    workload_by_member: [{ label: displayName, value: tasks.length, completed: tasks.filter(isCompletedTask).length }],
+    tasks_by_priority: groupTasksBy(tasks, getTaskPriority),
+  };
+}
+
 function EmployeeDashboard({ currentUser }) {
   const displayName = currentUser?.prenom || currentUser?.first_name || currentUser?.email || "Employe";
   const [statistics, setStatistics] = useState(fallbackStatistics);
@@ -64,10 +190,20 @@ function EmployeeDashboard({ currentUser }) {
     setStatisticsWarning("");
 
     try {
-      const data = await getDashboardStatistics();
-      const analyticsData = await getDashboardAnalytics();
-      setStatistics({ ...fallbackStatistics, ...data, ...(analyticsData.kpis || {}) });
-      setAnalytics(analyticsData);
+      const currentUserIds = buildCurrentUserIds(currentUser);
+      const assignedTasks = await getTasks({ assigned_to: "me" });
+      let employeeTasks = Array.isArray(assignedTasks) ? assignedTasks : [];
+
+      if (employeeTasks.length === 0 && currentUserIds.size) {
+        const authorizedTasks = await getTasks();
+        employeeTasks = (Array.isArray(authorizedTasks) ? authorizedTasks : []).filter((task) =>
+          isTaskAssignedToCurrentUser(task, currentUserIds)
+        );
+      }
+
+      const employeeStatistics = buildEmployeeStatistics(employeeTasks);
+      setStatistics({ ...fallbackStatistics, ...employeeStatistics });
+      setAnalytics(buildEmployeeAnalytics(employeeTasks, displayName));
     } catch (error) {
       console.error("Dashboard statistics error:", error);
       setStatistics(fallbackStatistics);
@@ -78,7 +214,7 @@ function EmployeeDashboard({ currentUser }) {
         setStatisticsLoading(false);
       }
     }
-  }, []);
+  }, [currentUser, displayName]);
 
   useEffect(() => {
     loadDashboardStatistics();
