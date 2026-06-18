@@ -1,104 +1,175 @@
 # Fadesol TaskFlow
 
-Fadesol TaskFlow is a PFE project for an internal task management platform based on a microservices architecture.
+Plateforme interne de gestion des projets, taches, services, utilisateurs, messagerie, notifications et tableaux de bord pour FADESOL.
 
-The goal is to help Fadesol centralize internal tasks, assign work by service, track progress, detect delays, and manage internal collaboration.
+Fadesol TaskFlow centralise le suivi du travail dans un environnement interne afin de mieux coordonner les services, reduire les charges d'abonnement aux outils externes et conserver les donnees de l'entreprise dans son propre systeme.
 
-## Technologies
+## Objectifs du projet
 
-Frontend:
-- React
-- Vite
-- Tailwind CSS
-- Axios
-- React Router
+- Centraliser le suivi du travail.
+- Ameliorer la coordination entre les services.
+- Reduire les charges d'abonnement aux outils externes.
+- Garder les donnees dans l'entreprise.
+- Faciliter le suivi des taches et projets.
 
-Backend:
-- Python
-- FastAPI
-- SQLAlchemy
-- Pydantic
-- JWT authentication
-- Uvicorn
+## Fonctionnalites principales
 
-Database:
-- PostgreSQL
+- Authentification JWT.
+- Gestion utilisateurs.
+- Gestion roles et permissions.
+- Gestion services FADESOL.
+- Gestion projets.
+- Gestion taches.
+- Gestion sous-taches.
+- Dashboard global et par service.
+- Messagerie interne.
+- Notifications.
+- Profil utilisateur.
+- Parametres.
+- CI/CD avec GitHub Actions.
 
-DevOps and tools:
-- Docker
-- Docker Compose
-- Git and GitHub
-- Postman
-- VS Code
+## Acteurs
 
-## Project Structure
+| Acteur | Role principal |
+| --- | --- |
+| Administrateur | Gere les utilisateurs, les permissions, les services et la configuration globale. |
+| Manager | Suit les projets, les taches et l'activite de son service. |
+| Employe | Consulte et met a jour les taches qui lui sont affectees. |
+
+## Architecture technique
+
+- Frontend React / Vite / Tailwind CSS.
+- Backend FastAPI.
+- API Gateway.
+- PostgreSQL.
+- Docker Compose.
+- Microservices.
+
+## Microservices
+
+| Service | Port | Role |
+| --- | ---: | --- |
+| frontend | 5173 | Interface web. |
+| api_gateway | 8000 | Point d'entree unique. |
+| auth_service | 8001 | Authentification et JWT. |
+| user_service | 8002 | Utilisateurs, roles et permissions. |
+| service_fadesol_service | 8003 | Services internes FADESOL. |
+| project_service | 8004 | Projets. |
+| task_service | 8005 | Taches et sous-taches. |
+| message_service | 8006 | Messagerie interne. |
+| dashboard_service | 8008 | Tableaux de bord. |
+| postgres_db | 5432 | Base PostgreSQL. |
+| pgAdmin | 5050 | Administration PostgreSQL. |
+
+## Structure du projet
 
 ```text
 fadesol-taskflow/
-├── frontend/
-├── backend/
-│   ├── api-gateway/
-│   ├── auth-service/
-│   ├── user-service/
-│   ├── project-service/
-│   ├── task-service/
-│   └── dashboard-service/
-├── docs/
-│   ├── cahier-des-charges/
-│   ├── diagrams/
-│   └── postman/
-├── docker-compose.yml
-├── README.md
-├── .gitignore
-└── .env.example
+|-- backend/
+|   |-- services/
+|   |   |-- api_gateway/
+|   |   |-- auth_service/
+|   |   |-- user_service/
+|   |   |-- service_fadesol_service/
+|   |   |-- project_service/
+|   |   |-- task_service/
+|   |   |-- message_service/
+|   |   `-- dashboard_service/
+|   |-- shared/
+|   `-- docker/
+|-- frontend/
+|   `-- src/
+|-- docs/
+|-- scripts/
+|-- docker-compose.yml
+|-- .env.example
+`-- README.md
 ```
 
-## Architecture Overview
+## Prerequis
 
-The frontend communicates only with the API Gateway.
+- Docker Desktop.
+- Node.js.
+- Python.
+- Git.
+- PostgreSQL si lancement local sans Docker.
 
-The API Gateway forwards requests to internal services:
-- Auth Service for login, registration, and JWT authentication
-- User Service for users, roles, and services
-- Project Service for project management
-- Task Service for tasks and subtasks
-- Dashboard Service for statistics and reporting
+## Installation avec Docker
 
-For the MVP, all services can share one PostgreSQL instance while keeping the code separated by service.
-
-## Git Workflow for Two Developers
-
-Recommended branches:
-- `main`: stable version
-- `develop`: integration branch
-- `feature/<module-name>`: one feature or module per branch
-
-Example workflow:
-
-```bash
-git checkout develop
-git pull origin develop
-git checkout -b feature/auth-service
+```powershell
+docker compose up -d --build
+docker compose ps
 ```
 
-After completing a small change:
+## Acces application
 
-```bash
-git status
-git add .
-git commit -m "Add auth service structure"
-git push origin feature/auth-service
+| Ressource | URL |
+| --- | --- |
+| Frontend | http://localhost:5173 |
+| API Gateway | http://localhost:8000 |
+| Swagger Gateway | http://localhost:8000/docs |
+| pgAdmin | http://localhost:5050 |
+
+## Comptes de demonstration
+
+| Acteur | Email | Mot de passe |
+| --- | --- | --- |
+| Admin | admin.demo@fadesol.local | Admin123456 |
+| Manager | manager.technique@fadesol.local | Manager123456 |
+| Employee | employee.commercial@fadesol.local | Employee123456 |
+
+## Tests rapides
+
+```powershell
+curl http://localhost:8000/health
+cd frontend
+npm.cmd run build
+cd ..
+python -m compileall backend/services
+docker compose config
 ```
 
-Then open a pull request from `feature/auth-service` into `develop`.
+## Commandes utiles
 
-Good practices:
-- Pull before starting work.
-- Keep commits small and clear.
-- Do not commit `.env` files or secrets.
-- Use pull requests to review each other's changes.
-- Merge into `main` only when the version is tested and stable.
+```powershell
+docker compose ps
+docker compose logs api_gateway --tail=100
+docker compose logs task_service --tail=100
+npm.cmd run build
+python -m compileall backend/services
+docker compose config
+```
 
-## Current Status
+## CI/CD
 
-Initial GitHub-ready structure only. Full implementation will be added progressively phase by phase.
+GitHub Actions verifie :
+
+- build frontend ;
+- compilation backend ;
+- validation Docker Compose.
+
+Le workflow se trouve dans `../.github/workflows/ci.yml` depuis ce dossier applicatif.
+
+## Securite
+
+- Ne jamais pousser `.env`.
+- Stocker les secrets dans les variables d'environnement.
+- Utiliser l'authentification JWT.
+- Controler les acces selon les roles et permissions.
+
+## Documentation
+
+- [Frontend](frontend/README.md)
+- [Backend](backend/README.md)
+- [Docker](docs/DOCKER.md)
+- [CI/CD](docs/CI_CD.md)
+- [Tests](docs/TESTS.md)
+
+## Auteurs
+
+- Mouhcine Asfoury
+- Abdelmounim Maani
+
+## Annee universitaire
+
+2025 / 2026
