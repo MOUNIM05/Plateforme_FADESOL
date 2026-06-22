@@ -184,6 +184,7 @@ function Projects() {
   const [formData, setFormData] = useState(emptyProject);
   const [editingProjectId, setEditingProjectId] = useState(null);
   const [selectedProject, setSelectedProject] = useState(null);
+  const [projectFormOpen, setProjectFormOpen] = useState(false);
   const [showProjectDetails, setShowProjectDetails] = useState(false);
   const [searchQuery, setSearchQuery] = useState("");
   const [serviceFilter, setServiceFilter] = useState("");
@@ -326,6 +327,22 @@ function Projects() {
     });
   }, [isManager, managerServiceValues, projects, searchQuery, serviceById, users]);
 
+  const projectStats = useMemo(() => {
+    const normalizeStatus = (status) =>
+      String(status || "")
+        .normalize("NFD")
+        .replace(/[\u0300-\u036f]/g, "")
+        .replace(/[^a-zA-Z0-9]/g, "")
+        .toLowerCase();
+
+    return {
+      total: projects.length,
+      inProgress: projects.filter((project) => normalizeStatus(project.statut).includes("encours")).length,
+      completed: projects.filter((project) => normalizeStatus(project.statut).startsWith("termin")).length,
+      blocked: projects.filter((project) => normalizeStatus(project.statut).includes("bloqu")).length,
+    };
+  }, [projects]);
+
   function handleChange(event) {
     // Met a jour le formulaire projet champ par champ.
     const { name, value } = event.target;
@@ -339,11 +356,24 @@ function Projects() {
   function resetForm() {
     // Revient en mode creation avec un service par defaut si disponible.
     setShowProjectDetails(false);
+    setProjectFormOpen(false);
     setEditingProjectId(null);
     setFormData({
       ...emptyProject,
       service_id: getFadesolServiceValue(services[0]) || "",
     });
+  }
+
+  function openCreateProject() {
+    setShowProjectDetails(false);
+    setEditingProjectId(null);
+    setFormData({
+      ...emptyProject,
+      service_id: getFadesolServiceValue(services[0]) || "",
+    });
+    setProjectFormOpen(true);
+    setMessage("");
+    setError("");
   }
 
   function viewProject(project) {
@@ -363,6 +393,7 @@ function Projects() {
 
     setShowProjectDetails(false);
     setEditingProjectId(project.id);
+    setProjectFormOpen(true);
     setMessage("");
     setError("");
     setFormData({
@@ -446,12 +477,12 @@ function Projects() {
     <div className="dashboard-page projects-page">
       <div className="board-toolbar">
         <div>
-          <h2>Projets</h2>
-          <p>Consultez et suivez l'avancement des projets Fadesol.</p>
+          <h2>Gestion des projets</h2>
+          <p>Consultez, filtrez et suivez l'avancement des projets Fadesol.</p>
         </div>
-        <div className="toolbar-actions">
+        <div className="toolbar-actions page-actions">
           {canCreateProjects && (
-            <button type="button" className="primary-action" onClick={resetForm}>
+            <button type="button" className="primary-action" onClick={openCreateProject}>
               <Plus size={17} />
               Nouveau projet
             </button>
@@ -467,124 +498,34 @@ function Projects() {
       {error && <p className="notice error">{error}</p>}
       {warning && <p className="notice warning">{warning}</p>}
 
-      <section className="management-grid">
-        <div className="user-side-stack">
-          {(canCreateProjects || (editingProjectId && canUpdateProjects)) && (
-          <form className="workspace-panel user-form project-form" onSubmit={handleSubmit}>
+      <section className="users-stats-grid" aria-label="Resume projets">
+        <article className="workspace-panel user-stat-card">
+          <FolderKanban size={20} />
+          <span>Total projets</span>
+          <strong>{projectStats.total}</strong>
+        </article>
+        <article className="workspace-panel user-stat-card">
+          <RefreshCw size={20} />
+          <span>En cours</span>
+          <strong>{projectStats.inProgress}</strong>
+        </article>
+        <article className="workspace-panel user-stat-card">
+          <Edit3 size={20} />
+          <span>Termines</span>
+          <strong>{projectStats.completed}</strong>
+        </article>
+        <article className="workspace-panel user-stat-card">
+          <X size={20} />
+          <span>Bloques</span>
+          <strong>{projectStats.blocked}</strong>
+        </article>
+      </section>
+
+      <section className="management-grid page-stack">
+        <div className="user-side-stack page-section-full">
+          <section className="workspace-panel user-list-panel list-card-full page-list-card">
             <div className="panel-title">
-              <h3>{editingProjectId ? "Modifier projet" : "Nouveau projet"}</h3>
-              {editingProjectId ? <button type="button" onClick={resetForm}>Annuler</button> : <span>Creation</span>}
-            </div>
-
-            <div className="form-grid">
-              <label>
-                Titre
-                <input
-                  name="titre"
-                  value={formData.titre}
-                  onChange={handleChange}
-                  placeholder="Ex: Installation solaire client"
-                  required
-                />
-              </label>
-
-              <label>
-                Description
-                <textarea
-                  name="description"
-                  value={formData.description}
-                  onChange={handleChange}
-                  placeholder="Objectif, contexte et périmètre du projet"
-                  rows={5}
-                />
-              </label>
-
-              <label>
-                Service
-                <select
-                  name="service_id"
-                  value={formData.service_id}
-                  onChange={handleChange}
-                  required
-                >
-                  <option value="">Sélectionner un service</option>
-                  {services.map((service) => (
-                    <option key={getFadesolServiceValue(service)} value={getFadesolServiceValue(service)}>
-                      {getFadesolServiceLabel(service)}
-                    </option>
-                  ))}
-                </select>
-              </label>
-
-              <label>
-                Responsable
-                <select
-                  name="responsable_id"
-                  value={formData.responsable_id}
-                  onChange={handleChange}
-                >
-                  <option value="">Non assigné</option>
-                  {users.map((user) => (
-                    <option key={user.id} value={user.id}>
-                      {getResponsibleName(users, user.id)}
-                    </option>
-                  ))}
-                </select>
-              </label>
-
-              <label>
-                Priorité
-                <select name="priorite" value={formData.priorite} onChange={handleChange}>
-                  {priorityOptions.map((priority) => (
-                    <option key={priority} value={priority}>{priority}</option>
-                  ))}
-                </select>
-              </label>
-
-              <label>
-                Statut
-                <select name="statut" value={formData.statut} onChange={handleChange}>
-                  {statusOptions.map((status) => (
-                    <option key={status.value} value={status.value}>{status.label}</option>
-                  ))}
-                </select>
-              </label>
-
-              <label>
-                Date début
-                <input name="date_debut" type="date" value={formData.date_debut} onChange={handleChange} />
-              </label>
-
-              <label>
-                Date limite
-                <input name="date_limite" type="date" value={formData.date_limite} onChange={handleChange} />
-              </label>
-
-              <label>
-                Progression
-                <input
-                  name="progression"
-                  type="number"
-                  min="0"
-                  max="100"
-                  value={formData.progression}
-                  onChange={handleChange}
-                />
-              </label>
-            </div>
-
-            <button type="submit" className="primary-action" disabled={saving || !services.length}>
-              {editingProjectId ? <Edit3 size={17} /> : <Plus size={17} />}
-              {saving ? "Enregistrement..." : editingProjectId ? "Modifier projet" : "Créer projet"}
-            </button>
-          </form>
-          )}
-        </div>
-
-        <div className="user-side-stack">
-          <section className="workspace-panel user-list-panel">
-            <div className="panel-title">
-              <h3>Suivi des projets</h3>
+              <h3>Liste des projets</h3>
               <span>{filteredProjects.length} projet(s)</span>
             </div>
 
@@ -693,90 +634,206 @@ function Projects() {
             )}
           </section>
 
-          {showProjectDetails && selectedProject && (
-            <section className="workspace-panel selected-profile-card project-details-card">
-              <div className="panel-title">
-                <h3>Détails projet</h3>
-                <div className="project-details-title-actions">
-                  <span>ID #{selectedProject.id.slice(0, 8)}</span>
-                  <button
-                    type="button"
-                    aria-label="Masquer les détails"
-                    title="Masquer les détails"
-                    onClick={() => setShowProjectDetails(false)}
-                  >
-                    <X size={16} />
-                  </button>
+        </div>
+      </section>
+
+      {projectFormOpen && (
+        <div className="service-modal-backdrop modal-overlay" role="presentation" onMouseDown={resetForm}>
+          <form
+            className="service-modal modal-card project-form-modal"
+            onSubmit={handleSubmit}
+            onMouseDown={(event) => event.stopPropagation()}
+          >
+            <header className="modal-header">
+              <div>
+                <h3>{editingProjectId ? "Modifier projet" : "Nouveau projet"}</h3>
+                <p>{editingProjectId ? "Mettez a jour les informations du projet." : "Renseignez les informations principales du projet."}</p>
+              </div>
+              <button type="button" className="service-modal-close" onClick={resetForm} aria-label="Fermer">
+                <X size={18} />
+              </button>
+            </header>
+
+            <div className="modal-body service-modal-form">
+              <div className="form-grid">
+                <label>
+                  Titre
+                  <input
+                    name="titre"
+                    value={formData.titre}
+                    onChange={handleChange}
+                    placeholder="Ex: Installation solaire client"
+                    required
+                  />
+                </label>
+                <label>
+                  Service
+                  <select name="service_id" value={formData.service_id} onChange={handleChange} required>
+                    <option value="">Selectionner un service</option>
+                    {services.map((service) => (
+                      <option key={getFadesolServiceValue(service)} value={getFadesolServiceValue(service)}>
+                        {getFadesolServiceLabel(service)}
+                      </option>
+                    ))}
+                  </select>
+                </label>
+                <label className="form-field-wide">
+                  Description
+                  <textarea
+                    name="description"
+                    value={formData.description}
+                    onChange={handleChange}
+                    placeholder="Objectif, contexte et perimetre du projet"
+                    rows={5}
+                  />
+                </label>
+                <label>
+                  Responsable
+                  <select name="responsable_id" value={formData.responsable_id} onChange={handleChange}>
+                    <option value="">Non assigne</option>
+                    {users.map((user) => (
+                      <option key={user.id} value={user.id}>
+                        {getResponsibleName(users, user.id)}
+                      </option>
+                    ))}
+                  </select>
+                </label>
+                <label>
+                  Priorite
+                  <select name="priorite" value={formData.priorite} onChange={handleChange}>
+                    {priorityOptions.map((priority) => (
+                      <option key={priority} value={priority}>{priority}</option>
+                    ))}
+                  </select>
+                </label>
+                <label>
+                  Statut
+                  <select name="statut" value={formData.statut} onChange={handleChange}>
+                    {statusOptions.map((status) => (
+                      <option key={status.value} value={status.value}>{status.label}</option>
+                    ))}
+                  </select>
+                </label>
+                <label>
+                  Date debut
+                  <input name="date_debut" type="date" value={formData.date_debut} onChange={handleChange} />
+                </label>
+                <label>
+                  Date echeance
+                  <input name="date_limite" type="date" value={formData.date_limite} onChange={handleChange} />
+                </label>
+                <label>
+                  Progression
+                  <input
+                    name="progression"
+                    type="number"
+                    min="0"
+                    max="100"
+                    value={formData.progression}
+                    onChange={handleChange}
+                  />
+                </label>
+              </div>
+            </div>
+
+            <footer className="modal-footer form-actions">
+              <button type="button" className="secondary-action" onClick={resetForm}>
+                Annuler
+              </button>
+              <button type="submit" className="primary-action" disabled={saving || !services.length}>
+                {editingProjectId ? <Edit3 size={17} /> : <Plus size={17} />}
+                {saving ? "Enregistrement..." : editingProjectId ? "Modifier projet" : "Creer projet"}
+              </button>
+            </footer>
+          </form>
+        </div>
+      )}
+
+      {showProjectDetails && selectedProject && (
+        <div className="service-modal-backdrop modal-overlay" role="presentation" onMouseDown={() => setShowProjectDetails(false)}>
+          <article
+            className="service-modal modal-card service-details-modal project-details-modal"
+            role="dialog"
+            aria-modal="true"
+            aria-labelledby="project-details-title"
+            onMouseDown={(event) => event.stopPropagation()}
+          >
+            <header className="modal-header">
+              <div>
+                <h3 id="project-details-title">Details projet</h3>
+                <p>ID #{selectedProject.id.slice(0, 8)}</p>
+              </div>
+              <button type="button" className="service-modal-close" onClick={() => setShowProjectDetails(false)} aria-label="Fermer">
+                <X size={18} />
+              </button>
+            </header>
+
+            <div className="modal-body">
+              <div className="selected-profile-card__head">
+                <div className="profile-avatar-large">
+                  <FolderKanban size={24} />
+                </div>
+                <div>
+                  <h4>{selectedProject.titre}</h4>
+                  <p>{getServiceName(services, selectedProject.service_id)}</p>
                 </div>
               </div>
 
-              <>
-                <div className="selected-profile-card__head">
-                  <div className="profile-avatar-large">
-                    <FolderKanban size={24} />
-                  </div>
-                  <div>
-                    <h4>{selectedProject.titre}</h4>
-                    <p>{getServiceName(services, selectedProject.service_id)}</p>
-                  </div>
+              <dl className="details-list compact">
+                <div>
+                  <dt>Description</dt>
+                  <dd>{selectedProject.description || "Non renseignee"}</dd>
                 </div>
-
-                <dl className="details-list compact">
-                  <div>
-                    <dt>Description</dt>
-                    <dd>{selectedProject.description || "Non renseignée"}</dd>
-                  </div>
-                  <div>
-                    <dt>Statut</dt>
-                    <dd>{getStatusLabel(selectedProject.statut)}</dd>
-                  </div>
-                  <div>
-                    <dt>Priorité</dt>
-                    <dd>{selectedProject.priorite}</dd>
-                  </div>
-                  <div>
-                    <dt>Responsable</dt>
-                    <dd>{getResponsibleName(users, selectedProject.responsable_id)}</dd>
-                  </div>
-                  <div>
-                    <dt>Dates</dt>
-                    <dd>{formatDate(selectedProject.date_debut)} {"->"} {formatDate(selectedProject.date_limite)}</dd>
-                  </div>
-                  <div>
-                    <dt>Progression</dt>
-                    <dd>{clampProgress(selectedProject.progression)}%</dd>
-                  </div>
-                </dl>
-
-                <div className="project-progress project-progress--details">
-                  <div>
-                    <span>Avancement</span>
-                    <strong>{clampProgress(selectedProject.progression)}%</strong>
-                  </div>
-                  <div className="progress-bar" aria-label={`Progression ${clampProgress(selectedProject.progression)}%`}>
-                    <i style={{ width: `${clampProgress(selectedProject.progression)}%` }} />
-                  </div>
+                <div>
+                  <dt>Statut</dt>
+                  <dd>{getStatusLabel(selectedProject.statut)}</dd>
                 </div>
-
-                <div className="profile-card-actions">
-                  {canUpdateProjects && (
-                    <button type="button" className="secondary-action" onClick={() => startEdit(selectedProject)}>
-                      <Edit3 size={16} />
-                      Modifier
-                    </button>
-                  )}
-                  {canDeleteProjects && (
-                    <button type="button" className="logout-action" onClick={() => handleDelete(selectedProject)}>
-                      <Trash2 size={16} />
-                      Supprimer
-                    </button>
-                  )}
+                <div>
+                  <dt>Priorite</dt>
+                  <dd>{selectedProject.priorite}</dd>
                 </div>
-              </>
-            </section>
-          )}
+                <div>
+                  <dt>Responsable</dt>
+                  <dd>{getResponsibleName(users, selectedProject.responsable_id)}</dd>
+                </div>
+                <div>
+                  <dt>Dates</dt>
+                  <dd>{formatDate(selectedProject.date_debut)} {"->"} {formatDate(selectedProject.date_limite)}</dd>
+                </div>
+                <div>
+                  <dt>Progression</dt>
+                  <dd>{clampProgress(selectedProject.progression)}%</dd>
+                </div>
+              </dl>
+
+              <div className="project-progress project-progress--details">
+                <div>
+                  <span>Avancement</span>
+                  <strong>{clampProgress(selectedProject.progression)}%</strong>
+                </div>
+                <div className="progress-bar" aria-label={`Progression ${clampProgress(selectedProject.progression)}%`}>
+                  <i style={{ width: `${clampProgress(selectedProject.progression)}%` }} />
+                </div>
+              </div>
+            </div>
+
+            <footer className="modal-footer">
+              {canUpdateProjects && (
+                <button type="button" className="secondary-action" onClick={() => startEdit(selectedProject)}>
+                  <Edit3 size={16} />
+                  Modifier
+                </button>
+              )}
+              {canDeleteProjects && (
+                <button type="button" className="logout-action" onClick={() => handleDelete(selectedProject)}>
+                  <Trash2 size={16} />
+                  Supprimer
+                </button>
+              )}
+            </footer>
+          </article>
         </div>
-      </section>
+      )}
     </div>
   );
 }

@@ -134,6 +134,22 @@ function serviceMatchesManager(service, managerServiceValue) {
   ].some((value) => normalizeServiceKey(value) === managerKey);
 }
 
+function userMatchesService(user, serviceValue, serviceLabel) {
+  const serviceKeys = [serviceValue, serviceLabel].map(normalizeServiceKey).filter(Boolean);
+
+  if (serviceKeys.length === 0) {
+    return true;
+  }
+
+  return [
+    user?.id_service,
+    user?.service_id,
+    user?.service,
+    user?.service_name,
+    user?.nom_service,
+  ].some((value) => serviceKeys.includes(normalizeServiceKey(value)));
+}
+
 function getUserDisplayName(user) {
   const fullName = [user.prenom || user.first_name, user.nom || user.last_name].filter(Boolean).join(" ");
 
@@ -170,6 +186,7 @@ function Tasks() {
   const [projects, setProjects] = useState([]);
   const [services, setServices] = useState([]);
   const [formData, setFormData] = useState(emptyTaskForm);
+  const [taskFormOpen, setTaskFormOpen] = useState(false);
   const [editingTaskId, setEditingTaskId] = useState("");
   const [selectedTask, setSelectedTask] = useState(null);
   const [taskDetailsLoading, setTaskDetailsLoading] = useState(false);
@@ -194,6 +211,10 @@ function Tasks() {
   const [uploadingAttachmentKey, setUploadingAttachmentKey] = useState("");
   const [deletingAttachmentId, setDeletingAttachmentId] = useState("");
   const [deletingTaskId, setDeletingTaskId] = useState("");
+  const [taskSearchQuery, setTaskSearchQuery] = useState("");
+  const [taskServiceFilter, setTaskServiceFilter] = useState("");
+  const [taskStatusFilter, setTaskStatusFilter] = useState("");
+  const [taskPriorityFilter, setTaskPriorityFilter] = useState("");
   const [message, setMessage] = useState("");
   const [error, setError] = useState("");
 
@@ -362,7 +383,50 @@ function Tasks() {
     return subscribeDataEvents([DATA_EVENTS.USERS_CHANGED], loadUsers);
   }, []);
 
-  const recentTasks = useMemo(() => tasks.slice(0, 8), [tasks]);
+  const taskStats = useMemo(() => {
+    const normalizeStatus = (status) =>
+      String(status || "")
+        .normalize("NFD")
+        .replace(/[\u0300-\u036f]/g, "")
+        .replace(/[^a-zA-Z0-9]/g, "")
+        .toLowerCase();
+
+    return {
+      total: tasks.length,
+      todo: tasks.filter((task) => ["nouveau", "afaire"].includes(normalizeStatus(task.status || task.statut))).length,
+      inProgress: tasks.filter((task) => normalizeStatus(task.status || task.statut).includes("encours")).length,
+      completed: tasks.filter((task) => normalizeStatus(task.status || task.statut).startsWith("termin")).length,
+      blocked: tasks.filter((task) => normalizeStatus(task.status || task.statut).includes("bloqu")).length,
+    };
+  }, [tasks]);
+
+  const recentTasks = useMemo(() => {
+    const query = taskSearchQuery.trim().toLowerCase();
+
+    return tasks.filter((task) => {
+      const searchable = [
+        task.title,
+        task.titre,
+        task.description,
+        task.status,
+        task.statut,
+        task.priority,
+        task.priorite,
+        task.service_id,
+        task.project_id,
+      ]
+        .filter(Boolean)
+        .join(" ")
+        .toLowerCase();
+
+      const matchesSearch = query === "" || searchable.includes(query);
+      const matchesService = taskServiceFilter === "" || String(task.service_id || "") === String(taskServiceFilter);
+      const matchesStatus = taskStatusFilter === "" || String(task.status || task.statut || "") === String(taskStatusFilter);
+      const matchesPriority = taskPriorityFilter === "" || String(task.priority || task.priorite || "") === String(taskPriorityFilter);
+
+      return matchesSearch && matchesService && matchesStatus && matchesPriority;
+    });
+  }, [taskPriorityFilter, taskSearchQuery, taskServiceFilter, taskStatusFilter, tasks]);
 
   useEffect(() => {
     // Calcule la progression des taches visibles a partir de leurs sous-taches.
@@ -428,6 +492,27 @@ function Tasks() {
     }, {});
   }, [serviceOptions]);
 
+  const managerDefaultServiceValue = useMemo(() => {
+    if (!isManager || !currentServiceId) {
+      return "";
+    }
+
+    return (
+      serviceOptions.find((service) =>
+        [service.value, service.label].some((value) => normalizeServiceKey(value) === normalizeServiceKey(currentServiceId))
+      )?.value ||
+      getFadesolServiceValue(services.find((service) => serviceMatchesManager(service, currentServiceId))) ||
+      String(currentServiceId)
+    );
+  }, [currentServiceId, isManager, serviceOptions, services]);
+
+  function getDefaultTaskForm() {
+    return {
+      ...emptyTaskForm,
+      service_id: managerDefaultServiceValue,
+    };
+  }
+
   const formAssignableUsers = useMemo(() => {
     // La liste d'affectation depend du service selectionne dans le formulaire.
     const serviceId = formData.service_id.trim();
@@ -437,7 +522,7 @@ function Tasks() {
       return users;
     }
 
-    return users.filter((user) => [user.id_service, user.service_id, user.service].includes(serviceId) || user.service === serviceName);
+    return users.filter((user) => userMatchesService(user, serviceId, serviceName));
   }, [formData.service_id, serviceById, users]);
 
   function getTaskAssignableUsers(task) {
@@ -448,7 +533,7 @@ function Tasks() {
     const serviceId = String(task.service_id);
     const serviceName = serviceById[serviceId];
 
-    return users.filter((user) => [user.id_service, user.service_id, user.service].includes(serviceId) || user.service === serviceName);
+    return users.filter((user) => userMatchesService(user, serviceId, serviceName));
   }
 
   function getAssignedUserName(userUuid) {
@@ -498,7 +583,7 @@ function Tasks() {
     return subtaskMembersByService[serviceId] || users.filter((user) => {
       const serviceName = serviceById[String(serviceId)];
 
-      return [user.id_service, user.service_id, user.service].includes(serviceId) || user.service === serviceName;
+      return userMatchesService(user, serviceId, serviceName);
     });
   }
 
@@ -515,7 +600,17 @@ function Tasks() {
 
   function resetTaskForm() {
     setEditingTaskId("");
-    setFormData(emptyTaskForm);
+    setTaskFormOpen(false);
+    setFormData(getDefaultTaskForm());
+    setError("");
+  }
+
+  function openCreateTask() {
+    setSelectedTask(null);
+    setEditingTaskId("");
+    setFormData(getDefaultTaskForm());
+    setTaskFormOpen(true);
+    setMessage("");
     setError("");
   }
 
@@ -526,8 +621,23 @@ function Tasks() {
     setError("");
 
     try {
-      const data = await getTask(task.id);
-      setSelectedTask(data);
+      const [taskResult, progressResult, subtasksResult] = await Promise.allSettled([
+        getTask(task.id),
+        getTaskProgress(task.id),
+        getSubtasksByTask(task.id),
+      ]);
+
+      if (taskResult.status === "fulfilled") {
+        setSelectedTask(taskResult.value);
+      }
+
+      if (progressResult.status === "fulfilled") {
+        setProgressByTask((current) => ({ ...current, [task.id]: progressResult.value }));
+      }
+
+      if (subtasksResult.status === "fulfilled") {
+        setSubtasksByTask((current) => ({ ...current, [task.id]: Array.isArray(subtasksResult.value) ? subtasksResult.value : [] }));
+      }
     } catch (err) {
       console.error("Load task details error:", err);
       setError(err.response?.data?.detail || "Impossible de charger les details de la tache.");
@@ -545,6 +655,7 @@ function Tasks() {
 
     setSelectedTask(null);
     setEditingTaskId(task.id);
+    setTaskFormOpen(true);
     setFormData({
       title: task.title || task.titre || "",
       description: task.description || "",
@@ -625,7 +736,8 @@ function Tasks() {
       }
 
       setEditingTaskId("");
-      setFormData(emptyTaskForm);
+      setTaskFormOpen(false);
+      setFormData(getDefaultTaskForm());
       await loadTasks({ showLoading: false });
       dispatchDataChanged(DATA_EVENTS.TASKS_CHANGED);
     } catch (err) {
@@ -980,130 +1092,88 @@ function Tasks() {
     <div className="dashboard-page tasks-page">
       <div className="board-toolbar">
         <div>
-          <h2>Création des tâches</h2>
-          <p>Créer, affecter et suivre les tâches internes de la plateforme.</p>
+          <h2>{isManager ? "Taches du service" : "Gestion des taches"}</h2>
+          <p>Consultez, filtrez et suivez les taches internes de la plateforme.</p>
+        </div>
+        <div className="toolbar-actions page-actions">
+          {canCreateTasks && (
+            <button type="button" className="primary-action" onClick={openCreateTask}>
+              <PlusCircle size={17} />
+              Nouvelle tâche
+            </button>
+          )}
         </div>
       </div>
 
       {message && <p className="notice success">{message}</p>}
       {error && <p className="notice error">{error}</p>}
 
-      <section className="management-grid">
-        {(canCreateTasks || (editingTaskId && canUpdateTasks)) ? (
-        <form className="workspace-panel user-form" onSubmit={handleSubmit}>
+      <section className="task-stats-grid" aria-label="Resume taches">
+        <article className="workspace-panel user-stat-card">
+          <ClipboardList size={20} />
+          <span>Total taches</span>
+          <strong>{taskStats.total}</strong>
+        </article>
+        <article className="workspace-panel user-stat-card">
+          <PlusCircle size={20} />
+          <span>A faire</span>
+          <strong>{taskStats.todo}</strong>
+        </article>
+        <article className="workspace-panel user-stat-card">
+          <GitBranch size={20} />
+          <span>En cours</span>
+          <strong>{taskStats.inProgress}</strong>
+        </article>
+        <article className="workspace-panel user-stat-card">
+          <Edit3 size={20} />
+          <span>Terminees</span>
+          <strong>{taskStats.completed}</strong>
+        </article>
+      </section>
+
+      <section className="management-grid page-stack">
+        <section className="workspace-panel user-list-panel list-card-full page-list-card">
           <div className="panel-title">
-            <h3>{editingTaskId ? "Modifier tache" : "Nouvelle tache"}</h3>
-            {editingTaskId ? (
-              <button type="button" onClick={resetTaskForm}>
-                Annuler
-              </button>
-            ) : (
-              <span>Creation</span>
-            )}
+            <h3>Liste des taches</h3>
+            <span>{recentTasks.length} / {tasks.length} tache(s)</span>
           </div>
 
-          <div className="form-grid">
-            <label>
-              Titre
-              <input name="title" value={formData.title} onChange={handleChange} required />
+          <div className="filters-row task-filters">
+            <label className="search-filter">
+              <ClipboardList size={17} />
+              <input
+                type="search"
+                value={taskSearchQuery}
+                onChange={(event) => setTaskSearchQuery(event.target.value)}
+                placeholder="Rechercher une tache"
+              />
             </label>
-            <label>
-              Projet
-              <select
-                name="project_id"
-                value={formData.project_id}
-                onChange={handleChange}
-                disabled={projectsLoading}
-              >
-                <option value="">
-                  {projectsLoading ? "Chargement des projets..." : "Aucun projet"}
-                </option>
-                {projectOptions.map((project) => (
-                  <option key={project.value} value={project.value}>
-                    {project.label}
-                  </option>
-                ))}
-              </select>
-            </label>
-            <label>
-              Assignée à
-              <select name="assigned_to" value={formData.assigned_to} onChange={handleChange} disabled={usersLoading}>
-                <option value="">Non affectee</option>
-                {formAssignableUsers.map((user) => (
-                  <option key={user.uuid} value={user.uuid}>
-                    {getUserDisplayName(user)}
-                  </option>
-                ))}
-              </select>
-            </label>
-            <label>
-              Service
-              <select
-                name="service_id"
-                value={formData.service_id}
-                onChange={handleChange}
-                disabled={servicesLoading || serviceOptions.length === 0}
-                required
-              >
-                <option value="">
-                  {servicesLoading
-                    ? "Chargement des services..."
-                    : serviceOptions.length
-                      ? "Sélectionner un service"
-                      : "Aucun service disponible"}
-                </option>
+            {isAdmin && (
+              <select value={taskServiceFilter} onChange={(event) => setTaskServiceFilter(event.target.value)}>
+                <option value="">Tous les services</option>
                 {serviceOptions.map((service) => (
                   <option key={service.value} value={service.value}>
                     {service.label}
                   </option>
                 ))}
               </select>
-            </label>
-            <label>
-              Statut
-              <select name="status" value={formData.status} onChange={handleChange}>
-                {statusOptions.map((status) => (
-                  <option key={status.value} value={status.value}>{status.label}</option>
-                ))}
-              </select>
-            </label>
-            <label>
-              Priorité
-              <select name="priority" value={formData.priority} onChange={handleChange}>
-                {priorityOptions.map((priority) => (
-                  <option key={priority.value} value={priority.value}>{priority.label}</option>
-                ))}
-              </select>
-            </label>
-            <label>
-              Échéance
-              <input name="due_date" type="date" value={formData.due_date} onChange={handleChange} />
-            </label>
-          </div>
-
-          <label>
-            Description
-            <textarea name="description" value={formData.description} onChange={handleChange} rows={5} />
-          </label>
-
-          <button className="primary-action" type="submit" disabled={saving}>
-            {saving ? "Enregistrement..." : editingTaskId ? "Modifier la tache" : "Creer la tache"}
-          </button>
-        </form>
-        ) : (
-          <section className="workspace-panel user-form">
-            <div className="panel-title">
-              <h3>Nouvelle tâche</h3>
-              <span>Lecture seule</span>
-            </div>
-            <p className="helper-text">Vous n'avez pas l'autorisation de créer des tâches.</p>
-          </section>
-        )}
-
-        <section className="workspace-panel user-list-panel">
-          <div className="panel-title">
-            <h3>Tâches récentes</h3>
-            <span>{tasks.length} tâche(s)</span>
+            )}
+            <select value={taskStatusFilter} onChange={(event) => setTaskStatusFilter(event.target.value)}>
+              <option value="">Tous les statuts</option>
+              {statusOptions.map((status) => (
+                <option key={status.value} value={status.value}>
+                  {status.label}
+                </option>
+              ))}
+            </select>
+            <select value={taskPriorityFilter} onChange={(event) => setTaskPriorityFilter(event.target.value)}>
+              <option value="">Toutes les priorites</option>
+              {priorityOptions.map((priority) => (
+                <option key={priority.value} value={priority.value}>
+                  {priority.label}
+                </option>
+              ))}
+            </select>
           </div>
 
           <div className="users-table">
@@ -1172,15 +1242,15 @@ function Tasks() {
                     ) : (
                       <small>{getAssignedUserName(task.assigned_to)}</small>
                     )}
-                    <button className="secondary-action compact-action" type="button" onClick={() => handleToggleSubtasks(task.id)}>
-                      <PlusCircle size={15} />
-                      Sous-tache
-                    </button>
                   </span>
                   <span className="task-row-actions">
                     <button type="button" onClick={() => openTaskDetails(task)}>
                       <Eye size={15} />
                       Voir
+                    </button>
+                    <button className="secondary-action compact-action" type="button" onClick={() => handleToggleSubtasks(task.id)}>
+                      <PlusCircle size={15} />
+                      Sous-tâche
                     </button>
                     {canUpdateTasks && (
                       <button type="button" onClick={() => startEditTask(task)}>
@@ -1418,7 +1488,7 @@ function Tasks() {
               <div className="empty-table">
                 <ClipboardList size={32} />
                 <strong>Aucune tâche</strong>
-                <p>Créez une première tâche depuis le formulaire.</p>
+                <p>Créez une première tâche avec le bouton Nouvelle tâche.</p>
               </div>
             )}
 
@@ -1427,10 +1497,130 @@ function Tasks() {
         </section>
       </section>
 
+      {taskFormOpen && (
+        <div className="service-modal-backdrop modal-overlay" role="presentation" onMouseDown={resetTaskForm}>
+          <form
+            className="service-modal modal-card task-form-modal"
+            onSubmit={handleSubmit}
+            onMouseDown={(event) => event.stopPropagation()}
+          >
+            <header className="modal-header">
+              <div>
+                <h3>{editingTaskId ? "Modifier tâche" : "Nouvelle tâche"}</h3>
+                <p>{editingTaskId ? "Mettez a jour les informations de la tache." : "Creez une tache et affectez-la au bon service."}</p>
+              </div>
+              <button type="button" className="service-modal-close" onClick={resetTaskForm} aria-label="Fermer">
+                <X size={18} />
+              </button>
+            </header>
+
+            <div className="modal-body service-modal-form">
+              <div className="form-grid">
+                <label>
+                  Titre
+                  <input name="title" value={formData.title} onChange={handleChange} required />
+                </label>
+                <label>
+                  Projet
+                  <select
+                    name="project_id"
+                    value={formData.project_id}
+                    onChange={handleChange}
+                    disabled={projectsLoading}
+                  >
+                    <option value="">
+                      {projectsLoading ? "Chargement des projets..." : "Aucun projet"}
+                    </option>
+                    {projectOptions.map((project) => (
+                      <option key={project.value} value={project.value}>
+                        {project.label}
+                      </option>
+                    ))}
+                  </select>
+                </label>
+                <label>
+                  Service
+                  <select
+                    name="service_id"
+                    value={formData.service_id}
+                    onChange={handleChange}
+                    disabled={servicesLoading || serviceOptions.length === 0 || isManager}
+                    required
+                  >
+                    <option value="">
+                      {servicesLoading
+                        ? "Chargement des services..."
+                        : serviceOptions.length
+                          ? "Selectionner un service"
+                          : "Aucun service disponible"}
+                    </option>
+                    {serviceOptions.map((service) => (
+                      <option key={service.value} value={service.value}>
+                        {service.label}
+                      </option>
+                    ))}
+                  </select>
+                </label>
+                <label>
+                  Assigne a
+                  <select name="assigned_to" value={formData.assigned_to} onChange={handleChange} disabled={usersLoading}>
+                    <option value="">Non affectee</option>
+                    {formAssignableUsers.map((user) => (
+                      <option key={user.uuid} value={user.uuid}>
+                        {getUserDisplayName(user)}
+                      </option>
+                    ))}
+                  </select>
+                </label>
+                <label>
+                  Priorite
+                  <select name="priority" value={formData.priority} onChange={handleChange}>
+                    {priorityOptions.map((priority) => (
+                      <option key={priority.value} value={priority.value}>{priority.label}</option>
+                    ))}
+                  </select>
+                </label>
+                <label>
+                  Statut
+                  <select name="status" value={formData.status} onChange={handleChange}>
+                    {statusOptions.map((status) => (
+                      <option key={status.value} value={status.value}>{status.label}</option>
+                    ))}
+                  </select>
+                </label>
+                <label>
+                  Date echeance
+                  <input name="due_date" type="date" value={formData.due_date} onChange={handleChange} />
+                </label>
+                <label className="form-field-wide">
+                  Description
+                  <textarea name="description" value={formData.description} onChange={handleChange} rows={5} />
+                </label>
+              </div>
+            </div>
+
+            <footer className="modal-footer form-actions">
+              <button type="button" className="secondary-action" onClick={resetTaskForm}>
+                Annuler
+              </button>
+              <button className="primary-action" type="submit" disabled={saving}>
+                {saving ? "Enregistrement..." : editingTaskId ? "Modifier la tache" : "Creer la tache"}
+              </button>
+            </footer>
+          </form>
+        </div>
+      )}
+
       {selectedTask && (
-        <div className="service-modal-backdrop" role="presentation">
-          <article className="service-modal task-details-modal" role="dialog" aria-modal="true" aria-labelledby="task-details-title">
-            <header>
+        <div className="service-modal-backdrop modal-overlay" role="presentation" onMouseDown={() => setSelectedTask(null)}>
+          <article
+            className="service-modal modal-card task-details-modal"
+            role="dialog"
+            aria-modal="true"
+            aria-labelledby="task-details-title"
+            onMouseDown={(event) => event.stopPropagation()}
+          >
+            <header className="modal-header">
               <div>
                 <h3 id="task-details-title">{selectedTask.title || selectedTask.titre || "Tache"}</h3>
                 <p>{taskDetailsLoading ? "Chargement..." : "Details de la tache"}</p>
@@ -1440,7 +1630,7 @@ function Tasks() {
               </button>
             </header>
 
-            <dl className="details-list compact">
+            <dl className="details-list compact modal-body">
               <div>
                 <dt>Projet</dt>
                 <dd>{projectById[String(selectedTask.project_id || "")] || selectedTask.project_id || "Sans projet"}</dd>
@@ -1471,7 +1661,33 @@ function Tasks() {
               </div>
             </dl>
 
-            <footer>
+            <section className="modal-body task-details-extra">
+              <div className="project-progress project-progress--details">
+                <div>
+                  <span>Progression</span>
+                  <strong>{getProgress(selectedTask.id).progression}%</strong>
+                </div>
+                <div className="progress-bar" aria-label={`Progression ${getProgress(selectedTask.id).progression}%`}>
+                  <i style={{ width: `${getProgress(selectedTask.id).progression}%` }} />
+                </div>
+              </div>
+
+              <div className="modal-subtasks-list">
+                <h4>Sous-taches</h4>
+                {(subtasksByTask[selectedTask.id] || []).length > 0 ? (
+                  (subtasksByTask[selectedTask.id] || []).map((subtask) => (
+                    <article key={subtask.id}>
+                      <strong>{subtask.title || subtask.titre}</strong>
+                      <span>{getOptionLabel(statusOptions, subtask.status || subtask.statut || "Nouveau")}</span>
+                    </article>
+                  ))
+                ) : (
+                  <p className="helper-text">Aucune sous-tache liee.</p>
+                )}
+              </div>
+            </section>
+
+            <footer className="modal-footer">
               {canUpdateTasks && (
                 <button type="button" className="secondary-action" onClick={() => startEditTask(selectedTask)}>
                   <Edit3 size={16} />

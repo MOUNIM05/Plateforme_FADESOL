@@ -108,10 +108,11 @@ function getFieldValue(...values) {
 
 function Users() {
   // Les permissions fines pilotent le mode lecture seule ou administration complete.
-  const { currentUser, hasPermission, logout } = useAuth();
+  const { currentUser, hasPermission } = useAuth();
   const [users, setUsers] = useState([]);
   const [formData, setFormData] = useState(emptyForm);
   const [editingUserId, setEditingUserId] = useState(null);
+  const [userFormOpen, setUserFormOpen] = useState(false);
   const [roleFilter, setRoleFilter] = useState("");
   const [serviceFilter, setServiceFilter] = useState("");
   const [searchQuery, setSearchQuery] = useState("");
@@ -233,6 +234,8 @@ function Users() {
     // Pre-remplit le formulaire avec le profil selectionne.
     setSelectedUser(user);
     setEditingUserId(user.id);
+    setDetailsOpen(false);
+    setUserFormOpen(true);
     setMessage("");
     setError("");
     setFormData({
@@ -249,6 +252,16 @@ function Users() {
   function resetForm() {
     setEditingUserId(null);
     setFormData(emptyForm);
+    setUserFormOpen(false);
+  }
+
+  function openCreateUser() {
+    setEditingUserId(null);
+    setFormData(emptyForm);
+    setDetailsOpen(false);
+    setUserFormOpen(true);
+    setMessage("");
+    setError("");
   }
 
   async function openUserDetails(user) {
@@ -403,13 +416,13 @@ function Users() {
               : "Gestion des comptes internes"}
           </p>
         </div>
-        <div className="toolbar-actions">
-          <button onClick={loadUsers} className="secondary-action" type="button">
-            Actualiser
-          </button>
-          <button onClick={logout} className="logout-action" type="button">
-            Déconnexion
-          </button>
+        <div className="toolbar-actions page-actions">
+          {canCreateUsers && (
+            <button type="button" className="primary-action" onClick={openCreateUser}>
+              <Plus size={17} />
+              Ajouter utilisateur
+            </button>
+          )}
         </div>
       </div>
 
@@ -444,129 +457,8 @@ function Users() {
         </article>
       </section>
 
-      <section className="management-grid">
-        <div className="user-side-stack">
-        {(canCreateUsers || (editingUserId && canUpdateUsers)) && (
-        <form onSubmit={handleSubmit} className="workspace-panel user-form">
-          <div className="panel-title">
-            <h3>{editingUserId ? "Modifier le profil" : "Ajouter utilisateur"}</h3>
-            {editingUserId && <button type="button" onClick={resetForm}>Annuler</button>}
-          </div>
-
-          <div className="form-grid">
-            <label>
-              Prénom
-              <input name="prenom" value={formData.prenom} onChange={handleChange} required />
-            </label>
-            <label>
-              Nom
-              <input name="nom" value={formData.nom} onChange={handleChange} required />
-            </label>
-            <label>
-              Email
-              <input name="email" type="email" value={formData.email} onChange={handleChange} required />
-            </label>
-            {!editingUserId && (
-              <label>
-                Mot de passe
-                <input
-                  name="password"
-                  type="password"
-                  minLength={6}
-                  value={formData.password}
-                  onChange={handleChange}
-                  placeholder="Minimum 6 caractères"
-                  required
-                />
-              </label>
-            )}
-            <label>
-              Rôle
-              <select name="role" value={formData.role} onChange={handleChange}>
-                {roleOptions.map((role) => (
-                  <option key={role.value} value={role.value}>{role.label}</option>
-                ))}
-              </select>
-            </label>
-            <label>
-              Service
-              <select name="id_service" value={formData.id_service} onChange={handleChange}>
-                {serviceOptions.map((service) => (
-                  <option key={service.value || "none"} value={service.value}>
-                    {service.label}
-                  </option>
-                ))}
-              </select>
-            </label>
-          </div>
-
-          <label className="toggle-line">
-            <input name="est_actif" type="checkbox" checked={formData.est_actif} onChange={handleChange} />
-            Compte actif
-          </label>
-
-          <button type="submit" className="primary-action">
-            {editingUserId ? <Edit3 size={17} /> : <Plus size={17} />}
-            {editingUserId ? "Modifier profil" : "Créer utilisateur"}
-          </button>
-        </form>
-        )}
-
-        <section className="workspace-panel selected-profile-card">
-          <div className="panel-title">
-            <h3>Profil sélectionné</h3>
-            {selectedUser && <span>ID #{selectedUser.id}</span>}
-          </div>
-
-          {selectedUser ? (
-            <>
-              <div className="selected-profile-card__head">
-                <div className="profile-avatar-large">{getInitials(selectedUser)}</div>
-                <div>
-                  <h4>{selectedUser.prenom || selectedUser.first_name} {selectedUser.nom || selectedUser.last_name}</h4>
-                  <p>{selectedUser.email}</p>
-                </div>
-              </div>
-
-              <dl className="details-list compact">
-                <div>
-                  <dt>Rôle</dt>
-                  <dd>{getRoleLabel(selectedUser.role)}</dd>
-                </div>
-                <div>
-                  <dt>Service</dt>
-                  <dd>{selectedUser.service || selectedUser.id_service || selectedUser.service_id || "Non affecté"}</dd>
-                </div>
-                <div>
-                  <dt>Statut</dt>
-                  <dd>{selectedUser.est_actif ?? selectedUser.is_active ? "Actif" : "Désactivé"}</dd>
-                </div>
-              </dl>
-
-              {canManageUsers && (
-                <div className="profile-card-actions">
-                  {canUpdateUsers && (
-                    <button type="button" className="secondary-action" onClick={() => startEdit(selectedUser)}>
-                      <Edit3 size={16} />
-                      Modifier
-                    </button>
-                  )}
-                  {canDeleteUsers && (
-                    <button type="button" className="logout-action" onClick={() => handleDelete(selectedUser.id)}>
-                      <Trash2 size={16} />
-                      Supprimer
-                    </button>
-                  )}
-                </div>
-              )}
-            </>
-          ) : (
-            <p className="helper-text">Sélectionnez un utilisateur pour voir son profil ici.</p>
-          )}
-        </section>
-        </div>
-
-        <section className="workspace-panel user-list-panel">
+      <section className="management-grid page-stack">
+        <section className="workspace-panel user-list-panel list-card-full page-list-card">
           <div className="panel-title">
             <h3>Liste des utilisateurs</h3>
             <span>{filteredUsers.length} affiché(s)</span>
@@ -652,6 +544,90 @@ function Users() {
           </div>
         </section>
       </section>
+
+      {userFormOpen && (canCreateUsers || (editingUserId && canUpdateUsers)) && (
+        <div className="service-modal-backdrop modal-overlay" role="presentation" onMouseDown={resetForm}>
+          <form
+            onSubmit={handleSubmit}
+            className="service-modal modal-card user-form-modal"
+            onMouseDown={(event) => event.stopPropagation()}
+          >
+            <header className="modal-header">
+              <div>
+                <h3>{editingUserId ? "Modifier utilisateur" : "Ajouter utilisateur"}</h3>
+                <p>{editingUserId ? "Mettez a jour les informations du compte." : "Creez un compte interne pour la plateforme."}</p>
+              </div>
+              <button type="button" className="service-modal-close" onClick={resetForm} aria-label="Fermer">
+                <X size={18} />
+              </button>
+            </header>
+
+            <div className="modal-body service-modal-form">
+              <div className="form-grid">
+                <label>
+                  Prénom
+                  <input name="prenom" value={formData.prenom} onChange={handleChange} required />
+                </label>
+                <label>
+                  Nom
+                  <input name="nom" value={formData.nom} onChange={handleChange} required />
+                </label>
+                <label>
+                  Email
+                  <input name="email" type="email" value={formData.email} onChange={handleChange} required />
+                </label>
+                {!editingUserId && (
+                  <label>
+                    Mot de passe
+                    <input
+                      name="password"
+                      type="password"
+                      minLength={6}
+                      value={formData.password}
+                      onChange={handleChange}
+                      placeholder="Minimum 6 caractères"
+                      required
+                    />
+                  </label>
+                )}
+                <label>
+                  Rôle
+                  <select name="role" value={formData.role} onChange={handleChange}>
+                    {roleOptions.map((role) => (
+                      <option key={role.value} value={role.value}>{role.label}</option>
+                    ))}
+                  </select>
+                </label>
+                <label>
+                  Service
+                  <select name="id_service" value={formData.id_service} onChange={handleChange}>
+                    {serviceOptions.map((service) => (
+                      <option key={service.value || "none"} value={service.value}>
+                        {service.label}
+                      </option>
+                    ))}
+                  </select>
+                </label>
+              </div>
+
+              <label className="toggle-line">
+                <input name="est_actif" type="checkbox" checked={formData.est_actif} onChange={handleChange} />
+                Compte actif
+              </label>
+            </div>
+
+            <footer className="modal-footer form-actions">
+              <button type="button" className="secondary-action" onClick={resetForm}>
+                Annuler
+              </button>
+              <button type="submit" className="primary-action">
+                {editingUserId ? <Edit3 size={17} /> : <Plus size={17} />}
+                {editingUserId ? "Modifier utilisateur" : "Créer utilisateur"}
+              </button>
+            </footer>
+          </form>
+        </div>
+      )}
 
       {detailsOpen && (
         <div
