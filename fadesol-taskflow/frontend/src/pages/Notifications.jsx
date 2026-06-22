@@ -6,14 +6,26 @@ import { useAuth } from "../context/AuthContext";
 import { getMessages, markMessageAsRead } from "../services/messageService";
 import { getTasks } from "../services/taskService";
 import { getMyUserProfile, getUsers } from "../services/userService";
+import { loadUserPreferences } from "../utils/userPreferences";
 
 function getUserIdentifiers(user) {
   // Regroupe les identifiants possibles pour reconnaitre le compte courant.
   return new Set(
-    [user?.uuid, user?.id, user?.user_id]
+    [user?.uuid, user?.id, user?.user_id, user?.utilisateur_id, user?.email]
       .filter((value) => value !== undefined && value !== null && value !== "")
       .map(String)
   );
+}
+
+function getTaskAssigneeValues(task) {
+  return [
+    task?.assigned_to,
+    task?.assigned_user_id,
+    task?.assignee_id,
+    task?.assignee_a,
+    task?.user_id,
+    task?.responsable_id,
+  ].filter((value) => value !== undefined && value !== null && value !== "");
 }
 
 function getUserName(user) {
@@ -43,6 +55,7 @@ function Notifications() {
   const [tasks, setTasks] = useState([]);
   const [users, setUsers] = useState([]);
   const [profile, setProfile] = useState(null);
+  const [preferences, setPreferences] = useState(() => loadUserPreferences(currentUser));
   const [loading, setLoading] = useState(true);
   const [message, setMessage] = useState("");
   const [error, setError] = useState("");
@@ -63,7 +76,11 @@ function Notifications() {
 
   const buildNotifications = useMemo(() => {
     // Transforme messages et taches en une liste unique triee par date.
-    const messageNotifications = (messages || [])
+    if (!preferences.notificationsEnabled) {
+      return [];
+    }
+
+    const messageNotifications = preferences.messageNotifications ? (messages || [])
       .map((m) => ({
         id: `message-${m.id}`,
         type: "message",
@@ -73,9 +90,9 @@ function Notifications() {
         unread: !m.est_lu,
         meta: m,
       }))
-      .filter(Boolean);
+      .filter(Boolean) : [];
 
-    const taskNotifications = (tasks || [])
+    const taskNotifications = preferences.taskNotifications ? (tasks || [])
       .map((t) => ({
         id: `task-${t.id}`,
         type: "task",
@@ -85,12 +102,12 @@ function Notifications() {
         unread: false,
         meta: t,
       }))
-      .filter(Boolean);
+      .filter(Boolean) : [];
 
     const all = [...messageNotifications, ...taskNotifications];
 
     return all.sort((a, b) => new Date(b.date || 0).getTime() - new Date(a.date || 0).getTime());
-  }, [messages, tasks]);
+  }, [messages, preferences, tasks]);
 
   const unreadMessages = useMemo(() => buildNotifications.filter((n) => n.type === "message" && n.unread), [buildNotifications]);
 
@@ -151,6 +168,20 @@ function Notifications() {
     loadNotifications();
   }, []);
 
+  useEffect(() => {
+    function handleSettingsChanged(event) {
+      setPreferences(event.detail?.preferences || loadUserPreferences(currentUser));
+    }
+
+    window.addEventListener("fadesol-user-settings-changed", handleSettingsChanged);
+
+    return () => window.removeEventListener("fadesol-user-settings-changed", handleSettingsChanged);
+  }, [currentUser]);
+
+  useEffect(() => {
+    setPreferences(loadUserPreferences(currentUser));
+  }, [currentUser]);
+
   async function markOneAsRead(messageId) {
     // Marque une notification message comme lue.
     setMessage("");
@@ -196,9 +227,14 @@ function Notifications() {
     if (notification.type === "task") {
       const taskId = notification.meta?.id || notification.meta?.task_id;
       if (taskId) {
-        navigate(`/tasks?taskId=${taskId}`);
+        const role = profile?.role || currentUser?.role || "";
+        const normalizedRole = String(role).toLowerCase();
+        const isPersonalTask = getTaskAssigneeValues(notification.meta).some((value) => userIds.has(String(value)));
+        const shouldOpenMyTasks = isPersonalTask && (normalizedRole.includes("manager") || normalizedRole.includes("employee") || normalizedRole.includes("employ"));
+
+        navigate(`${shouldOpenMyTasks ? "/my-tasks" : "/tasks"}?taskId=${taskId}`);
       } else {
-        navigate("/tasks");
+        navigate("/notifications");
       }
       return;
     }
@@ -214,6 +250,8 @@ function Notifications() {
       }
       return;
     }
+
+    navigate("/notifications");
   }
 
   return (

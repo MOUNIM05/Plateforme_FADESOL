@@ -117,6 +117,36 @@ function normalizeServiceKey(value) {
     .toLowerCase();
 }
 
+function normalizeProgressStatus(value) {
+  return normalizeServiceKey(value);
+}
+
+function getProgressFromStatus(status, existingProgress = 0) {
+  const normalized = normalizeProgressStatus(status);
+
+  if (["nouveau", "afaire"].includes(normalized)) {
+    return 0;
+  }
+
+  if (normalized.includes("encours")) {
+    return 50;
+  }
+
+  if (normalized.includes("bloqu")) {
+    return 25;
+  }
+
+  if (normalized.startsWith("termin") || normalized === "done") {
+    return 100;
+  }
+
+  if (normalized.startsWith("annul")) {
+    return Number(existingProgress) || 0;
+  }
+
+  return Number(existingProgress) || 0;
+}
+
 function serviceMatchesManager(service, managerServiceValue) {
   const managerKey = normalizeServiceKey(managerServiceValue);
 
@@ -150,6 +180,27 @@ function userMatchesService(user, serviceValue, serviceLabel) {
   ].some((value) => serviceKeys.includes(normalizeServiceKey(value)));
 }
 
+function getUserIdentityValues(user) {
+  return [
+    user?.id,
+    user?.uuid,
+    user?.user_id,
+    user?.utilisateur_id,
+    user?.email,
+  ].filter((value) => value !== undefined && value !== null && value !== "");
+}
+
+function getTaskAssigneeValues(task) {
+  return [
+    task?.assigned_to,
+    task?.assigned_user_id,
+    task?.assignee_id,
+    task?.assignee_a,
+    task?.user_id,
+    task?.responsable_id,
+  ].filter((value) => value !== undefined && value !== null && value !== "");
+}
+
 function getUserDisplayName(user) {
   const fullName = [user.prenom || user.first_name, user.nom || user.last_name].filter(Boolean).join(" ");
 
@@ -177,6 +228,7 @@ function Tasks() {
     currentUser?.service_name ||
     currentUser?.nom_service ||
     "";
+  const currentUserIds = useMemo(() => getUserIdentityValues(currentUser).map(String), [currentUser]);
   const [searchParams] = useSearchParams();
 
   const isAdmin = role === "Admin" || role === "Administrateur";
@@ -218,6 +270,12 @@ function Tasks() {
   const [message, setMessage] = useState("");
   const [error, setError] = useState("");
 
+  function isTaskAssignedToCurrentUser(task) {
+    const assigneeValues = getTaskAssigneeValues(task).map(String);
+
+    return assigneeValues.some((value) => currentUserIds.includes(value));
+  }
+
   async function loadTasks({ showLoading = true } = {}) {
     // Charge les taches selon le role : Employee = ses taches, Manager = son service, Admin = tout.
     setError("");
@@ -232,6 +290,10 @@ function Tasks() {
       };
       const data = await getTasks(filters);
       let taskData = Array.isArray(data) ? data : [];
+
+      if (isManager) {
+        taskData = taskData.filter((task) => !isTaskAssignedToCurrentUser(task));
+      }
 
       setTasks(
         [...taskData].sort((firstTask, secondTask) => {
@@ -353,7 +415,9 @@ function Tasks() {
 
         if (!isMounted) return;
 
-        if (isAdmin || isManager) {
+        if (isManager && isTaskAssignedToCurrentUser(taskData)) {
+          navigate(`/my-tasks?taskId=${taskId}`, { replace: true });
+        } else if (isAdmin || isManager) {
           setSelectedTask(taskData);
         } else {
           setError("Élément introuvable ou non autorisé.");
@@ -369,7 +433,7 @@ function Tasks() {
     return () => {
       isMounted = false;
     };
-  }, [searchParams, tasks, isEmployee, isManager, isAdmin, currentServiceId]);
+  }, [searchParams, tasks, isEmployee, isManager, isAdmin, currentServiceId, currentUserIds, navigate]);
 
   useEffect(() => {
     return subscribeDataEvents([DATA_EVENTS.PROJECTS_CHANGED], loadProjects);
@@ -404,6 +468,10 @@ function Tasks() {
     const query = taskSearchQuery.trim().toLowerCase();
 
     return tasks.filter((task) => {
+      if (isManager && isTaskAssignedToCurrentUser(task)) {
+        return false;
+      }
+
       const searchable = [
         task.title,
         task.titre,
@@ -426,7 +494,7 @@ function Tasks() {
 
       return matchesSearch && matchesService && matchesStatus && matchesPriority;
     });
-  }, [taskPriorityFilter, taskSearchQuery, taskServiceFilter, taskStatusFilter, tasks]);
+  }, [isManager, taskPriorityFilter, taskSearchQuery, taskServiceFilter, taskStatusFilter, tasks, currentUserIds]);
 
   useEffect(() => {
     // Calcule la progression des taches visibles a partir de leurs sous-taches.
@@ -553,6 +621,39 @@ function Tasks() {
       total_subtasks: 0,
       completed_subtasks: 0,
       progression: 0,
+    };
+  }
+
+  function getTaskProgressInfo(task) {
+    const apiProgress = getProgress(task.id);
+    const subtasks =
+      task.subtasks ||
+      task.sous_taches ||
+      task.sousTasks ||
+      subtasksByTask[task.id] ||
+      [];
+    const hasSubtasks = Number(apiProgress.total_subtasks) > 0 || (Array.isArray(subtasks) && subtasks.length > 0);
+
+    if (hasSubtasks) {
+      if (Number(apiProgress.total_subtasks) > 0) {
+        return apiProgress;
+      }
+
+      const completed = subtasks.filter((subtask) => getProgressFromStatus(subtask.status || subtask.statut) === 100).length;
+
+      return {
+        total_subtasks: subtasks.length,
+        completed_subtasks: completed,
+        progression: Math.round((completed / subtasks.length) * 100),
+      };
+    }
+
+    const existingProgress = task.progression ?? task.progress ?? apiProgress.progression ?? 0;
+
+    return {
+      total_subtasks: 0,
+      completed_subtasks: 0,
+      progression: getProgressFromStatus(task.status || task.statut, existingProgress),
     };
   }
 
@@ -760,7 +861,12 @@ function Tasks() {
 
     try {
       const updatedTask = await assignTask(taskId, assignedTo);
-      setTasks((current) => current.map((task) => (task.id === taskId ? updatedTask : task)));
+      setTasks((current) =>
+        current
+          .map((task) => (task.id === taskId ? updatedTask : task))
+          .filter((task) => !(isManager && isTaskAssignedToCurrentUser(task)))
+      );
+      setSelectedTask((current) => (current?.id === taskId && isTaskAssignedToCurrentUser(updatedTask) ? null : current));
       setMessage("Tache affectee avec succes.");
       dispatchDataChanged(DATA_EVENTS.TASKS_CHANGED);
     } catch (err) {
@@ -779,7 +885,8 @@ function Tasks() {
 
     try {
       const updatedTask = await updateTaskStatus(taskId, status);
-      setTasks((current) => current.map((task) => (task.id === taskId ? updatedTask : task)));
+      setTasks((current) => current.map((task) => (task.id === taskId ? { ...task, ...updatedTask, status } : task)));
+      setSelectedTask((current) => (current?.id === taskId ? { ...current, ...updatedTask, status } : current));
       setMessage("Statut mis a jour avec succes.");
       dispatchDataChanged(DATA_EVENTS.TASKS_CHANGED);
     } catch (err) {
@@ -1189,7 +1296,10 @@ function Tasks() {
               <span>Actions</span>
             </div>
 
-            {recentTasks.map((task) => (
+            {recentTasks.map((task) => {
+              const taskProgress = getTaskProgressInfo(task);
+
+              return (
               <Fragment key={task.id}>
                 <div className="table-row">
                   <span>{task.title}</span>
@@ -1215,12 +1325,12 @@ function Tasks() {
                   </span>
                   <span>{getOptionLabel(priorityOptions, task.priority)}</span>
                   <span className="task-progress-cell">
-                    <strong>{getProgress(task.id).progression}%</strong>
+                    <strong>{taskProgress.progression}%</strong>
                     <small>
-                      {getProgress(task.id).completed_subtasks} / {getProgress(task.id).total_subtasks} sous-taches terminees
+                      {taskProgress.completed_subtasks} / {taskProgress.total_subtasks} sous-taches terminees
                     </small>
                     <i>
-                      <b style={{ width: `${getProgress(task.id).progression}%` }} />
+                      <b style={{ width: `${taskProgress.progression}%` }} />
                     </i>
                   </span>
                   <span>{task.due_date || "Aucune"}</span>
@@ -1482,7 +1592,8 @@ function Tasks() {
                   </div>
                 )}
               </Fragment>
-            ))}
+              );
+            })}
 
             {!loading && recentTasks.length === 0 && (
               <div className="empty-table">
@@ -1665,10 +1776,10 @@ function Tasks() {
               <div className="project-progress project-progress--details">
                 <div>
                   <span>Progression</span>
-                  <strong>{getProgress(selectedTask.id).progression}%</strong>
+                  <strong>{getTaskProgressInfo(selectedTask).progression}%</strong>
                 </div>
-                <div className="progress-bar" aria-label={`Progression ${getProgress(selectedTask.id).progression}%`}>
-                  <i style={{ width: `${getProgress(selectedTask.id).progression}%` }} />
+                <div className="progress-bar" aria-label={`Progression ${getTaskProgressInfo(selectedTask).progression}%`}>
+                  <i style={{ width: `${getTaskProgressInfo(selectedTask).progression}%` }} />
                 </div>
               </div>
 

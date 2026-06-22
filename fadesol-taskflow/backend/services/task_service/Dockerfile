@@ -1,5 +1,5 @@
 # Image du microservice taches.
-FROM python:3.11-slim
+FROM public.ecr.aws/docker/library/python:3.11-slim
 
 WORKDIR /app
 

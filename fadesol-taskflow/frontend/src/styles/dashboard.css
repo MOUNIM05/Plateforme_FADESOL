@@ -5581,3 +5581,690 @@
     flex-direction: column;
   }
 }
+
+/* Préférences utilisateur globales : thème sombre, affichage compact et avatars. */
+:root.theme-dark .dashboard-shell,
+:root.theme-dark .dashboard-main,
+:root.theme-dark .dashboard-page,
+:root.theme-dark .settings-page,
+:root.theme-dark .users-view {
+  background: #0f172a;
+  color: #e5e7eb;
+}
+
+:root.theme-dark .main-sidebar,
+:root.theme-dark .workspace-panel,
+:root.theme-dark .board-toolbar,
+:root.theme-dark .service-modal,
+:root.theme-dark .modal-card,
+:root.theme-dark .user-details-modal,
+:root.theme-dark .notification-dropdown,
+:root.theme-dark .messages-sidebar-panel,
+:root.theme-dark .messages-chat-panel,
+:root.theme-dark .conversation-item,
+:root.theme-dark .table-row,
+:root.theme-dark .project-tracking-card,
+:root.theme-dark .my-task-card,
+:root.theme-dark .service-admin-card,
+:root.theme-dark .service-summary-card,
+:root.theme-dark .info-card,
+:root.theme-dark .settings-summary-card,
+:root.theme-dark .settings-panel,
+:root.theme-dark .settings-save-panel,
+:root.theme-dark .settings-health-panel,
+:root.theme-dark .permissions-panel,
+:root.theme-dark .user-list-panel,
+:root.theme-dark .profile-card-main,
+:root.theme-dark .empty-state-panel {
+  background: #111827;
+  border-color: #334155;
+  color: #e5e7eb;
+  box-shadow: 0 18px 44px rgba(0, 0, 0, 0.28);
+}
+
+:root.theme-dark .sidebar-brand,
+:root.theme-dark .sidebar-profile,
+:root.theme-dark .service-modal header,
+:root.theme-dark .service-modal footer,
+:root.theme-dark .modal-header,
+:root.theme-dark .modal-footer,
+:root.theme-dark .user-details-modal__header,
+:root.theme-dark .user-details-modal__footer,
+:root.theme-dark .messages-sidebar-header,
+:root.theme-dark .messages-chat-header,
+:root.theme-dark .panel-title,
+:root.theme-dark .settings-switch,
+:root.theme-dark .permission-toggle-row,
+:root.theme-dark .modal-list-row,
+:root.theme-dark .modal-subtasks-list article,
+:root.theme-dark .attachment-item,
+:root.theme-dark .subtask-item {
+  border-color: #334155;
+}
+
+:root.theme-dark h1,
+:root.theme-dark h2,
+:root.theme-dark h3,
+:root.theme-dark h4,
+:root.theme-dark h5,
+:root.theme-dark strong,
+:root.theme-dark .sidebar-brand strong,
+:root.theme-dark .sidebar-profile strong,
+:root.theme-dark .panel-title h3,
+:root.theme-dark .settings-summary-card strong,
+:root.theme-dark .project-card-main strong,
+:root.theme-dark .my-task-card h3,
+:root.theme-dark .table-row > span strong,
+:root.theme-dark .conversation-item strong,
+:root.theme-dark .service-modal h3,
+:root.theme-dark .details-list dd,
+:root.theme-dark .project-progress strong {
+  color: #f8fafc;
+}
+
+:root.theme-dark p,
+:root.theme-dark small,
+:root.theme-dark span,
+:root.theme-dark time,
+:root.theme-dark .board-toolbar p,
+:root.theme-dark .sidebar-brand span,
+:root.theme-dark .sidebar-profile span,
+:root.theme-dark .project-card-main p,
+:root.theme-dark .my-task-card p,
+:root.theme-dark .conversation-item p,
+:root.theme-dark .notification-dropdown article p,
+:root.theme-dark .details-list dt,
+:root.theme-dark .helper-text {
+  color: #cbd5e1;
+}
+
+:root.theme-dark input,
+:root.theme-dark select,
+:root.theme-dark textarea,
+:root.theme-dark .search-filter,
+:root.theme-dark .messages-search,
+:root.theme-dark .permissions-search,
+:root.theme-dark .settings-input-with-unit {
+  background: #0f172a;
+  border-color: #334155;
+  color: #e5e7eb;
+}
+
+:root.theme-dark input::placeholder,
+:root.theme-dark textarea::placeholder {
+  color: #94a3b8;
+}
+
+:root.theme-dark input:focus,
+:root.theme-dark select:focus,
+:root.theme-dark textarea:focus {
+  border-color: #22c55e;
+  box-shadow: 0 0 0 3px rgba(34, 197, 94, 0.18);
+}
+
+:root.theme-dark .secondary-action,
+:root.theme-dark .icon-button,
+:root.theme-dark .sidebar-collapse,
+:root.theme-dark .account-menu__trigger,
+:root.theme-dark .conversation-item:hover,
+:root.theme-dark .conversation-item.is-selected,
+:root.theme-dark .notification-dropdown article.is-unread,
+:root.theme-dark .table-row:hover,
+:root.theme-dark .permissions-users-list button,
+:root.theme-dark .progress-editor select {
+  background: #1e293b;
+  border-color: #334155;
+  color: #e5e7eb;
+}
+
+:root.theme-dark .secondary-action:hover,
+:root.theme-dark .icon-button:hover,
+:root.theme-dark .sidebar-collapse:hover,
+:root.theme-dark .sidebar-section button:hover,
+:root.theme-dark .sidebar-section button.is-active {
+  background: #064e3b;
+  color: #dcfce7;
+}
+
+:root.theme-dark .primary-action,
+:root.theme-dark .primary-action span,
+:root.theme-dark .logout-action {
+  color: #ffffff;
+}
+
+:root.theme-dark .sidebar-section h3,
+:root.theme-dark .sidebar-section button {
+  color: #cbd5e1;
+}
+
+:root.theme-dark .sidebar-section button.is-active::before {
+  background: #22c55e;
+}
+
+:root.theme-dark .service-modal-backdrop,
+:root.theme-dark .modal-overlay,
+:root.theme-dark .user-details-modal-backdrop {
+  background: rgba(2, 6, 23, 0.72);
+}
+
+:root.theme-dark .progress-bar,
+:root.theme-dark .my-task-progress i {
+  background: #334155;
+}
+
+:root.theme-dark .message-bubble {
+  background: #1e293b;
+  color: #e5e7eb;
+}
+
+:root.theme-dark .message-bubble-row.is-mine .message-bubble {
+  background: #166534;
+  color: #f0fdf4;
+}
+
+:root.theme-dark .notice.success {
+  background: #052e16;
+  border-color: #166534;
+  color: #bbf7d0;
+}
+
+:root.theme-dark .notice.error,
+:root.theme-dark .notice.warning {
+  background: #451a03;
+  border-color: #92400e;
+  color: #fed7aa;
+}
+
+:root.theme-dark .settings-summary-card svg,
+:root.theme-dark .user-stat-card svg,
+:root.theme-dark .project-card-icon,
+:root.theme-dark .profile-avatar-large,
+:root.theme-dark .message-avatar,
+:root.theme-dark .sidebar-avatar,
+:root.theme-dark .header-avatar,
+:root.theme-dark .account-menu__avatar,
+:root.theme-dark .activity-avatar {
+  background: #064e3b;
+  color: #bbf7d0;
+}
+
+/* Dashboard : lisibilite complete des cartes, graphiques et KPI en mode sombre. */
+:root.theme-dark .kpi-card,
+:root.theme-dark .dashboard-card,
+:root.theme-dark .analytics-chart-card,
+:root.theme-dark .global-progress-panel,
+:root.theme-dark .services-overview-card,
+:root.theme-dark .service-detail-card,
+:root.theme-dark .members-workload-table-card,
+:root.theme-dark .members-workload-chart-card,
+:root.theme-dark .workload-card,
+:root.theme-dark .calendar-card,
+:root.theme-dark .realtime-card {
+  background: #111827;
+  border-color: #334155;
+  color: #f8fafc;
+  box-shadow: 0 18px 44px rgba(0, 0, 0, 0.28);
+}
+
+:root.theme-dark .kpi-card:hover,
+:root.theme-dark .dashboard-card:hover,
+:root.theme-dark .workspace-panel:hover {
+  border-color: #475569;
+  box-shadow: 0 20px 48px rgba(0, 0, 0, 0.34);
+}
+
+:root.theme-dark .kpi-card p,
+:root.theme-dark .card-header p,
+:root.theme-dark .dashboard-card p,
+:root.theme-dark .analytics-chart-row,
+:root.theme-dark .chart-legend,
+:root.theme-dark .legend-list div,
+:root.theme-dark .workload-legend div,
+:root.theme-dark .service-table__head,
+:root.theme-dark .service-table__row,
+:root.theme-dark .service-dashboard-table__head,
+:root.theme-dark .service-dashboard-table__row,
+:root.theme-dark .members-workload-table__head,
+:root.theme-dark .members-workload-table__row,
+:root.theme-dark .members-workload-chart span,
+:root.theme-dark .service-overview-kpis span,
+:root.theme-dark .service-detail-stats span,
+:root.theme-dark .urgent-list span,
+:root.theme-dark .urgent-list time,
+:root.theme-dark .realtime-list p,
+:root.theme-dark .realtime-list span,
+:root.theme-dark .event-row span,
+:root.theme-dark .line-chart__labels,
+:root.theme-dark .donut-chart span,
+:root.theme-dark .gauge-ring span {
+  color: #cbd5e1;
+}
+
+:root.theme-dark .kpi-card strong,
+:root.theme-dark .card-header h2,
+:root.theme-dark .panel-title h3,
+:root.theme-dark .analytics-chart-row strong,
+:root.theme-dark .legend-list strong,
+:root.theme-dark .workload-legend strong,
+:root.theme-dark .service-table__row strong,
+:root.theme-dark .service-dashboard-table__row strong,
+:root.theme-dark .members-workload-table__row strong,
+:root.theme-dark .members-workload-chart strong,
+:root.theme-dark .service-overview-kpis strong,
+:root.theme-dark .service-detail-stats strong,
+:root.theme-dark .urgent-list strong,
+:root.theme-dark .realtime-list strong,
+:root.theme-dark .event-row strong,
+:root.theme-dark .donut-chart strong,
+:root.theme-dark .gauge-ring strong {
+  color: #ffffff;
+}
+
+:root.theme-dark .kpi-card__icon.is-green,
+:root.theme-dark .kpi-card__trend.is-green,
+:root.theme-dark .status-badge {
+  background: #064e3b;
+  color: #bbf7d0;
+}
+
+:root.theme-dark .kpi-card__icon.is-blue,
+:root.theme-dark .kpi-card__trend.is-blue,
+:root.theme-dark .priority-pill.is-moyenne {
+  background: #1e3a8a;
+  color: #bfdbfe;
+}
+
+:root.theme-dark .kpi-card__icon.is-purple,
+:root.theme-dark .kpi-card__trend.is-purple {
+  background: #3b0764;
+  color: #e9d5ff;
+}
+
+:root.theme-dark .kpi-card__icon.is-orange,
+:root.theme-dark .kpi-card__trend.is-orange,
+:root.theme-dark .priority-pill.is-haute {
+  background: #7c2d12;
+  color: #fed7aa;
+}
+
+:root.theme-dark .kpi-card__icon.is-red,
+:root.theme-dark .kpi-card__trend.is-red,
+:root.theme-dark .priority-pill.is-urgente {
+  background: #7f1d1d;
+  color: #fecaca;
+}
+
+:root.theme-dark .kpi-card__sparkline i,
+:root.theme-dark .progress-bar i,
+:root.theme-dark .analytics-chart-track i,
+:root.theme-dark .members-workload-chart i {
+  background: linear-gradient(90deg, #22c55e, #86efac);
+}
+
+:root.theme-dark .progress-bar,
+:root.theme-dark .analytics-chart-track,
+:root.theme-dark .service-dashboard-table__row .progress-bar,
+:root.theme-dark .members-workload-table__row .progress-bar,
+:root.theme-dark .members-workload-chart > div > div {
+  background: #334155;
+}
+
+:root.theme-dark .chart-grid-line {
+  stroke: #334155;
+}
+
+:root.theme-dark .chart-dot {
+  stroke: #0f172a;
+}
+
+:root.theme-dark .donut-chart::after,
+:root.theme-dark .gauge-ring > div {
+  background: #111827;
+  box-shadow: inset 0 0 0 1px #334155;
+}
+
+:root.theme-dark .gauge-ring {
+  background: conic-gradient(#22c55e 0 68%, #334155 68% 100%);
+}
+
+:root.theme-dark .service-overview-kpis div,
+:root.theme-dark .service-detail-stats div,
+:root.theme-dark .members-workload-summary div,
+:root.theme-dark .service-dashboard-table__row,
+:root.theme-dark .members-workload-table__row,
+:root.theme-dark .event-days article,
+:root.theme-dark .members-workload-empty {
+  background: #1e293b;
+  border-color: #334155;
+  color: #e5e7eb;
+}
+
+:root.theme-dark .service-dashboard-table__row:hover,
+:root.theme-dark .service-dashboard-table__row.is-selected {
+  background: #064e3b;
+  border-color: rgba(34, 197, 94, 0.45);
+}
+
+:root.theme-dark .realtime-list article,
+:root.theme-dark .urgent-list article,
+:root.theme-dark .event-row {
+  border-color: #334155;
+}
+
+:root.theme-dark .date-selector {
+  background: #111827;
+  border-color: #334155;
+  color: #e5e7eb;
+}
+
+/* Couche globale : evite les fonds blancs residuels et les textes illisibles en theme sombre. */
+:root.theme-dark,
+:root.theme-dark body,
+:root.theme-dark #root {
+  background: #0f172a;
+  color: #f8fafc;
+}
+
+:root.theme-dark .board-toolbar,
+:root.theme-dark .page-header,
+:root.theme-dark .page-list-card,
+:root.theme-dark .list-card-full,
+:root.theme-dark .notifications-panel,
+:root.theme-dark .permissions-card,
+:root.theme-dark .permissions-users-list,
+:root.theme-dark .permissions-table,
+:root.theme-dark .module-grid .info-card,
+:root.theme-dark .project-list article,
+:root.theme-dark .project-details-card,
+:root.theme-dark .task-list-compact div,
+:root.theme-dark .task-row,
+:root.theme-dark .subtask-panel,
+:root.theme-dark .subtask-form,
+:root.theme-dark .subtask-row,
+:root.theme-dark .subtask-item,
+:root.theme-dark .attachments-panel,
+:root.theme-dark .attachment-upload,
+:root.theme-dark .attachment-item,
+:root.theme-dark .modal-section,
+:root.theme-dark .modal-list-row,
+:root.theme-dark .empty-table,
+:root.theme-dark .messages-whatsapp-shell,
+:root.theme-dark .messages-chat-header,
+:root.theme-dark .messages-chat-history,
+:root.theme-dark .messages-chat-composer,
+:root.theme-dark .messages-chat-empty,
+:root.theme-dark .messages-empty,
+:root.theme-dark .notification-item,
+:root.theme-dark .notification-dropdown header,
+:root.theme-dark .notification-dropdown__footer,
+:root.theme-dark .account-menu__dropdown,
+:root.theme-dark .user-details-grid div,
+:root.theme-dark .user-permission-summary,
+:root.theme-dark .settings-switch,
+:root.theme-dark .preference-switch,
+:root.theme-dark .settings-health-panel div,
+:root.theme-dark .permission-toggle-row,
+:root.theme-dark .permissions-table__row,
+:root.theme-dark .settings-input-with-unit {
+  background: #111827;
+  border-color: #334155;
+  color: #f8fafc;
+}
+
+:root.theme-dark .settings-switch,
+:root.theme-dark .preference-switch,
+:root.theme-dark .settings-health-panel div,
+:root.theme-dark .permission-toggle-row,
+:root.theme-dark .user-details-grid div,
+:root.theme-dark .task-list-compact div,
+:root.theme-dark .subtask-panel,
+:root.theme-dark .subtask-form,
+:root.theme-dark .subtask-item,
+:root.theme-dark .modal-list-row,
+:root.theme-dark .notification-item,
+:root.theme-dark .empty-table,
+:root.theme-dark .messages-empty,
+:root.theme-dark .messages-chat-empty {
+  background: #1e293b;
+}
+
+:root.theme-dark .table-head,
+:root.theme-dark .permissions-table__head,
+:root.theme-dark .service-table__head,
+:root.theme-dark .service-dashboard-table__head,
+:root.theme-dark .members-workload-table__head,
+:root.theme-dark .task-list-compact span,
+:root.theme-dark .subtask-panel-title span,
+:root.theme-dark .subtask-panel-title small,
+:root.theme-dark .subtask-empty,
+:root.theme-dark .notification-item p,
+:root.theme-dark .notification-item time,
+:root.theme-dark .settings-switch span,
+:root.theme-dark .settings-switch small,
+:root.theme-dark .preference-switch span,
+:root.theme-dark .preference-switch small,
+:root.theme-dark .permission-toggle-row span,
+:root.theme-dark .permission-toggle-row small,
+:root.theme-dark .user-details-grid dt,
+:root.theme-dark .user-permission-summary span,
+:root.theme-dark .empty-table p,
+:root.theme-dark .messages-empty,
+:root.theme-dark .messages-chat-empty,
+:root.theme-dark .message-meta,
+:root.theme-dark .presence-text {
+  color: #cbd5e1;
+}
+
+:root.theme-dark .table-row > span,
+:root.theme-dark .table-row mark,
+:root.theme-dark .permissions-table__row,
+:root.theme-dark .permissions-table__row strong,
+:root.theme-dark .project-list strong,
+:root.theme-dark .project-list span,
+:root.theme-dark .project-list mark,
+:root.theme-dark .task-list-compact strong,
+:root.theme-dark .subtask-item strong,
+:root.theme-dark .subtask-item span,
+:root.theme-dark .modal-list-row strong,
+:root.theme-dark .modal-list-row span,
+:root.theme-dark .notification-item strong,
+:root.theme-dark .account-menu__dropdown button,
+:root.theme-dark .user-details-grid dd,
+:root.theme-dark .settings-switch strong,
+:root.theme-dark .preference-switch strong,
+:root.theme-dark .settings-health-panel strong,
+:root.theme-dark .empty-table strong {
+  color: #f8fafc;
+}
+
+:root.theme-dark .filters-row select,
+:root.theme-dark .filters-row input,
+:root.theme-dark .search-field,
+:root.theme-dark .search-field input,
+:root.theme-dark .service-modal-form input,
+:root.theme-dark .service-modal-form select,
+:root.theme-dark .service-modal-form textarea,
+:root.theme-dark .user-form input,
+:root.theme-dark .user-form select,
+:root.theme-dark .user-form textarea,
+:root.theme-dark .settings-form-grid input,
+:root.theme-dark .settings-form-grid select,
+:root.theme-dark .subtask-assignment-controls select,
+:root.theme-dark .subtask-form input,
+:root.theme-dark .subtask-form select,
+:root.theme-dark .subtask-form textarea,
+:root.theme-dark .assignment-select,
+:root.theme-dark .status-select,
+:root.theme-dark .messages-chat-composer textarea {
+  background: #0f172a;
+  border-color: #334155;
+  color: #f8fafc;
+}
+
+:root.theme-dark select option {
+  background: #0f172a;
+  color: #f8fafc;
+}
+
+:root.theme-dark .filters-row select:disabled,
+:root.theme-dark .assignment-select:disabled,
+:root.theme-dark input:disabled,
+:root.theme-dark select:disabled,
+:root.theme-dark textarea:disabled {
+  background: #1e293b;
+  color: #94a3b8;
+  opacity: 1;
+}
+
+:root.theme-dark .row-actions button,
+:root.theme-dark .task-row-actions button,
+:root.theme-dark .project-details-title-actions button,
+:root.theme-dark .service-modal-close,
+:root.theme-dark .user-details-modal__close,
+:root.theme-dark .messages-chat-composer button,
+:root.theme-dark .notification-item button,
+:root.theme-dark .notification-dropdown__footer,
+:root.theme-dark .account-menu__dropdown button {
+  background: #1e293b;
+  border-color: #334155;
+  color: #f8fafc;
+}
+
+:root.theme-dark .row-actions button:hover,
+:root.theme-dark .task-row-actions button:hover,
+:root.theme-dark .project-details-title-actions button:hover,
+:root.theme-dark .service-modal-close:hover,
+:root.theme-dark .user-details-modal__close:hover,
+:root.theme-dark .notification-item button:hover,
+:root.theme-dark .notification-dropdown__footer:hover,
+:root.theme-dark .account-menu__dropdown button:hover {
+  background: #064e3b;
+  border-color: rgba(34, 197, 94, 0.45);
+  color: #dcfce7;
+}
+
+:root.theme-dark .logout-action,
+:root.theme-dark .row-actions button:last-child,
+:root.theme-dark .task-row-actions button.is-danger,
+:root.theme-dark .project-details-title-actions button {
+  background: #451a1a;
+  border-color: #7f1d1d;
+  color: #fecaca;
+}
+
+:root.theme-dark .message-bubble-row:not(.is-mine) .message-bubble {
+  background: #1e293b;
+  border-color: #334155;
+  color: #f8fafc;
+}
+
+:root.theme-dark .project-card-meta span,
+:root.theme-dark .project-card-meta time,
+:root.theme-dark .my-task-meta span,
+:root.theme-dark .project-list mark,
+:root.theme-dark .table-row mark,
+:root.theme-dark .role-badge,
+:root.theme-dark .badge,
+:root.theme-dark .stat-badge {
+  background: #1e293b;
+  border-color: #334155;
+  color: #e5e7eb;
+}
+
+:root.theme-dark .project-status-badge.is-new,
+:root.theme-dark .project-status-badge.is-done,
+:root.theme-dark .status-badge,
+:root.theme-dark .role-badge.is-admin,
+:root.theme-dark .badge.is-success {
+  background: #064e3b;
+  color: #bbf7d0;
+}
+
+:root.theme-dark .project-status-badge.is-progress,
+:root.theme-dark .role-badge.is-manager,
+:root.theme-dark .badge.is-info {
+  background: #1e3a8a;
+  color: #bfdbfe;
+}
+
+:root.theme-dark .project-status-badge.is-waiting,
+:root.theme-dark .badge.is-warning {
+  background: #7c2d12;
+  color: #fed7aa;
+}
+
+:root.theme-dark .project-status-badge.is-blocked,
+:root.theme-dark .badge.is-danger {
+  background: #7f1d1d;
+  color: #fecaca;
+}
+
+:root.theme-dark .modal-header,
+:root.theme-dark .modal-footer,
+:root.theme-dark .messages-sidebar-header,
+:root.theme-dark .messages-chat-header,
+:root.theme-dark .messages-chat-composer,
+:root.theme-dark .notification-dropdown header,
+:root.theme-dark .notification-dropdown__footer,
+:root.theme-dark .subtask-row,
+:root.theme-dark .realtime-list article,
+:root.theme-dark .urgent-list article,
+:root.theme-dark .table-head,
+:root.theme-dark .table-row,
+:root.theme-dark .permissions-table__row {
+  border-color: #334155;
+}
+
+:root.theme-dark .table-row:hover,
+:root.theme-dark .project-tracking-card:hover,
+:root.theme-dark .my-task-card:hover,
+:root.theme-dark .notification-item:hover {
+  background: #1e293b;
+}
+
+:root.compact-mode .dashboard-main {
+  padding: 14px 18px;
+}
+
+:root.compact-mode .dashboard-page,
+:root.compact-mode .page-stack,
+:root.compact-mode .settings-page {
+  gap: 14px;
+}
+
+:root.compact-mode .workspace-panel,
+:root.compact-mode .board-toolbar,
+:root.compact-mode .project-tracking-card,
+:root.compact-mode .my-task-card,
+:root.compact-mode .table-row,
+:root.compact-mode .service-modal,
+:root.compact-mode .modal-card,
+:root.compact-mode .user-details-modal {
+  padding: 14px;
+}
+
+:root.compact-mode .table-row,
+:root.compact-mode .conversation-item,
+:root.compact-mode .project-tracking-card,
+:root.compact-mode .my-task-card {
+  gap: 10px;
+}
+
+:root.compact-mode .sidebar-nav {
+  padding-block: 10px;
+}
+
+:root.compact-mode .sidebar-section__items {
+  gap: 4px;
+}
+
+:root.hide-avatars .sidebar-avatar,
+:root.hide-avatars .header-avatar,
+:root.hide-avatars .account-menu__avatar,
+:root.hide-avatars .message-avatar,
+:root.hide-avatars .profile-avatar-large,
+:root.hide-avatars .activity-avatar,
+:root.hide-avatars .tf-user-avatar,
+:root.hide-avatars .tf-mini-avatar {
+  display: none !important;
+}

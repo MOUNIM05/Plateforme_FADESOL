@@ -1,26 +1,18 @@
 import { useEffect, useMemo, useState } from "react";
 import {
   Bell,
-  CheckCircle2,
   Clock3,
   Database,
-  KeyRound,
   RefreshCw,
   Save,
-  Search,
   Settings as SettingsIcon,
   ShieldCheck,
   ToggleLeft,
-  UsersRound,
 } from "lucide-react";
 import { useAuth } from "../context/AuthContext";
-import {
-  getPermissionCatalog,
-  getUserPermissions,
-  getUsers,
-  updateUserPermissions,
-} from "../services/userService";
-import { DATA_EVENTS, dispatchDataChanged } from "../utils/dataEvents";
+import { applyUserPreferences, loadUserPreferences, saveUserPreferences } from "../utils/userPreferences";
+  
+
 
 const storageKey = "fadesol_platform_settings";
 
@@ -66,18 +58,13 @@ function SettingSwitch({ checked, label, name, onChange }) {
 }
 
 function Settings() {
-  const { currentUser, hasPermission, refreshCurrentUser } = useAuth();
+  const { currentUser } = useAuth();
+
   const [settings, setSettings] = useState(loadSettings);
+  const [preferences, setPreferences] = useState(() => loadUserPreferences(currentUser));
   const [message, setMessage] = useState("");
   const [error, setError] = useState("");
-  const [users, setUsers] = useState([]);
-  const [permissionCatalog, setPermissionCatalog] = useState([]);
-  const [selectedUserId, setSelectedUserId] = useState("");
-  const [selectedPermissions, setSelectedPermissions] = useState({});
-  const [permissionSearch, setPermissionSearch] = useState("");
-  const [permissionsLoading, setPermissionsLoading] = useState(false);
-  const [savingPermissions, setSavingPermissions] = useState(false);
-  const canManagePermissions = hasPermission("settings.permissions.manage");
+  
 
   const activeSecurityRules = useMemo(() => {
     return [
@@ -109,9 +96,41 @@ function Settings() {
     setError("");
   }
 
+  useEffect(() => {
+    applyUserPreferences(preferences);
+  }, [preferences]);
+
+  useEffect(() => {
+    const accountPreferences = loadUserPreferences(currentUser);
+    setPreferences(accountPreferences);
+    applyUserPreferences(accountPreferences);
+    setMessage("");
+  }, [currentUser]);
+
+  function handlePrefChange(event) {
+    const { name, value, type, checked } = event.target;
+
+    setPreferences((current) => ({
+      ...current,
+      [name]: type === "checkbox" ? checked : value,
+    }));
+    setMessage("");
+    setError("");
+  }
+
   function handleSubmit(event) {
     event.preventDefault();
     localStorage.setItem(storageKey, JSON.stringify(settings));
+
+    // Sauvegarde des préférences utilisateur (mode d'affichage)
+    try {
+      const savedPreferences = saveUserPreferences(preferences, currentUser);
+      applyUserPreferences(savedPreferences);
+      setPreferences(savedPreferences);
+    } catch (e) {
+      console.error(e);
+    }
+
     setMessage("Paramètres enregistrés.");
     setError("");
   }
@@ -123,123 +142,7 @@ function Settings() {
     setError("");
   }
 
-  useEffect(() => {
-    if (!canManagePermissions) {
-      return;
-    }
-
-    async function loadPermissionManagement() {
-      setPermissionsLoading(true);
-      setError("");
-
-      try {
-        const [usersData, catalogData] = await Promise.all([getUsers(), getPermissionCatalog()]);
-        const loadedUsers = Array.isArray(usersData) ? usersData : [];
-
-        setUsers(loadedUsers);
-        setPermissionCatalog(Array.isArray(catalogData) ? catalogData : []);
-        setSelectedUserId((current) => current || String(loadedUsers[0]?.id || ""));
-      } catch (loadError) {
-        console.error("Load permissions management error:", loadError);
-        setError("Impossible de charger la gestion des permissions.");
-      } finally {
-        setPermissionsLoading(false);
-      }
-    }
-
-    loadPermissionManagement();
-  }, [canManagePermissions]);
-
-  useEffect(() => {
-    if (!selectedUserId || !canManagePermissions) {
-      return;
-    }
-
-    async function loadSelectedPermissions() {
-      setPermissionsLoading(true);
-      setError("");
-
-      try {
-        const data = await getUserPermissions(selectedUserId);
-        setSelectedPermissions(data.permissions || {});
-      } catch (loadError) {
-        console.error("Load user permissions error:", loadError);
-        setError("Impossible de charger les permissions de cet utilisateur.");
-      } finally {
-        setPermissionsLoading(false);
-      }
-    }
-
-    loadSelectedPermissions();
-  }, [canManagePermissions, selectedUserId]);
-
-  const filteredUsers = useMemo(() => {
-    const search = permissionSearch.trim().toLowerCase();
-
-    if (!search) {
-      return users;
-    }
-
-    return users.filter((user) =>
-      [
-        user.prenom,
-        user.nom,
-        user.first_name,
-        user.last_name,
-        user.email,
-        user.role,
-        user.service,
-      ]
-        .filter(Boolean)
-        .join(" ")
-        .toLowerCase()
-        .includes(search)
-    );
-  }, [permissionSearch, users]);
-
-  const selectedUser = useMemo(
-    () => users.find((user) => String(user.id) === String(selectedUserId)) || null,
-    [selectedUserId, users]
-  );
-
-  function getUserName(user) {
-    return [user?.prenom || user?.first_name, user?.nom || user?.last_name].filter(Boolean).join(" ") || user?.email || "Utilisateur";
-  }
-
-  function togglePermission(permissionKey) {
-    setSelectedPermissions((current) => ({
-      ...current,
-      [permissionKey]: !current[permissionKey],
-    }));
-    setMessage("");
-    setError("");
-  }
-
-  async function savePermissions() {
-    if (!selectedUserId) {
-      return;
-    }
-
-    setSavingPermissions(true);
-    setMessage("");
-    setError("");
-
-    try {
-      const data = await updateUserPermissions(selectedUserId, selectedPermissions);
-      setSelectedPermissions(data.permissions || {});
-      setMessage("Permissions mises à jour avec succès.");
-      dispatchDataChanged(DATA_EVENTS.PERMISSIONS_CHANGED);
-
-      if (Number(selectedUserId) === Number(currentUser?.user_id || currentUser?.id)) {
-        await refreshCurrentUser();
-      }
-    } catch (saveError) {
-      console.error("Save permissions error:", saveError);
-      setError("Impossible d'enregistrer les permissions.");
-    } finally {
-      setSavingPermissions(false);
-    }
-  }
+  
 
   return (
     <div className="dashboard-page settings-page">
@@ -278,7 +181,7 @@ function Settings() {
         <article className="workspace-panel settings-summary-card">
           <Database size={20} />
           <span>Mode</span>
-          <strong>{settings.maintenanceMode ? "Maintenance" : "Production"}</strong>
+          <strong>{preferences?.theme === "dark" ? "Sombre" : "Clair"}</strong>
         </article>
       </section>
 
@@ -308,6 +211,13 @@ function Settings() {
                 <option value="fr">Français</option>
                 <option value="ar">Arabe</option>
                 <option value="en">Anglais</option>
+              </select>
+            </label>
+            <label>
+              Mode d'affichage
+              <select name="theme" value={preferences.theme} onChange={handlePrefChange}>
+                <option value="light">Clair</option>
+                <option value="dark">Sombre</option>
               </select>
             </label>
             <label>
@@ -395,83 +305,7 @@ function Settings() {
           </div>
         </section>
 
-        {canManagePermissions && (
-          <section className="workspace-panel settings-panel permissions-panel">
-            <div className="panel-title">
-              <h3>Gestion des permissions</h3>
-              <span>{permissionsLoading ? "Chargement..." : "Administrateur"}</span>
-            </div>
-
-            <div className="permissions-management">
-              <aside className="permissions-users-list">
-                <label className="permissions-search">
-                  <Search size={16} />
-                  <input
-                    value={permissionSearch}
-                    onChange={(event) => setPermissionSearch(event.target.value)}
-                    placeholder="Rechercher un utilisateur..."
-                  />
-                </label>
-
-                <div>
-                  {filteredUsers.map((user) => (
-                    <button
-                      type="button"
-                      key={user.id}
-                      className={String(selectedUserId) === String(user.id) ? "is-selected" : ""}
-                      onClick={() => setSelectedUserId(String(user.id))}
-                    >
-                      <strong>{getUserName(user)}</strong>
-                      <span>{user.email}</span>
-                      <small>{user.role}{user.service ? ` - ${user.service}` : ""}</small>
-                    </button>
-                  ))}
-                  {!filteredUsers.length && <p>Aucun utilisateur trouvé.</p>}
-                </div>
-              </aside>
-
-              <section className="permissions-editor">
-                {selectedUser ? (
-                  <>
-                    <header>
-                      <div>
-                        <h4>{getUserName(selectedUser)}</h4>
-                        <span>{selectedUser.email} - {selectedUser.role}</span>
-                      </div>
-                      <button type="button" className="primary-action" onClick={savePermissions} disabled={savingPermissions}>
-                        <Save size={17} />
-                        {savingPermissions ? "Enregistrement..." : "Enregistrer les permissions"}
-                      </button>
-                    </header>
-
-                    <div className="permissions-groups">
-                      {permissionCatalog.map((group) => (
-                        <article key={group.module}>
-                          <h5>{group.module}</h5>
-                          {group.permissions.map((permission) => (
-                            <label key={permission.key} className="permission-toggle-row">
-                              <input
-                                type="checkbox"
-                                checked={selectedPermissions[permission.key] === true}
-                                onChange={() => togglePermission(permission.key)}
-                              />
-                              <span>
-                                <strong>{permission.label}</strong>
-                                <small>{permission.key}</small>
-                              </span>
-                            </label>
-                          ))}
-                        </article>
-                      ))}
-                    </div>
-                  </>
-                ) : (
-                  <p className="helper-text">Sélectionnez un utilisateur pour gérer ses permissions.</p>
-                )}
-              </section>
-            </div>
-          </section>
-        )}
+        
 
         <section className="workspace-panel settings-save-panel">
           <div>
@@ -484,11 +318,7 @@ function Settings() {
           </button>
         </section>
 
-        <section className="workspace-panel settings-health-panel">
-          <div><CheckCircle2 size={16} /><span>API Gateway</span><strong>Actif</strong></div>
-          <div><UsersRound size={16} /><span>Rôles</span><strong>3</strong></div>
-          <div><KeyRound size={16} /><span>JWT</span><strong>HS256</strong></div>
-        </section>
+        
       </form>
     </div>
   );

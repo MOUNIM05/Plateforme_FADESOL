@@ -6,6 +6,7 @@ import { getMessages, getMessagesWebSocketUrl } from "../../services/messageServ
 import { getTasks } from "../../services/taskService";
 import { getMyUserProfile } from "../../services/userService";
 import { DATA_EVENTS, subscribeDataEvents } from "../../utils/dataEvents";
+import { loadUserPreferences } from "../../utils/userPreferences";
 
 function getUserIdentifiers(user) {
   return new Set(
@@ -21,6 +22,7 @@ function NotificationButton() {
   const [messages, setMessages] = useState([]);
   const [tasks, setTasks] = useState([]);
   const [profile, setProfile] = useState(null);
+  const [preferences, setPreferences] = useState(() => loadUserPreferences(currentUser));
   const [open, setOpen] = useState(false);
   const dropdownRef = useRef(null);
 
@@ -43,6 +45,20 @@ function NotificationButton() {
       setTasks([]);
     }
   }, []);
+
+  useEffect(() => {
+    function handleSettingsChanged(event) {
+      setPreferences(event.detail?.preferences || loadUserPreferences(currentUser));
+    }
+
+    window.addEventListener("fadesol-user-settings-changed", handleSettingsChanged);
+
+    return () => window.removeEventListener("fadesol-user-settings-changed", handleSettingsChanged);
+  }, [currentUser]);
+
+  useEffect(() => {
+    setPreferences(loadUserPreferences(currentUser));
+  }, [currentUser]);
 
   useEffect(() => {
     function handleDocumentClick(event) {
@@ -108,6 +124,10 @@ function NotificationButton() {
   }, [loadUnreadMessages]);
 
   const unreadCount = messages.filter((message) => {
+    if (!preferences.notificationsEnabled || !preferences.messageNotifications) {
+      return false;
+    }
+
     const recipientId = String(message.destinataire_id || "");
     const senderId = String(message.expediteur_id || "");
 
@@ -115,6 +135,10 @@ function NotificationButton() {
   }).length;
 
   const notificationItems = useMemo(() => {
+    if (!preferences.notificationsEnabled) {
+      return [];
+    }
+
     const messageNotifications = messages
       .filter((message) => {
         const recipientId = String(message.destinataire_id || "");
@@ -138,8 +162,11 @@ function NotificationButton() {
       unread: false,
     }));
 
-    return [...messageNotifications, ...taskNotifications].slice(0, 5);
-  }, [messages, tasks, userIds]);
+    return [
+      ...(preferences.messageNotifications ? messageNotifications : []),
+      ...(preferences.taskNotifications ? taskNotifications : []),
+    ].slice(0, 5);
+  }, [messages, preferences, tasks, userIds]);
 
   function formatNotificationDate(value) {
     if (!value) {

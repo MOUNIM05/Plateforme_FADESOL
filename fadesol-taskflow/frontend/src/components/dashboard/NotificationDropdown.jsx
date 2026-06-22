@@ -7,6 +7,7 @@ import { getMessages, getMessagesWebSocketUrl } from "../../services/messageServ
 import { getTasks } from "../../services/taskService";
 import { getMyUserProfile, getUsers } from "../../services/userService";
 import { DATA_EVENTS, subscribeDataEvents } from "../../utils/dataEvents";
+import { loadUserPreferences } from "../../utils/userPreferences";
 
 function getUserIdentifiers(user) {
   // Regroupe les identifiants possibles pour reconnaitre les messages du compte courant.
@@ -25,6 +26,7 @@ function NotificationDropdown() {
   const [tasks, setTasks] = useState([]);
   const [profile, setProfile] = useState(null);
   const [serviceUsers, setServiceUsers] = useState([]);
+  const [preferences, setPreferences] = useState(() => loadUserPreferences(currentUser));
   const [open, setOpen] = useState(false);
   const dropdownRef = useRef(null);
 
@@ -74,6 +76,20 @@ function NotificationDropdown() {
       setTasks([]);
     }
   }, [isEmployee, isManager, currentServiceId, serviceUsers, userIds]);
+
+  useEffect(() => {
+    function handleSettingsChanged(event) {
+      setPreferences(event.detail?.preferences || loadUserPreferences(currentUser));
+    }
+
+    window.addEventListener("fadesol-user-settings-changed", handleSettingsChanged);
+
+    return () => window.removeEventListener("fadesol-user-settings-changed", handleSettingsChanged);
+  }, [currentUser]);
+
+  useEffect(() => {
+    setPreferences(loadUserPreferences(currentUser));
+  }, [currentUser]);
 
   useEffect(() => {
     // Ferme le menu au clic en dehors.
@@ -148,6 +164,10 @@ function NotificationDropdown() {
   }, [loadNotifications]);
 
   const unreadCount = messages.filter((message) => {
+    if (!preferences.notificationsEnabled || !preferences.messageNotifications) {
+      return false;
+    }
+
     // Compte seulement les messages recus et pas encore lus.
     const recipientId = String(message.destinataire_id || "");
     const senderId = String(message.expediteur_id || "");
@@ -157,7 +177,11 @@ function NotificationDropdown() {
 
   const notificationItems = useMemo(() => {
     // Prepare une liste courte pour le menu deroulant.
-    const messageNotifications = messages
+    if (!preferences.notificationsEnabled) {
+      return [];
+    }
+
+    const messageNotifications = preferences.messageNotifications ? messages
       .slice(0, 3)
       .map((message) => ({
         id: `message-${message.id}`,
@@ -166,9 +190,9 @@ function NotificationDropdown() {
         detail: message.contenu,
         date: message.date_creation || message.created_at,
         unread: !message.est_lu,
-      }));
+      })) : [];
 
-    const taskNotifications = tasks
+    const taskNotifications = preferences.taskNotifications ? tasks
       .slice(0, 3)
       .map((task) => ({
         id: `task-${task.id}`,
@@ -177,10 +201,10 @@ function NotificationDropdown() {
         detail: task.title || task.titre || "Tâche",
         date: task.created_at || task.date_creation || task.due_date,
         unread: false,
-      }));
+      })) : [];
 
     return [...messageNotifications, ...taskNotifications].slice(0, 5);
-  }, [messages, tasks]);
+  }, [messages, preferences, tasks]);
 
   function formatNotificationDate(value) {
     if (!value) return "";
@@ -220,12 +244,6 @@ function NotificationDropdown() {
               <article
                 key={item.id}
                 className={item.unread ? "is-unread" : ""}
-                onClick={() => {
-                  setOpen(false);
-                  if (item.type === "task") navigate("/tasks");
-                  if (item.type === "message") navigate("/messages");
-                }}
-                style={{ cursor: "pointer" }}
               >
                 <div>
                   <strong>{item.title}</strong>

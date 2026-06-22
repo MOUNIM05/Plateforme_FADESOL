@@ -1,25 +1,7 @@
 import { Bell, Eye, Moon, Save, Settings as SettingsIcon, Sun } from "lucide-react";
 import { useEffect, useMemo, useState } from "react";
-
-const storageKey = "fadesol_user_preferences";
-
-const defaultPreferences = {
-  theme: "light",
-  compactMode: false,
-  showAvatars: true,
-  notificationsEnabled: true,
-  messageNotifications: true,
-  taskNotifications: true,
-};
-
-function loadPreferences() {
-  try {
-    const raw = localStorage.getItem(storageKey);
-    return raw ? { ...defaultPreferences, ...JSON.parse(raw) } : defaultPreferences;
-  } catch {
-    return defaultPreferences;
-  }
-}
+import { useAuth } from "../context/AuthContext";
+import { applyUserPreferences, loadUserPreferences, saveUserPreferences } from "../utils/userPreferences";
 
 function PreferenceSwitch({ checked, description, label, name, onChange }) {
   return (
@@ -34,7 +16,8 @@ function PreferenceSwitch({ checked, description, label, name, onChange }) {
 }
 
 function UserSettings() {
-  const [preferences, setPreferences] = useState(loadPreferences);
+  const { currentUser } = useAuth();
+  const [preferences, setPreferences] = useState(() => loadUserPreferences(currentUser));
   const [message, setMessage] = useState("");
 
   const activePreferences = useMemo(
@@ -43,8 +26,15 @@ function UserSettings() {
   );
 
   useEffect(() => {
-    document.documentElement.dataset.theme = preferences.theme;
-  }, [preferences.theme]);
+    applyUserPreferences(preferences);
+  }, [preferences]);
+
+  useEffect(() => {
+    const accountPreferences = loadUserPreferences(currentUser);
+    setPreferences(accountPreferences);
+    applyUserPreferences(accountPreferences);
+    setMessage("");
+  }, [currentUser]);
 
   function handleChange(event) {
     const { name, type, checked, value } = event.target;
@@ -58,7 +48,9 @@ function UserSettings() {
 
   function handleSubmit(event) {
     event.preventDefault();
-    localStorage.setItem(storageKey, JSON.stringify(preferences));
+    const savedPreferences = saveUserPreferences(preferences, currentUser);
+    applyUserPreferences(savedPreferences);
+    setPreferences(savedPreferences);
     setMessage("Préférences enregistrées.");
   }
 

@@ -173,14 +173,19 @@ function MyTasks() {
     // Si taskId est present dans l'URL, ouvre la modale apres chargement.
     const taskId = searchParams.get("taskId");
 
-    if (taskId && tasks.length) {
-      const found = tasks.find((t) => String(t.id) === String(taskId));
-
-      if (found) {
-        openTaskDetails(found);
-      }
+    if (!taskId || loading) {
+      return;
     }
-  }, [searchParams, tasks]);
+
+    const found = tasks.find((t) => String(t.id) === String(taskId));
+
+    if (found) {
+      openTaskDetails(found);
+      return;
+    }
+
+    setError("Tache introuvable ou non autorisee.");
+  }, [searchParams, tasks, loading]);
 
   useEffect(() => {
     // Recharge les taches personnelles quand les filtres changent.

@@ -10,6 +10,12 @@
   -moz-osx-font-smoothing: grayscale;
 }
 
+:root.theme-dark {
+  color: #e5e7eb;
+  background: #0f172a;
+  color-scheme: dark;
+}
+
 * {
   box-sizing: border-box;
 }
@@ -33,6 +39,12 @@ body,
 body {
   min-width: 320px;
   background: #f4f7f6;
+}
+
+:root.theme-dark body,
+:root.theme-dark #root {
+  background: #0f172a;
+  color: #e5e7eb;
 }
 
 img,

@@ -4,6 +4,7 @@ import { createContext, useCallback, useContext, useEffect, useMemo, useState } 
 import { getCurrentUser, loginUser } from "../services/authService";
 import { getMyPermissions, getMyUserProfile } from "../services/userService";
 import { DATA_EVENTS, subscribeDataEvents } from "../utils/dataEvents";
+import { applyUserPreferences, loadUserPreferences } from "../utils/userPreferences";
 
 export const ROLES = {
   ADMIN: "Admin",
@@ -177,6 +178,11 @@ export function AuthProvider({ children }) {
       refreshCurrentUser();
     });
   }, [refreshCurrentUser]);
+
+  useEffect(() => {
+    // Applique les preferences propres au compte courant a chaque changement de session.
+    applyUserPreferences(loadUserPreferences(currentUser));
+  }, [currentUser]);
 
   async function login(email, password) {
     // Connecte l'utilisateur puis charge son profil complet.

@@ -101,6 +101,7 @@ function Messages() {
   const selectedThreadIdRef = useRef("");
   const selectedConversationIdRef = useRef("");
   const chatHistoryRef = useRef(null);
+  const handledNotificationRouteRef = useRef("");
 
   const currentUserIdentifiers = useMemo(() => {
     // Regroupe tous les identifiants possibles du compte courant pour comparer les messages.
@@ -195,6 +196,25 @@ function Messages() {
     }
 
     return senderId;
+  }
+
+  function getConversationIdentifier(conversation) {
+    return String(conversation?.conversation_id || conversation?.conversation || conversation?.conversationId || conversation?.id || "");
+  }
+
+  function selectConversationThread(conversation, fallbackConversationId = "") {
+    const participantId = getConversationUserId(conversation);
+    const matchingThread = threadItems.find((thread) => {
+      const threadConversationId = getConversationIdentifier(thread.conversation);
+
+      return (
+        String(thread.id) === String(participantId) ||
+        String(thread.id) === String(fallbackConversationId) ||
+        (threadConversationId && threadConversationId === String(fallbackConversationId))
+      );
+    });
+
+    setSelectedThreadId(matchingThread?.id || participantId || String(fallbackConversationId || ""));
   }
 
   function getConversationUser(conversation) {
@@ -328,10 +348,40 @@ function Messages() {
       });
   }, [conversationByUserId, conversations, currentUser, currentUserIdentifiers, searchTerm, userById, visibleUsers]);
 
-  const selectedThread = useMemo(
-    () => threadItems.find((item) => item.id === selectedThreadId) || null,
-    [selectedThreadId, threadItems]
-  );
+  const selectedThread = useMemo(() => {
+    const found = threadItems.find((item) => item.id === selectedThreadId);
+
+    if (found) {
+      return found;
+    }
+
+    if (!selectedConversation || !selectedThreadId) {
+      return null;
+    }
+
+    const conversationId = getConversationIdentifier(selectedConversation);
+    const participantId = getConversationUserId(selectedConversation);
+
+    if (String(selectedThreadId) !== String(participantId) && String(selectedThreadId) !== String(conversationId)) {
+      return null;
+    }
+
+    const user = getConversationUser(selectedConversation);
+    const name = user ? getUserName(user) : getConversationTitle(selectedConversation);
+
+    return {
+      id: selectedThreadId,
+      userId: participantId || selectedThreadId,
+      user,
+      conversation: selectedConversation,
+      name,
+      displayName: computeDisplayName(name, selectedConversation),
+      role: getConversationRole(selectedConversation, user),
+      lastMessage: selectedConversation.last_message || "",
+      lastMessageAt: selectedConversation.last_message_at || selectedConversation.date_creation || null,
+      unreadCount: selectedConversation.unread_count || 0,
+    };
+  }, [selectedConversation, selectedThreadId, threadItems, userById]);
 
   useEffect(() => {
     loadMessagingData();
@@ -343,13 +393,25 @@ function Messages() {
   useEffect(() => {
     const conversationId = searchParams.get("conversationId");
     const messageId = searchParams.get("messageId");
+    const deepLinkKey = conversationId ? `conversation:${conversationId}` : messageId ? `message:${messageId}` : "";
+
+    if (!deepLinkKey) {
+      handledNotificationRouteRef.current = "";
+      return;
+    }
+
+    if (handledNotificationRouteRef.current === deepLinkKey) {
+      return;
+    }
+
+    handledNotificationRouteRef.current = deepLinkKey;
 
     if (conversationId) {
       // Charge les donnees puis ouvre la conversation cible.
       (async () => {
+        const data = await loadConversation(conversationId);
+        selectConversationThread(data?.conversation, conversationId);
         await loadMessagingData(false);
-        setSelectedThreadId(String(conversationId));
-        await loadConversation(conversationId);
       })();
       return;
     }
@@ -365,17 +427,25 @@ function Messages() {
             const convId = msg.conversation_id || msg.conversation || msg.conversationId;
 
             if (convId) {
+              const data = await loadConversation(convId);
+              selectConversationThread(data?.conversation, convId);
               await loadMessagingData(false);
-              setSelectedThreadId(String(convId));
-              await loadConversation(convId);
+            } else {
+              const directConversationId = `direct--${[String(msg.expediteur_id || ""), String(msg.destinataire_id || "")].sort().join("--")}`;
+              const data = await loadConversation(directConversationId);
+              selectConversationThread(data?.conversation, directConversationId);
+              await loadMessagingData(false);
             }
+          } else {
+            setError("Message introuvable ou non autorise.");
           }
         } catch (err) {
           console.error("Message lookup error:", err);
+          setError("Impossible d'ouvrir le message demande.");
         }
       })();
     }
-  }, [searchParams]);
+  }, [searchParams, threadItems]);
 
   useEffect(() => {
     selectedThreadIdRef.current = selectedThreadId;
@@ -540,6 +610,7 @@ function Messages() {
         const messageData = Array.isArray(data.messages) ? data.messages : [];
         setMessages(messageData);
         markVisibleMessagesAsRead(messageData);
+        return data;
       })
       .catch((loadError) => {
         console.error("Conversation load error:", loadError);
