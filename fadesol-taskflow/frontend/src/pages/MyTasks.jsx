@@ -3,7 +3,7 @@ import { useEffect, useMemo, useState } from "react";
 import { useSearchParams } from "react-router-dom";
 import { useAuth } from "../context/AuthContext";
 import { CalendarDays, ClipboardList, Eye, Filter, Paperclip, UserRound, X } from "lucide-react";
-import { getTask, getTaskAttachments, getSubtasksByTask, getTasks, updateTaskStatus } from "../services/taskService";
+import { getTask, getTaskAttachments, getSubtasksByTask, getTasks, updateTask, updateTaskStatus } from "../services/taskService";
 
 const statusOptions = [
   { label: "Tous les statuts", value: "" },
@@ -25,6 +25,8 @@ const priorityOptions = [
   { label: "Faible", value: "Faible" },
 ];
 
+const progressOptions = [0, 25, 50, 75, 100];
+
 function getOptionLabel(options, value) {
   return options.find((option) => option.value === value)?.label || value || "Non defini";
 }
@@ -41,16 +43,97 @@ function formatDate(value) {
   }).format(new Date(value));
 }
 
+function normalizeProgressStatus(value) {
+  return String(value || "")
+    .normalize("NFD")
+    .replace(/[\u0300-\u036f]/g, "")
+    .replace(/[^a-zA-Z0-9]/g, "")
+    .toLowerCase();
+}
+
+function clampProgress(value) {
+  return Math.min(100, Math.max(0, Number(value) || 0));
+}
+
+function getProgressFromStatus(status, existingProgress = 0) {
+  const normalized = normalizeProgressStatus(status);
+
+  if (["nouveau", "afaire"].includes(normalized)) {
+    return 0;
+  }
+
+  if (normalized.includes("encours")) {
+    return 50;
+  }
+
+  if (normalized.includes("bloqu")) {
+    return 25;
+  }
+
+  if (normalized.startsWith("termin") || normalized === "done") {
+    return 100;
+  }
+
+  if (normalized.startsWith("annul")) {
+    return clampProgress(existingProgress);
+  }
+
+  return clampProgress(existingProgress);
+}
+
+function getUserIdentityValues(user) {
+  return [
+    user?.id,
+    user?.uuid,
+    user?.user_id,
+    user?.utilisateur_id,
+    user?.email,
+  ].filter((value) => value !== undefined && value !== null && value !== "");
+}
+
+function hasTaskSubtasks(task, subtasks = []) {
+  const taskSubtasks = task?.subtasks || task?.sous_taches || task?.sousTasks || subtasks || [];
+
+  return Array.isArray(taskSubtasks) && taskSubtasks.length > 0;
+}
+
+function getTaskProgressInfo(task, subtasks = []) {
+  const taskSubtasks = task?.subtasks || task?.sous_taches || task?.sousTasks || subtasks || [];
+
+  if (Array.isArray(taskSubtasks) && taskSubtasks.length > 0) {
+    const completed = taskSubtasks.filter((subtask) => getProgressFromStatus(subtask.status || subtask.statut) === 100).length;
+
+    return {
+      total_subtasks: taskSubtasks.length,
+      completed_subtasks: completed,
+      progression: Math.round((completed / taskSubtasks.length) * 100),
+    };
+  }
+
+  const storedProgress = task?.progression ?? task?.progress;
+
+  return {
+    total_subtasks: 0,
+    completed_subtasks: 0,
+    progression:
+      storedProgress !== undefined && storedProgress !== null && storedProgress !== ""
+        ? clampProgress(storedProgress)
+        : getProgressFromStatus(task?.status || task?.statut, 0),
+  };
+}
+
 function MyTasks() {
   // Vue employee/individuelle : les donnees sont filtrees avec assigned_to=me.
-  const { hasPermission } = useAuth();
+  const { currentUser, hasPermission } = useAuth();
   const canUpdateTasks = hasPermission("tasks.update");
+  const currentUserIds = useMemo(() => getUserIdentityValues(currentUser).map(String), [currentUser]);
 
   const [tasks, setTasks] = useState([]);
   const [statusFilter, setStatusFilter] = useState("");
   const [priorityFilter, setPriorityFilter] = useState("");
   const [loading, setLoading] = useState(true);
   const [updatingStatusTaskId, setUpdatingStatusTaskId] = useState("");
+  const [updatingProgressTaskId, setUpdatingProgressTaskId] = useState("");
   const [selectedTask, setSelectedTask] = useState(null);
   const [selectedSubtasks, setSelectedSubtasks] = useState([]);
   const [selectedAttachments, setSelectedAttachments] = useState([]);
@@ -69,6 +152,22 @@ function MyTasks() {
   );
 
   const [searchParams] = useSearchParams();
+
+  function isAssignedToCurrentUser(task) {
+    const assigneeValues = [
+      task?.assigned_to,
+      task?.assigned_user_id,
+      task?.assignee_id,
+      task?.user_id,
+      task?.responsable_id,
+    ].filter((value) => value !== undefined && value !== null && value !== "");
+
+    return assigneeValues.some((value) => currentUserIds.includes(String(value)));
+  }
+
+  function canEditTaskProgress(task, subtasks = []) {
+    return (canUpdateTasks || isAssignedToCurrentUser(task)) && !hasTaskSubtasks(task, subtasks);
+  }
 
   useEffect(() => {
     // Si taskId est present dans l'URL, ouvre la modale apres chargement.
@@ -124,19 +223,53 @@ function MyTasks() {
     setUpdatingStatusTaskId(taskId);
 
     try {
-      const updatedTask = await updateTaskStatus(taskId, status);
+      const currentTask = tasks.find((task) => task.id === taskId);
+      let updatedTask = await updateTaskStatus(taskId, status);
+      const nextProgress = getProgressFromStatus(status, currentTask?.progression ?? currentTask?.progress ?? 0);
+
+      if (currentTask && !hasTaskSubtasks(currentTask)) {
+        const progressUpdate = await updateTask(taskId, { progression: nextProgress });
+        updatedTask = { ...updatedTask, ...progressUpdate, progression: nextProgress };
+      }
 
       setTasks((current) =>
         current
-          .map((task) => (task.id === taskId ? updatedTask : task))
+          .map((task) => (task.id === taskId ? { ...task, ...updatedTask, status, progression: nextProgress } : task))
           .filter((task) => !statusFilter || task.status === statusFilter)
       );
+      setSelectedTask((current) => (current?.id === taskId ? { ...current, ...updatedTask, status, progression: nextProgress } : current));
       setMessage("Statut mis a jour avec succes.");
     } catch (err) {
       console.error("Update task status error:", err);
       setError(err.response?.data?.detail || "Impossible de modifier le statut de la tache.");
     } finally {
       setUpdatingStatusTaskId("");
+    }
+  }
+
+  async function handleTaskProgressChange(task, value) {
+    if (!canEditTaskProgress(task)) {
+      setError("Vous ne pouvez modifier que la progression de vos taches sans sous-taches.");
+      return;
+    }
+
+    const nextProgress = clampProgress(value);
+    setError("");
+    setMessage("");
+    setUpdatingProgressTaskId(task.id);
+
+    try {
+      const updatedTask = await updateTask(task.id, { progression: nextProgress });
+      const mergedTask = { ...task, ...updatedTask, progression: nextProgress };
+
+      setTasks((current) => current.map((item) => (item.id === task.id ? { ...item, ...mergedTask } : item)));
+      setSelectedTask((current) => (current?.id === task.id ? { ...current, ...mergedTask } : current));
+      setMessage("Progression de la tache mise a jour.");
+    } catch (err) {
+      console.error("Update task progress error:", err);
+      setError(err.response?.data?.detail || "Impossible de modifier la progression de la tache.");
+    } finally {
+      setUpdatingProgressTaskId("");
     }
   }
 
@@ -216,11 +349,37 @@ function MyTasks() {
         </div>
 
         <div className="my-tasks-list">
-          {tasks.map((task) => (
+          {tasks.map((task) => {
+            const taskProgress = getTaskProgressInfo(task);
+
+            return (
             <article className="my-task-card" key={task.id}>
               <div>
                 <h3>{task.title}</h3>
                 <p>{task.description || "Aucune description."}</p>
+                <div className="my-task-progress">
+                  <span>Progression</span>
+                  <strong>{taskProgress.progression}%</strong>
+                  <i>
+                    <b style={{ width: `${taskProgress.progression}%` }} />
+                  </i>
+                  {canEditTaskProgress(task) && (
+                    <label className="progress-editor">
+                      <span>Modifier</span>
+                      <select
+                        value={taskProgress.progression}
+                        onChange={(event) => handleTaskProgressChange(task, event.target.value)}
+                        disabled={updatingProgressTaskId === task.id}
+                      >
+                        {progressOptions.map((option) => (
+                          <option key={option} value={option}>
+                            {option}%
+                          </option>
+                        ))}
+                      </select>
+                    </label>
+                  )}
+                </div>
               </div>
 
                   <div className="my-task-meta">
@@ -263,7 +422,8 @@ function MyTasks() {
                 </button>
               </div>
             </article>
-          ))}
+            );
+          })}
 
           {!loading && tasks.length === 0 && (
             <div className="empty-table">
@@ -298,6 +458,35 @@ function MyTasks() {
               <div><dt>Date limite</dt><dd>{formatDate(selectedTask.due_date)}</dd></div>
               <div><dt>Projet</dt><dd>{selectedTask.project_id || selectedTask.projet_id || "Sans projet"}</dd></div>
             </dl>
+
+            <section className="modal-section">
+              <h4>Progression</h4>
+              <div className="project-progress project-progress--details">
+                <div>
+                  <span>Avancement</span>
+                  <strong>{getTaskProgressInfo(selectedTask, selectedSubtasks).progression}%</strong>
+                </div>
+                <div className="progress-bar" aria-label={`Progression ${getTaskProgressInfo(selectedTask, selectedSubtasks).progression}%`}>
+                  <i style={{ width: `${getTaskProgressInfo(selectedTask, selectedSubtasks).progression}%` }} />
+                </div>
+                {canEditTaskProgress(selectedTask, selectedSubtasks) && (
+                  <label className="progress-editor progress-editor--details">
+                    <span>Modifier</span>
+                    <select
+                      value={getTaskProgressInfo(selectedTask, selectedSubtasks).progression}
+                      onChange={(event) => handleTaskProgressChange(selectedTask, event.target.value)}
+                      disabled={updatingProgressTaskId === selectedTask.id}
+                    >
+                      {progressOptions.map((option) => (
+                        <option key={option} value={option}>
+                          {option}%
+                        </option>
+                      ))}
+                    </select>
+                  </label>
+                )}
+              </div>
+            </section>
 
             <section className="modal-section">
               <h4>Sous-tâches</h4>

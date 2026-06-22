@@ -29,6 +29,7 @@ const emptyProject = {
 };
 
 const priorityOptions = ["Faible", "Normale", "Haute", "Urgente"];
+const progressOptions = [0, 25, 50, 75, 100];
 const statusOptions = [
   { label: "Nouveau", value: "Nouveau" },
   { label: "En cours", value: "EnCours" },
@@ -109,6 +110,16 @@ function serviceMatchesManager(service, managerServiceValues) {
   ].some((value) => managerKeys.has(normalizeServiceKey(value)));
 }
 
+function getUserIdentityValues(user) {
+  return [
+    user?.id,
+    user?.uuid,
+    user?.user_id,
+    user?.utilisateur_id,
+    user?.email,
+  ].filter((value) => value !== undefined && value !== null && value !== "");
+}
+
 function getStatusLabel(statusValue) {
   return statusOptions.find((status) => status.value === statusValue)?.label || statusValue || "Non défini";
 }
@@ -162,6 +173,42 @@ function clampProgress(value) {
   return Math.min(100, Math.max(0, Number(value) || 0));
 }
 
+function getProgressFromProjectStatus(status, existingProgress = 0) {
+  const normalized = normalizeServiceKey(status);
+
+  if (["nouveau", "afaire"].includes(normalized)) {
+    return 0;
+  }
+
+  if (normalized.includes("encours")) {
+    return 50;
+  }
+
+  if (normalized.includes("bloqu") || normalized.includes("attente")) {
+    return 25;
+  }
+
+  if (normalized.startsWith("termin") || normalized === "done") {
+    return 100;
+  }
+
+  if (normalized.startsWith("annul")) {
+    return 0;
+  }
+
+  return clampProgress(existingProgress);
+}
+
+function getProjectProgress(project) {
+  const storedProgress = project?.progression ?? project?.progress;
+
+  if (storedProgress !== undefined && storedProgress !== null && storedProgress !== "") {
+    return clampProgress(storedProgress);
+  }
+
+  return getProgressFromProjectStatus(project?.statut || project?.status, 0);
+}
+
 function formatDate(value) {
   if (!value) {
     return "Non définie";
@@ -191,6 +238,7 @@ function Projects() {
   const [statusFilter, setStatusFilter] = useState("");
   const [loading, setLoading] = useState(true);
   const [saving, setSaving] = useState(false);
+  const [savingProgressProjectId, setSavingProgressProjectId] = useState("");
   const [message, setMessage] = useState("");
   const [error, setError] = useState("");
   const [warning, setWarning] = useState("");
@@ -343,6 +391,39 @@ function Projects() {
     };
   }, [projects]);
 
+  const currentUserIds = useMemo(() => getUserIdentityValues(currentUser).map(String), [currentUser]);
+
+  function canAdjustProjectProgress(project) {
+    if (!canUpdateProjects || !project) {
+      return false;
+    }
+
+    if (["admin", "administrateur"].includes(normalizeServiceKey(currentUser?.role))) {
+      return true;
+    }
+
+    if (!isManager) {
+      return false;
+    }
+
+    const projectServiceName = serviceById[project.service_id] || "";
+    const projectServiceKeys = [
+      project.service_id,
+      project.id_service,
+      project.service?.id,
+      project.service?.uuid,
+      project.service,
+      project.nom_service,
+      project.service_name,
+      projectServiceName,
+    ].map(normalizeServiceKey);
+    const managerServiceKeys = managerServiceValues.map(normalizeServiceKey);
+    const sameService = managerServiceKeys.some((serviceKey) => projectServiceKeys.includes(serviceKey));
+    const responsibleMatches = currentUserIds.includes(String(project.responsable_id || project.responsable || ""));
+
+    return sameService || responsibleMatches;
+  }
+
   function handleChange(event) {
     // Met a jour le formulaire projet champ par champ.
     const { name, value } = event.target;
@@ -473,6 +554,33 @@ function Projects() {
     }
   }
 
+  async function handleProjectProgressChange(project, value) {
+    if (!canAdjustProjectProgress(project)) {
+      setError("Vous n'avez pas l'autorisation de modifier la progression de ce projet.");
+      return;
+    }
+
+    const nextProgress = clampProgress(value);
+    setError("");
+    setMessage("");
+    setSavingProgressProjectId(project.id);
+
+    try {
+      const updatedProject = await updateProject(project.id, { progression: nextProgress });
+      const mergedProject = { ...project, ...updatedProject, progression: nextProgress };
+
+      setProjects((current) => current.map((item) => (item.id === project.id ? { ...item, ...mergedProject } : item)));
+      setSelectedProject((current) => (current?.id === project.id ? { ...current, ...mergedProject } : current));
+      setMessage("Progression du projet mise a jour.");
+      dispatchDataChanged(DATA_EVENTS.PROJECTS_CHANGED);
+    } catch (err) {
+      console.error("Update project progress error:", err);
+      setError(err.response?.data?.detail || "Impossible de modifier la progression du projet.");
+    } finally {
+      setSavingProgressProjectId("");
+    }
+  }
+
   return (
     <div className="dashboard-page projects-page">
       <div className="board-toolbar">
@@ -571,7 +679,7 @@ function Projects() {
             {!loading && filteredProjects.length > 0 && (
               <div className="project-tracking-list">
                 {filteredProjects.map((project) => {
-                  const progress = clampProgress(project.progression);
+                  const progress = getProjectProgress(project);
 
                   return (
                     <article key={project.id} className="project-tracking-card">
@@ -607,6 +715,22 @@ function Projects() {
                         <div className="progress-bar" aria-label={`Progression ${progress}%`}>
                           <i style={{ width: `${progress}%` }} />
                         </div>
+                        {canAdjustProjectProgress(project) && (
+                          <label className="progress-editor">
+                            <span>Modifier</span>
+                            <select
+                              value={progress}
+                              onChange={(event) => handleProjectProgressChange(project, event.target.value)}
+                              disabled={savingProgressProjectId === project.id}
+                            >
+                              {progressOptions.map((option) => (
+                                <option key={option} value={option}>
+                                  {option}%
+                                </option>
+                              ))}
+                            </select>
+                          </label>
+                        )}
                       </div>
 
                       <span className="row-actions">
@@ -802,17 +926,17 @@ function Projects() {
                 </div>
                 <div>
                   <dt>Progression</dt>
-                  <dd>{clampProgress(selectedProject.progression)}%</dd>
+                  <dd>{getProjectProgress(selectedProject)}%</dd>
                 </div>
               </dl>
 
               <div className="project-progress project-progress--details">
                 <div>
                   <span>Avancement</span>
-                  <strong>{clampProgress(selectedProject.progression)}%</strong>
+                  <strong>{getProjectProgress(selectedProject)}%</strong>
                 </div>
-                <div className="progress-bar" aria-label={`Progression ${clampProgress(selectedProject.progression)}%`}>
-                  <i style={{ width: `${clampProgress(selectedProject.progression)}%` }} />
+                <div className="progress-bar" aria-label={`Progression ${getProjectProgress(selectedProject)}%`}>
+                  <i style={{ width: `${getProjectProgress(selectedProject)}%` }} />
                 </div>
               </div>
             </div>

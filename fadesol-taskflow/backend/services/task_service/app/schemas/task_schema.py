@@ -21,6 +21,7 @@ class TaskBase(BaseModel):
     service_id: str | None = None
     status: StatutTache = Field(default=StatutTache.NOUVEAU, validation_alias=AliasChoices("status", "statut"))
     priority: Priorite = Field(default=Priorite.NORMALE, validation_alias=AliasChoices("priority", "priorite"))
+    progression: float = Field(default=0.0, ge=0.0, le=100.0, validation_alias=AliasChoices("progression", "progress"))
     due_date: date | None = Field(default=None, validation_alias=AliasChoices("due_date", "date_limite"))
 
 
@@ -42,6 +43,7 @@ class TaskUpdate(BaseModel):
     service_id: str | None = None
     status: StatutTache | None = Field(default=None, validation_alias=AliasChoices("status", "statut"))
     priority: Priorite | None = Field(default=None, validation_alias=AliasChoices("priority", "priorite"))
+    progression: float | None = Field(default=None, ge=0.0, le=100.0, validation_alias=AliasChoices("progression", "progress"))
     due_date: date | None = Field(default=None, validation_alias=AliasChoices("due_date", "date_limite"))
 
 

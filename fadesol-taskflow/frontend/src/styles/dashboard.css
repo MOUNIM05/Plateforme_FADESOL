@@ -3634,6 +3634,34 @@
   color: #0f172a;
 }
 
+.progress-editor {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 10px;
+  min-width: 0;
+  color: #64748b;
+  font-size: 12px;
+  font-weight: 800;
+}
+
+.progress-editor select {
+  min-width: 84px;
+  height: 34px;
+  padding: 0 10px;
+  border: 1px solid #dbe3ef;
+  border-radius: 10px;
+  background: #ffffff;
+  color: #0f172a;
+  font-size: 13px;
+  font-weight: 800;
+}
+
+.progress-editor select:disabled {
+  cursor: not-allowed;
+  opacity: 0.65;
+}
+
 .project-progress--details {
   margin-bottom: 16px;
 }
@@ -4220,6 +4248,41 @@
   line-height: 1.5;
 }
 
+.my-task-progress {
+  max-width: 360px;
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) auto;
+  gap: 7px 10px;
+  margin-top: 12px;
+  color: #64748b;
+  font-size: 12px;
+  font-weight: 800;
+}
+
+.my-task-progress strong {
+  color: #0f172a;
+}
+
+.my-task-progress i {
+  grid-column: 1 / -1;
+  height: 7px;
+  overflow: hidden;
+  border-radius: 999px;
+  background: #e5e7eb;
+}
+
+.my-task-progress b {
+  display: block;
+  height: 100%;
+  border-radius: inherit;
+  background: linear-gradient(90deg, #16a34a, #22c55e);
+}
+
+.my-task-progress .progress-editor {
+  grid-column: 1 / -1;
+  max-width: 220px;
+}
+
 .my-task-meta {
   display: grid;
   grid-template-columns: repeat(2, minmax(0, 1fr));
@@ -4535,35 +4598,34 @@
 }
 
 .settings-page {
-  gap: 18px;
+  gap: 24px;
 }
 
 .settings-summary-grid {
   display: grid;
   grid-template-columns: repeat(4, minmax(0, 1fr));
-  gap: 14px;
+  gap: 18px;
 }
 
 .settings-summary-card {
-  min-height: 108px;
+  min-height: 118px;
   display: grid;
-  grid-template-columns: 44px minmax(0, 1fr);
+  grid-template-columns: 48px minmax(0, 1fr);
   align-items: center;
-  gap: 12px;
-  padding: 16px;
+  gap: 14px;
+  padding: 18px;
 }
 
 .settings-summary-card svg {
-  width: 44px;
-  height: 44px;
+  width: 48px;
+  height: 48px;
   padding: 11px;
   border-radius: 14px;
   color: #16a34a;
   background: #e8f7ef;
 }
 
-.settings-summary-card span,
-.settings-summary-card strong {
+.settings-summary-card span {
   min-width: 0;
   overflow: hidden;
   text-overflow: ellipsis;
@@ -4577,9 +4639,17 @@
 }
 
 .settings-summary-card strong {
+  min-width: 0;
+  max-width: 100%;
+  overflow: visible;
   color: #0f172a;
-  font-size: 20px;
+  font-size: 18px;
   font-weight: 800;
+  line-height: 1.2;
+  text-overflow: unset;
+  white-space: nowrap;
+  word-break: normal;
+  overflow-wrap: normal;
 }
 
 .settings-layout {

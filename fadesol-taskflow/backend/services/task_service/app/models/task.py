@@ -3,7 +3,7 @@
 from datetime import date
 from uuid import uuid4
 
-from sqlalchemy import Column, Date, DateTime, String, Text
+from sqlalchemy import Column, Date, DateTime, Float, String, Text
 from sqlalchemy.orm import synonym
 from sqlalchemy.sql import func
 
@@ -30,6 +30,7 @@ class Task(Base):
     # Statut et priorite structurent le suivi operationnel de la tache.
     status = Column("statut", String(40), default=StatutTache.NOUVEAU.value, nullable=False)
     priority = Column("priorite", String(40), nullable=False)
+    progression = Column(Float, default=0.0, nullable=False)
     due_date = Column("date_limite", Date, nullable=True)
     created_at = Column("date_creation", DateTime(timezone=True), server_default=func.now(), nullable=False)
     updated_at = Column(
