@@ -147,10 +147,6 @@ function Profile() {
           <h2>Parametres du compte</h2>
           <p>Profil personnel et informations du compte connecte.</p>
         </div>
-        <button type="button" className="logout-action" onClick={handleLogout}>
-          <LogOut size={17} />
-          Déconnexion
-        </button>
       </div>
 
       {message && <p className="notice success">{message}</p>}
@@ -164,6 +160,11 @@ function Profile() {
           <div>
             <h3>{getFullName(user)}</h3>
             <p>{user?.email || "Non renseigne"}</p>
+            <label className="profile-photo-link">
+              <Camera size={15} />
+              {uploading ? "Envoi de la photo..." : "Changer la photo"}
+              <input type="file" accept=".jpg,.jpeg,.png,image/jpeg,image/png" onChange={handlePhotoChange} disabled={uploading} />
+            </label>
           </div>
           <span className="status-badge">
             <ShieldCheck size={14} />
@@ -171,19 +172,7 @@ function Profile() {
           </span>
         </article>
 
-        <article className="workspace-panel info-card">
-          <div className="panel-title">
-            <h3>Photo de profil</h3>
-            <span>{uploading ? "Envoi..." : "JPG, JPEG, PNG"}</span>
-          </div>
-          <label className="photo-upload-action">
-            <Camera size={17} />
-            {uploading ? "Chargement..." : "Changer photo"}
-            <input type="file" accept=".jpg,.jpeg,.png,image/jpeg,image/png" onChange={handlePhotoChange} disabled={uploading} />
-          </label>
-        </article>
-
-        <article className="workspace-panel info-card">
+        <article className="workspace-panel info-card profile-account-details">
           <div className="panel-title">
             <h3>Details du compte</h3>
           </div>
@@ -197,26 +186,7 @@ function Profile() {
           </dl>
         </article>
 
-        {isAdmin && (
-          <article className="workspace-panel info-card">
-            <div className="panel-title">
-              <h3>Actions administrateur</h3>
-              <span>Gestion globale</span>
-            </div>
-            <div className="profile-actions">
-              <button type="button" className="secondary-action" onClick={() => navigate("/users")}>
-                <UsersRound size={17} />
-                Gerer utilisateurs
-              </button>
-              <button type="button" className="secondary-action" onClick={() => navigate("/system-settings")}>
-                <Settings size={17} />
-                Parametres systeme
-              </button>
-            </div>
-          </article>
-        )}
-
-        <article className="workspace-panel info-card">
+        <article className="workspace-panel info-card profile-security-card">
           <div className="panel-title">
             <h3>Securite</h3>
           </div>
@@ -226,6 +196,29 @@ function Profile() {
             <div><UserRound size={16} /><span>Profil charge depuis le service utilisateurs</span></div>
             {isAdmin && <div><KeyRound size={16} /><span>Modification des acces via la gestion utilisateurs</span></div>}
           </div>
+        </article>
+
+        <article className="workspace-panel info-card profile-actions-card">
+          <div className="panel-title">
+            <h3>Actions du compte</h3>
+            <span>Session et raccourcis</span>
+          </div>
+          {isAdmin && (
+            <div className="profile-actions">
+              <button type="button" className="secondary-action" onClick={() => navigate("/users")}>
+                <UsersRound size={17} />
+                Gerer utilisateurs
+              </button>
+              <button type="button" className="secondary-action" onClick={() => navigate("/settings")}>
+                <Settings size={17} />
+                Parametres
+              </button>
+            </div>
+          )}
+          <button type="button" className="logout-action profile-logout-action" onClick={handleLogout}>
+            <LogOut size={17} />
+            Deconnexion
+          </button>
         </article>
       </section>
     </div>
