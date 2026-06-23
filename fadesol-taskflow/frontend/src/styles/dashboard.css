@@ -6222,6 +6222,446 @@
   background: #1e293b;
 }
 
+/* Services : contraste renforce pour eviter les textes pales sur fonds clairs en mode sombre. */
+:root.theme-dark .services-page .service-summary-card,
+:root.theme-dark .services-page .service-admin-card,
+:root.theme-dark .services-page .service-details-modal,
+:root.theme-dark .services-page .service-confirm-modal {
+  background: #111827;
+  border-color: #334155;
+  color: #f8fafc;
+}
+
+:root.theme-dark .services-page .service-admin-stats div,
+:root.theme-dark .services-page .service-details-stats div,
+:root.theme-dark .services-page .service-members-columns section,
+:root.theme-dark .services-page .service-details-members,
+:root.theme-dark .services-page .service-member-chip,
+:root.theme-dark .services-page .details-list div {
+  background: #1e293b;
+  border-color: #334155;
+  color: #f8fafc;
+}
+
+:root.theme-dark .services-page .service-member-chip.is-manager,
+:root.theme-dark .services-page .service-admin-card__header > strong,
+:root.theme-dark .services-page .service-admin-card__actions > strong,
+:root.theme-dark .services-page .service-summary-card svg,
+:root.theme-dark .services-page .service-admin-stats svg {
+  background: #064e3b;
+  color: #bbf7d0;
+}
+
+:root.theme-dark .services-page .service-summary-card strong,
+:root.theme-dark .services-page .service-admin-card__header h3,
+:root.theme-dark .services-page .service-admin-progress strong,
+:root.theme-dark .services-page .service-admin-stats strong,
+:root.theme-dark .services-page .service-members-columns h4,
+:root.theme-dark .services-page .service-member-chip span,
+:root.theme-dark .services-page .service-modal h3,
+:root.theme-dark .services-page .details-list dd {
+  color: #f8fafc;
+}
+
+:root.theme-dark .services-page .service-summary-card span,
+:root.theme-dark .services-page .service-admin-card__header p,
+:root.theme-dark .services-page .service-admin-progress span,
+:root.theme-dark .services-page .service-admin-stats span,
+:root.theme-dark .services-page .service-members-columns p,
+:root.theme-dark .services-page .service-member-chip small,
+:root.theme-dark .services-page .service-modal p,
+:root.theme-dark .services-page .details-list dt,
+:root.theme-dark .services-page .helper-text,
+:root.theme-dark .services-page .service-confirm-copy {
+  color: #cbd5e1;
+}
+
+:root.theme-dark .services-page .service-admin-card__eyebrow {
+  color: #86efac;
+}
+
+:root.theme-dark .services-page .service-delete-button {
+  background: #3f1d1d;
+  border: 1px solid #7f1d1d;
+  color: #fecaca;
+}
+
+:root.theme-dark .services-page .service-danger-action {
+  background: #991b1b;
+  border: 1px solid #7f1d1d;
+  color: #ffffff;
+}
+
+:root.theme-dark .services-page .service-delete-button:hover,
+:root.theme-dark .services-page .service-danger-action:hover {
+  background: #7f1d1d;
+  color: #ffffff;
+}
+
+:root.theme-dark .services-page .secondary-action,
+:root.theme-dark .services-page .compact-action,
+:root.theme-dark .services-page .service-modal-close {
+  background: #1e293b;
+  border-color: #475569;
+  color: #f8fafc;
+}
+
+:root.theme-dark .services-page .secondary-action:hover,
+:root.theme-dark .services-page .compact-action:hover,
+:root.theme-dark .services-page .service-modal-close:hover {
+  background: #064e3b;
+  border-color: rgba(34, 197, 94, 0.45);
+  color: #dcfce7;
+}
+
+:root.theme-dark .services-page .progress-bar {
+  background: #334155;
+}
+
+:root.theme-dark .services-page .progress-bar i {
+  background: linear-gradient(90deg, #22c55e, #86efac);
+}
+
+:root.theme-dark .services-page .service-modal-form label,
+:root.theme-dark .services-page .service-status-toggle {
+  color: #f8fafc;
+}
+
+:root.theme-dark .services-page .service-modal-form input,
+:root.theme-dark .services-page .service-modal-form select,
+:root.theme-dark .services-page .service-modal-form textarea {
+  background: #0f172a;
+  border-color: #334155;
+  color: #f8fafc;
+}
+
+:root.theme-dark .services-page .service-modal-form input::placeholder,
+:root.theme-dark .services-page .service-modal-form textarea::placeholder {
+  color: #94a3b8;
+}
+
+:root.theme-dark .services-page .service-delete-button:disabled,
+:root.theme-dark .services-page .service-danger-action:disabled,
+:root.theme-dark .services-page .primary-toolbar-action:disabled {
+  opacity: 0.82;
+}
+
+:root.theme-dark .text-muted,
+:root.theme-dark .subtitle,
+:root.theme-dark .card-subtitle,
+:root.theme-dark .service-meta,
+:root.theme-dark .member-email,
+:root.theme-dark .small-text,
+:root.theme-dark .description {
+  color: #cbd5e1;
+}
+
+/* Projets : cartes, filtres, badges et modales lisibles en mode sombre. */
+:root.theme-dark .projects-page .user-stat-card,
+:root.theme-dark .projects-page .user-list-panel,
+:root.theme-dark .projects-page .project-tracking-card,
+:root.theme-dark .projects-page .project-form-modal,
+:root.theme-dark .projects-page .project-details-modal {
+  background: #111827;
+  border-color: #334155;
+  color: #f8fafc;
+}
+
+:root.theme-dark .projects-page .project-card-main strong,
+:root.theme-dark .projects-page .project-progress strong,
+:root.theme-dark .projects-page .details-list dd,
+:root.theme-dark .projects-page .selected-profile-card__head h3 {
+  color: #f8fafc;
+}
+
+:root.theme-dark .projects-page .project-card-main p,
+:root.theme-dark .projects-page .project-progress div:first-child,
+:root.theme-dark .projects-page .progress-editor,
+:root.theme-dark .projects-page .details-list dt,
+:root.theme-dark .projects-page .selected-profile-card__head p,
+:root.theme-dark .projects-page .loading-line {
+  color: #cbd5e1;
+}
+
+:root.theme-dark .projects-page .project-card-meta span,
+:root.theme-dark .projects-page .project-card-meta time,
+:root.theme-dark .projects-page .priority-pill.is-normale,
+:root.theme-dark .projects-page .priority-pill.is-faible {
+  background: #1e293b;
+  border-color: #334155;
+  color: #e5e7eb;
+}
+
+:root.theme-dark .projects-page .project-card-icon,
+:root.theme-dark .projects-page .profile-avatar-large {
+  background: #064e3b;
+  color: #bbf7d0;
+}
+
+:root.theme-dark .projects-page .project-status-badge.is-new,
+:root.theme-dark .projects-page .project-status-badge.is-done {
+  background: #064e3b;
+  color: #bbf7d0;
+}
+
+:root.theme-dark .projects-page .project-status-badge.is-progress {
+  background: #1e3a8a;
+  color: #bfdbfe;
+}
+
+:root.theme-dark .projects-page .project-status-badge.is-waiting {
+  background: #7c2d12;
+  color: #fed7aa;
+}
+
+:root.theme-dark .projects-page .project-status-badge.is-blocked,
+:root.theme-dark .projects-page .priority-pill.is-urgente {
+  background: #7f1d1d;
+  color: #fecaca;
+}
+
+:root.theme-dark .projects-page .project-filters select,
+:root.theme-dark .projects-page .project-filters input,
+:root.theme-dark .projects-page .search-filter,
+:root.theme-dark .projects-page .progress-editor select {
+  background: #0f172a;
+  border-color: #334155;
+  color: #f8fafc;
+}
+
+:root.theme-dark .projects-page .project-filters input::placeholder {
+  color: #94a3b8;
+}
+
+:root.theme-dark .projects-page .progress-editor select:disabled {
+  background: #1e293b;
+  color: #94a3b8;
+  opacity: 1;
+}
+
+:root.theme-dark .projects-page .row-actions button,
+:root.theme-dark .projects-page .project-details-title-actions button {
+  background: #1e293b;
+  border-color: #475569;
+  color: #f8fafc;
+}
+
+:root.theme-dark .projects-page .row-actions button:hover,
+:root.theme-dark .projects-page .project-details-title-actions button:hover {
+  background: #064e3b;
+  border-color: rgba(34, 197, 94, 0.45);
+  color: #dcfce7;
+}
+
+:root.theme-dark .projects-page .row-actions button:last-child,
+:root.theme-dark .projects-page .logout-action {
+  background: #3f1d1d;
+  border-color: #7f1d1d;
+  color: #fecaca;
+}
+
+:root.theme-dark .projects-page .progress-bar {
+  background: #334155;
+}
+
+:root.theme-dark .projects-page .progress-bar i {
+  background: linear-gradient(90deg, #22c55e, #86efac);
+}
+
+/* Messagerie : conversations, bulles, panneaux et composer avec contraste stable. */
+:root.theme-dark .messages-page .messages-whatsapp-shell,
+:root.theme-dark .messages-page .messages-sidebar-panel,
+:root.theme-dark .messages-page .messages-chat-panel,
+:root.theme-dark .messages-page .messages-sidebar-header,
+:root.theme-dark .messages-page .messages-chat-header,
+:root.theme-dark .messages-page .messages-chat-composer,
+:root.theme-dark .messages-page .messages-chat-empty,
+:root.theme-dark .messages-page .messages-empty {
+  background: #111827;
+  border-color: #334155;
+  color: #f8fafc;
+}
+
+:root.theme-dark .messages-page .messages-chat-history {
+  background:
+    linear-gradient(180deg, rgba(15, 23, 42, 0.96), rgba(15, 23, 42, 0.96)),
+    radial-gradient(circle at top left, rgba(34, 197, 94, 0.12), transparent 34%);
+}
+
+:root.theme-dark .messages-page .messages-sidebar-header h3,
+:root.theme-dark .messages-page .messages-chat-header h3,
+:root.theme-dark .messages-page .messages-chat-empty h3,
+:root.theme-dark .messages-page .conversation-item strong,
+:root.theme-dark .messages-page .message-bubble p {
+  color: #f8fafc;
+}
+
+:root.theme-dark .messages-page .messages-sidebar-header span,
+:root.theme-dark .messages-page .messages-chat-header span,
+:root.theme-dark .messages-page .presence-text,
+:root.theme-dark .messages-page .conversation-item p,
+:root.theme-dark .messages-page .conversation-item time,
+:root.theme-dark .messages-page .conversation-item footer span,
+:root.theme-dark .messages-page .message-meta,
+:root.theme-dark .messages-page .message-status,
+:root.theme-dark .messages-page .message-bubble time {
+  color: #cbd5e1;
+}
+
+:root.theme-dark .messages-page .conversation-item {
+  background: #111827;
+  border-color: #334155;
+  color: #f8fafc;
+}
+
+:root.theme-dark .messages-page .conversation-item:hover,
+:root.theme-dark .messages-page .conversation-item.is-selected {
+  background: #064e3b;
+  border-color: rgba(34, 197, 94, 0.55);
+}
+
+:root.theme-dark .messages-page .conversation-item.is-selected p,
+:root.theme-dark .messages-page .conversation-item.is-selected span,
+:root.theme-dark .messages-page .conversation-item.is-selected time,
+:root.theme-dark .messages-page .conversation-item.is-selected small {
+  color: #dcfce7;
+}
+
+:root.theme-dark .messages-page .message-bubble-row:not(.is-mine) .message-bubble {
+  background: #1e293b;
+  border-color: #334155;
+  color: #f8fafc;
+}
+
+:root.theme-dark .messages-page .message-bubble-row.is-mine .message-bubble {
+  background: #065f46;
+  border-color: rgba(34, 197, 94, 0.55);
+  color: #ecfdf5;
+}
+
+:root.theme-dark .messages-page .message-bubble-row.is-mine .message-bubble p,
+:root.theme-dark .messages-page .message-bubble-row.is-mine .message-bubble time,
+:root.theme-dark .messages-page .message-bubble-row.is-mine .message-status {
+  color: #ecfdf5;
+}
+
+:root.theme-dark .messages-page .messages-search,
+:root.theme-dark .messages-page .messages-chat-composer {
+  border-color: #334155;
+}
+
+:root.theme-dark .messages-page .messages-search input,
+:root.theme-dark .messages-page .messages-chat-composer textarea {
+  background: #0f172a;
+  border-color: #334155;
+  color: #f8fafc;
+}
+
+:root.theme-dark .messages-page .messages-search input::placeholder,
+:root.theme-dark .messages-page .messages-chat-composer textarea::placeholder {
+  color: #94a3b8;
+}
+
+:root.theme-dark .messages-page .messages-chat-composer button {
+  background: #16a34a;
+  color: #ffffff;
+}
+
+:root.theme-dark .messages-page .messages-chat-composer button:disabled {
+  background: #334155;
+  color: #94a3b8;
+  opacity: 1;
+}
+
+:root.theme-dark .messages-page .conversation-item footer mark,
+:root.theme-dark .messages-page .realtime-status {
+  background: #064e3b;
+  color: #bbf7d0;
+}
+
+/* Permissions : listes, modules, lignes et etats de selection en mode sombre. */
+:root.theme-dark .permissions-page .permissions-panel,
+:root.theme-dark .permissions-page .permissions-users-list,
+:root.theme-dark .permissions-page .permissions-editor,
+:root.theme-dark .permissions-page .permissions-table,
+:root.theme-dark .permissions-page .settings-summary-card {
+  background: #111827;
+  border-color: #334155;
+  color: #f8fafc;
+}
+
+:root.theme-dark .permissions-page .permissions-groups article,
+:root.theme-dark .permissions-page .permission-toggle-row,
+:root.theme-dark .permissions-page .permissions-table__row {
+  background: #1e293b;
+  border-color: #334155;
+  color: #f8fafc;
+}
+
+:root.theme-dark .permissions-page .permissions-users-list button {
+  background: #111827;
+  border-color: #334155;
+  color: #f8fafc;
+}
+
+:root.theme-dark .permissions-page .permissions-users-list button:hover,
+:root.theme-dark .permissions-page .permissions-users-list button.is-selected {
+  background: #064e3b;
+  border-color: rgba(34, 197, 94, 0.55);
+}
+
+:root.theme-dark .permissions-page .permissions-users-list button.is-selected span,
+:root.theme-dark .permissions-page .permissions-users-list button.is-selected small {
+  color: #dcfce7;
+}
+
+:root.theme-dark .permissions-page .permissions-editor h4,
+:root.theme-dark .permissions-page .permissions-groups h5,
+:root.theme-dark .permissions-page .permission-toggle-row strong,
+:root.theme-dark .permissions-page .permissions-table__row strong,
+:root.theme-dark .permissions-page .permissions-users-list strong {
+  color: #f8fafc;
+}
+
+:root.theme-dark .permissions-page .permissions-editor header span,
+:root.theme-dark .permissions-page .permission-toggle-row small,
+:root.theme-dark .permissions-page .permissions-users-list span,
+:root.theme-dark .permissions-page .permissions-users-list small,
+:root.theme-dark .permissions-page .permissions-table__head,
+:root.theme-dark .permissions-page .helper-text {
+  color: #cbd5e1;
+}
+
+:root.theme-dark .permissions-page .permissions-search input {
+  background: #0f172a;
+  border-color: #334155;
+  color: #f8fafc;
+}
+
+:root.theme-dark .permissions-page .permissions-search input::placeholder {
+  color: #94a3b8;
+}
+
+:root.theme-dark .permissions-page .permission-toggle-row input {
+  accent-color: #22c55e;
+}
+
+:root.theme-dark .permissions-page .permission-mark {
+  background: #334155;
+  color: #e5e7eb;
+}
+
+:root.theme-dark .permissions-page .permission-mark.is-enabled {
+  background: #064e3b;
+  color: #bbf7d0;
+}
+
+:root.theme-dark .permissions-page .primary-action:disabled {
+  background: #334155;
+  color: #94a3b8;
+  opacity: 1;
+}
+
 :root.compact-mode .dashboard-main {
   padding: 14px 18px;
 }
