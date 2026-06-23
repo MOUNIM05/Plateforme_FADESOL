@@ -761,7 +761,7 @@ function Projects() {
         </div>
       </section>
 
-      {projectFormOpen && (
+      {projectFormOpen && ((editingProjectId && canUpdateProjects) || (!editingProjectId && canCreateProjects)) && (
         <div className="service-modal-backdrop modal-overlay" role="presentation" onMouseDown={resetForm}>
           <form
             className="service-modal modal-card project-form-modal"

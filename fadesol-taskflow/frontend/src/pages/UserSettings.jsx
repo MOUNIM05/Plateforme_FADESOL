@@ -15,6 +15,22 @@ function PreferenceSwitch({ checked, description, label, name, onChange }) {
   );
 }
 
+const languageOptions = [
+  { value: "fr", label: "Français" },
+  { value: "ar", label: "Arabe" },
+  { value: "en", label: "Anglais" },
+];
+
+const timezoneOptions = [
+  { value: "Africa/Casablanca", label: "Africa/Casablanca" },
+  { value: "Europe/Paris", label: "Europe/Paris" },
+  { value: "UTC", label: "UTC" },
+];
+
+function getUserDisplayName(user) {
+  return [user?.prenom || user?.first_name, user?.nom || user?.last_name].filter(Boolean).join(" ") || user?.email || "Utilisateur";
+}
+
 function UserSettings() {
   const { currentUser } = useAuth();
   const [preferences, setPreferences] = useState(() => loadUserPreferences(currentUser));
@@ -103,6 +119,26 @@ function UserSettings() {
                 <option value="dark">Sombre</option>
               </select>
             </label>
+            <label>
+              Langue
+              <select name="language" value={preferences.language} onChange={handleChange}>
+                {languageOptions.map((language) => (
+                  <option key={language.value} value={language.value}>
+                    {language.label}
+                  </option>
+                ))}
+              </select>
+            </label>
+            <label>
+              Fuseau horaire
+              <select name="timezone" value={preferences.timezone} onChange={handleChange}>
+                {timezoneOptions.map((timezone) => (
+                  <option key={timezone.value} value={timezone.value}>
+                    {timezone.label}
+                  </option>
+                ))}
+              </select>
+            </label>
           </div>
 
           <div className="settings-switch-list">
@@ -151,6 +187,24 @@ function UserSettings() {
               checked={preferences.taskNotifications}
               onChange={handleChange}
             />
+          </div>
+        </section>
+
+        <section className="workspace-panel settings-panel">
+          <div className="panel-title">
+            <h3>Compte</h3>
+            <span>Session connectée</span>
+          </div>
+
+          <div className="settings-form-grid">
+            <label>
+              Utilisateur
+              <input value={getUserDisplayName(currentUser)} readOnly />
+            </label>
+            <label>
+              Email
+              <input value={currentUser?.email || ""} readOnly />
+            </label>
           </div>
         </section>
 

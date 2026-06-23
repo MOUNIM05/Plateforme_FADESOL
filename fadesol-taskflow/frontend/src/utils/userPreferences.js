@@ -2,6 +2,8 @@ export const USER_SETTINGS_STORAGE_KEY = "fadesol-user-settings";
 
 export const defaultUserPreferences = {
   theme: "light",
+  language: "fr",
+  timezone: "Africa/Casablanca",
   compactMode: false,
   showAvatars: true,
   notificationsEnabled: true,
@@ -60,6 +62,8 @@ export function applyUserPreferences(preferences) {
   root.classList.toggle("compact-mode", nextPreferences.compactMode === true);
   root.classList.toggle("hide-avatars", nextPreferences.showAvatars === false);
   root.dataset.theme = nextPreferences.theme;
+  root.lang = nextPreferences.language || "fr";
+  root.dataset.timezone = nextPreferences.timezone || "Africa/Casablanca";
 
   return nextPreferences;
 }

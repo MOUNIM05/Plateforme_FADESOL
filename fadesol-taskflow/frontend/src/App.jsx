@@ -1,6 +1,6 @@
 // Definition centrale des routes React et des protections d'acces.
 import { BrowserRouter, Navigate, Route, Routes } from "react-router-dom";
-import { AuthProvider, ROLES, useAuth } from "./context/AuthContext";
+import { AuthProvider, ROLES, getDashboardPath, useAuth } from "./context/AuthContext";
 import DashboardLayout from "./layouts/DashboardLayout";
 import AccessDenied from "./pages/AccessDenied";
 import Dashboard from "./pages/Dashboard";
@@ -12,7 +12,6 @@ import Permissions from "./pages/Permissions";
 import Profile from "./pages/Profile";
 import Projects from "./pages/Projects";
 import Services from "./pages/Services";
-import Settings from "./pages/Settings";
 import Tasks from "./pages/Tasks";
 import Users from "./pages/Users";
 import UserSettings from "./pages/UserSettings";
@@ -21,7 +20,7 @@ import RoleRoute from "./routes/RoleRoute";
 
 function AuthRedirect() {
   // Redirige la racine selon l'etat de session courant.
-  const { isAuthenticated, loading } = useAuth();
+  const { currentUser, isAuthenticated, loading } = useAuth();
 
   if (loading) {
     return (
@@ -34,7 +33,7 @@ function AuthRedirect() {
     );
   }
 
-  return <Navigate to={isAuthenticated ? "/dashboard" : "/login"} replace />;
+  return <Navigate to={isAuthenticated ? getDashboardPath(currentUser) : "/login"} replace />;
 }
 
 function AppRoutes() {
@@ -44,25 +43,31 @@ function AppRoutes() {
       <Route path="/login" element={<Login />} />
       <Route element={<ProtectedRoute />}>
         <Route element={<DashboardLayout />}>
-          <Route path="/dashboard" element={<Dashboard />} />
+          <Route element={<RoleRoute allowedPermissions={["dashboard.view"]} />}>
+            <Route path="/dashboard" element={<Dashboard />} />
+          </Route>
           <Route path="/profile" element={<Profile />} />
-          <Route element={<RoleRoute allowedRoles={[ROLES.ADMIN]} />}>
+          <Route element={<RoleRoute allowedPermissions={["users.view"]} />}>
             <Route path="/users" element={<Users />} />
           </Route>
-          <Route element={<RoleRoute allowedRoles={[ROLES.ADMIN]} />}>
+          <Route element={<RoleRoute allowedPermissions={["services.view"]} />}>
             <Route
               path="/services"
               element={<Services />}
             />
           </Route>
-          <Route element={<RoleRoute allowedPermissions={["projects.view", "projects.create", "projects.update"]} allowedRoles={[ROLES.ADMIN, ROLES.MANAGER]} />}>
+          <Route element={<RoleRoute allowedPermissions={["projects.view"]} />}>
             <Route
               path="/projects"
               element={<Projects />}
             />
           </Route>
-          <Route path="/my-tasks" element={<MyTasks />} />
-          <Route path="/tasks" element={<Tasks />} />
+          <Route element={<RoleRoute allowedRoles={[ROLES.MANAGER, ROLES.EMPLOYEE]} />}>
+            <Route path="/my-tasks" element={<MyTasks />} />
+          </Route>
+          <Route element={<RoleRoute allowedPermissions={["tasks.view"]} />}>
+            <Route path="/tasks" element={<Tasks />} />
+          </Route>
           <Route element={<RoleRoute allowedPermissions={["messages.view"]} />}>
             <Route
               path="/messages"
@@ -71,13 +76,7 @@ function AppRoutes() {
           </Route>
           <Route path="/notifications" element={<Notifications />} />
           <Route path="/settings" element={<UserSettings />} />
-          <Route element={<RoleRoute allowedRoles={[ROLES.ADMIN]} />}>
-            <Route
-              path="/system-settings"
-              element={<Settings />}
-            />
-          </Route>
-          <Route element={<RoleRoute allowedRoles={[ROLES.ADMIN]} />}>
+          <Route element={<RoleRoute allowedRoles={[ROLES.ADMIN]} allowedPermissions={["settings.permissions.manage"]} />}>
             <Route
               path="/permissions"
               element={<Permissions />}

@@ -218,6 +218,7 @@ function Tasks() {
   const canCreateTasks = hasPermission("tasks.create");
   const canUpdateTasks = hasPermission("tasks.update");
   const canDeleteTasks = hasPermission("tasks.delete");
+  const canManageTaskDetails = canCreateTasks || canUpdateTasks;
   const role = currentUser?.role;
   const isManager = role === "Manager";
   const isEmployee = role === "Employee" || role === "Employe" || role === "EmployÃ©";
@@ -1358,10 +1359,12 @@ function Tasks() {
                       <Eye size={15} />
                       Voir
                     </button>
-                    <button className="secondary-action compact-action" type="button" onClick={() => handleToggleSubtasks(task.id)}>
-                      <PlusCircle size={15} />
-                      Sous-tâche
-                    </button>
+                    {canManageTaskDetails && (
+                      <button className="secondary-action compact-action" type="button" onClick={() => handleToggleSubtasks(task.id)}>
+                        <PlusCircle size={15} />
+                        Sous-tâche
+                      </button>
+                    )}
                     {canUpdateTasks && (
                       <button type="button" onClick={() => startEditTask(task)}>
                         <Edit3 size={15} />
@@ -1377,7 +1380,7 @@ function Tasks() {
                   </span>
                 </div>
 
-                {expandedTaskId === task.id && (
+                {expandedTaskId === task.id && canManageTaskDetails && (
                   <div className="subtask-row">
                     <div className="subtask-panel">
                       <section className="attachments-panel">
@@ -1608,7 +1611,7 @@ function Tasks() {
         </section>
       </section>
 
-      {taskFormOpen && (
+      {taskFormOpen && ((editingTaskId && canUpdateTasks) || (!editingTaskId && canCreateTasks)) && (
         <div className="service-modal-backdrop modal-overlay" role="presentation" onMouseDown={resetTaskForm}>
           <form
             className="service-modal modal-card task-form-modal"

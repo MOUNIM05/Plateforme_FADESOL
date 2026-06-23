@@ -60,8 +60,62 @@ export function getInitials(user) {
     .join("");
 }
 
-export function getDashboardPath() {
-  return "/dashboard";
+export const permissionRouteOrder = [
+  { path: "/dashboard", permission: "dashboard.view" },
+  { path: "/users", permission: "users.view" },
+  { path: "/services", permission: "services.view" },
+  { path: "/projects", permission: "projects.view" },
+  { path: "/my-tasks", roles: [ROLES.MANAGER, ROLES.EMPLOYEE] },
+  { path: "/tasks", permission: "tasks.view" },
+  { path: "/messages", permission: "messages.view" },
+  { path: "/permissions", permission: "settings.permissions.manage", roles: [ROLES.ADMIN] },
+];
+
+export function userHasPermission(user, permissionKey) {
+  if (!permissionKey) {
+    return true;
+  }
+
+  if (normalizeRole(user?.role) === ROLES.ADMIN) {
+    return true;
+  }
+
+  return user?.permissions?.[permissionKey] === true;
+}
+
+export function getRouteAccess(pathname = "") {
+  return permissionRouteOrder.find((route) => pathname.startsWith(route.path));
+}
+
+export function canAccessPath(user, pathname = "") {
+  const routeAccess = getRouteAccess(pathname);
+
+  if (!routeAccess) {
+    return true;
+  }
+
+  const allowedByPermission = userHasPermission(user, routeAccess.permission);
+  const allowedByRole = !routeAccess.roles || routeAccess.roles.includes(normalizeRole(user?.role));
+
+  return allowedByPermission && allowedByRole;
+}
+
+export function getFirstAllowedPath(user) {
+  const firstAllowedRoute = permissionRouteOrder.find((route) => canAccessPath(user, route.path));
+
+  return firstAllowedRoute?.path || "/access-denied";
+}
+
+export function getAuthorizedPath(user, preferredPath) {
+  if (preferredPath && preferredPath !== "/login" && canAccessPath(user, preferredPath)) {
+    return preferredPath;
+  }
+
+  return getFirstAllowedPath(user);
+}
+
+export function getDashboardPath(user) {
+  return getFirstAllowedPath(user);
 }
 
 async function getCurrentUserWithPermissions() {
@@ -229,11 +283,7 @@ export function AuthProvider({ children }) {
   const hasPermission = useCallback(
     (permissionKey) => {
       // L'admin possede toujours tous les droits fonctionnels.
-      if (normalizeRole(currentUser?.role) === ROLES.ADMIN) {
-        return true;
-      }
-
-      return currentUser?.permissions?.[permissionKey] === true;
+      return userHasPermission(currentUser, permissionKey);
     },
     [currentUser?.permissions, currentUser?.role]
   );

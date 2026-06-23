@@ -5,7 +5,7 @@ import AccessDenied from "../pages/AccessDenied";
 import { useAuth } from "../context/AuthContext";
 
 function RoleRoute({ allowedPermissions = [], allowedRoles = [] }) {
-  // Les pages peuvent etre autorisees par role, par permission, ou par les deux.
+  // Les pages protegees doivent satisfaire toutes les contraintes declarees.
   const { currentUser, hasAnyPermission, loading, token } = useAuth();
 
   if (loading) {
@@ -25,11 +25,10 @@ function RoleRoute({ allowedPermissions = [], allowedRoles = [] }) {
 
   const normalizedAllowedRoles = allowedRoles.map(normalizeRole);
   const currentRole = normalizeRole(currentUser.role);
-  // Le controle reste souple pour supporter les permissions fines configurees par l'Admin.
-  const hasAllowedRole = normalizedAllowedRoles.includes(currentRole);
-  const hasAllowedPermission = allowedPermissions.length > 0 && hasAnyPermission(allowedPermissions);
+  const hasAllowedRole = allowedRoles.length === 0 || normalizedAllowedRoles.includes(currentRole);
+  const hasAllowedPermission = allowedPermissions.length === 0 || hasAnyPermission(allowedPermissions);
 
-  if (!hasAllowedRole && !hasAllowedPermission) {
+  if (!hasAllowedRole || !hasAllowedPermission) {
     return <AccessDenied />;
   }
 

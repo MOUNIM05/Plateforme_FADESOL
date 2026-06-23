@@ -20,26 +20,25 @@ const sections = [
   {
     title: "ORGANISATION",
     items: [
-      { label: "Dashboard", icon: BarChart3, roles: [ROLES.ADMIN, ROLES.MANAGER, ROLES.EMPLOYEE] },
-      { label: "Services", icon: Building2, roles: [ROLES.ADMIN], permission: "services.view" },
-      { label: "Utilisateurs", icon: UsersRound, roles: [ROLES.ADMIN], permission: "users.view" },
+      { label: "Dashboard", icon: BarChart3, permission: "dashboard.view" },
+      { label: "Services", icon: Building2, permission: "services.view" },
+      { label: "Utilisateurs", icon: UsersRound, permission: "users.view" },
     ],
   },
-      {
-        title: "PROJETS & TACHES",
-        items: [
-          { label: "Projets", icon: FolderKanban, roles: [ROLES.ADMIN, ROLES.MANAGER], permission: "projects.view" },
-          { label: "Taches", icon: ClipboardList, roles: [ROLES.ADMIN, ROLES.MANAGER], permission: "tasks.view" },
-          { label: "Mes taches", icon: ShieldCheck, roles: [ROLES.MANAGER, ROLES.EMPLOYEE] },
-        ],
-      },
+  {
+    title: "PROJETS & TACHES",
+    items: [
+      { label: "Projets", icon: FolderKanban, permission: "projects.view" },
+      { label: "Taches", icon: ClipboardList, permission: "tasks.view" },
+      { label: "Mes taches", icon: ShieldCheck, roles: [ROLES.MANAGER, ROLES.EMPLOYEE] },
+    ],
+  },
   {
     title: "COMMUNICATION",
     items: [
       {
         label: "Messagerie",
         icon: MessageSquareText,
-        roles: [ROLES.ADMIN, ROLES.MANAGER, ROLES.EMPLOYEE],
         permission: "messages.view",
       },
     ],
@@ -47,9 +46,8 @@ const sections = [
   {
     title: "SYSTEME",
     items: [
-      { label: "Parametres systeme", icon: Settings, roles: [ROLES.ADMIN], permission: "settings.view" },
       { label: "Permissions", icon: KeyRound, roles: [ROLES.ADMIN], permission: "settings.permissions.manage" },
-      { label: "Parametres", icon: Settings, roles: [ROLES.MANAGER, ROLES.EMPLOYEE] },
+      { label: "Parametres", icon: Settings },
     ],
   },
 ];

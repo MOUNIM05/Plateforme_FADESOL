@@ -2,7 +2,7 @@
 import { useState } from "react";
 import { Outlet, useLocation, useNavigate } from "react-router-dom";
 import MainSidebar from "../components/dashboard/MainSidebar";
-import { useAuth } from "../context/AuthContext";
+import { getDashboardPath, useAuth } from "../context/AuthContext";
 import "../styles/dashboard.css";
 
 const itemRoutes = {
@@ -13,7 +13,6 @@ const itemRoutes = {
   Taches: "/tasks",
   "Mes taches": "/my-tasks",
   Messagerie: "/messages",
-  "Parametres systeme": "/system-settings",
   Permissions: "/permissions",
   Parametres: "/settings",
 };
@@ -22,10 +21,6 @@ function getActiveItem(pathname) {
   // Determine l'element actif de la sidebar a partir de l'URL courante.
   if (pathname.startsWith("/permissions")) {
     return "Permissions";
-  }
-
-  if (pathname.startsWith("/system-settings")) {
-    return "Parametres systeme";
   }
 
   if (pathname.startsWith("/settings")) {
@@ -47,7 +42,7 @@ function DashboardLayout() {
 
   function handleSelect(itemLabel) {
     // Convertit un libelle de menu en route React.
-    navigate(itemRoutes[itemLabel] || "/dashboard");
+    navigate(itemRoutes[itemLabel] || getDashboardPath(currentUser));
   }
 
   return (

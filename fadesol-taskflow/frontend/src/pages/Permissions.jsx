@@ -1,6 +1,6 @@
 // Page d'administration des permissions fines par utilisateur.
 import { CheckCircle2, KeyRound, Save, Search, ShieldCheck, UsersRound } from "lucide-react";
-import { useEffect, useMemo, useState } from "react";
+import { useEffect, useMemo, useRef, useState } from "react";
 import { useAuth } from "../context/AuthContext";
 import {
   getPermissionCatalog,
@@ -18,6 +18,12 @@ function getUserService(user) {
   return user?.service || user?.nom_service || user?.service_name || user?.id_service || user?.service_id || "Non affecté";
 }
 
+function getPermissionUserId(user) {
+  return user?.id ?? user?.user_id ?? "";
+}
+
+const selectedPermissionUserStorageKey = "fadesol-permissions-selected-user-id";
+
 function countEnabledPermissions(permissions) {
   // Compte les droits actifs pour afficher un resume rapide.
   return Object.values(permissions || {}).filter(Boolean).length;
@@ -25,7 +31,8 @@ function countEnabledPermissions(permissions) {
 
 function Permissions() {
   // Cette page modifie les surcharges de permissions puis rafraichit le contexte Auth.
-  const { currentUser, refreshCurrentUser } = useAuth();
+  const { currentUser, hasPermission, refreshCurrentUser } = useAuth();
+  const canManagePermissions = hasPermission("settings.permissions.manage");
   const [users, setUsers] = useState([]);
   const [permissionCatalog, setPermissionCatalog] = useState([]);
   const [selectedUserId, setSelectedUserId] = useState("");
@@ -35,6 +42,11 @@ function Permissions() {
   const [saving, setSaving] = useState(false);
   const [message, setMessage] = useState("");
   const [error, setError] = useState("");
+  const selectedUserIdRef = useRef("");
+
+  useEffect(() => {
+    selectedUserIdRef.current = String(selectedUserId || "");
+  }, [selectedUserId]);
 
   useEffect(() => {
     // Charge le catalogue de permissions et la liste des utilisateurs.
@@ -54,7 +66,19 @@ function Permissions() {
 
         setUsers(loadedUsers);
         setPermissionCatalog(Array.isArray(catalogData) ? catalogData : []);
-        setSelectedUserId(String(loadedUsers[0]?.id || ""));
+        setSelectedUserId((currentSelectedUserId) => {
+          const storedSelectedUserId = sessionStorage.getItem(selectedPermissionUserStorageKey) || "";
+          const preferredUserId = String(currentSelectedUserId || selectedUserIdRef.current || storedSelectedUserId || "");
+          const preferredUserExists = loadedUsers.some(
+            (user) => String(getPermissionUserId(user)) === preferredUserId
+          );
+
+          if (preferredUserExists) {
+            return preferredUserId;
+          }
+
+          return String(getPermissionUserId(loadedUsers[0]) || "");
+        });
       } catch (loadError) {
         if (isMounted) {
           setError(loadError.response?.data?.detail || "Impossible de charger les permissions.");
@@ -128,7 +152,7 @@ function Permissions() {
   }, [search, users]);
 
   const selectedUser = useMemo(
-    () => users.find((user) => String(user.id) === String(selectedUserId)) || null,
+    () => users.find((user) => String(getPermissionUserId(user)) === String(selectedUserId)) || null,
     [selectedUserId, users]
   );
 
@@ -138,6 +162,10 @@ function Permissions() {
   );
 
   function togglePermission(permissionKey) {
+    if (!canManagePermissions || !selectedUserId || loading || saving) {
+      return;
+    }
+
     // Inverse localement un droit avant sauvegarde.
     setSelectedPermissions((current) => ({
       ...current,
@@ -147,18 +175,35 @@ function Permissions() {
     setError("");
   }
 
+  function selectUser(user) {
+    const nextUserId = String(getPermissionUserId(user));
+
+    if (!nextUserId || nextUserId === String(selectedUserId)) {
+      return;
+    }
+
+    setSelectedUserId(nextUserId);
+    sessionStorage.setItem(selectedPermissionUserStorageKey, nextUserId);
+    setMessage("");
+    setError("");
+  }
+
   async function savePermissions() {
-    if (!selectedUserId || saving) {
+    if (!canManagePermissions || !selectedUserId || !selectedUser || saving || loading) {
       return;
     }
 
     setSaving(true);
     setMessage("");
     setError("");
+    const preservedSelectedUserId = String(selectedUserId);
+    sessionStorage.setItem(selectedPermissionUserStorageKey, preservedSelectedUserId);
 
     try {
       const data = await updateUserPermissions(selectedUserId, selectedPermissions);
       setSelectedPermissions(data.permissions || {});
+      setSelectedUserId(preservedSelectedUserId);
+      sessionStorage.setItem(selectedPermissionUserStorageKey, preservedSelectedUserId);
       setMessage("Permissions enregistrées avec succès.");
       dispatchDataChanged(DATA_EVENTS.PERMISSIONS_CHANGED);
 
@@ -178,17 +223,6 @@ function Permissions() {
         <div>
           <h2>Permissions</h2>
           <p>Gestion des droits utilisateurs réservée à l'administration.</p>
-        </div>
-        <div className="toolbar-actions">
-          <button
-            type="button"
-            className="primary-action"
-            onClick={savePermissions}
-            disabled={!selectedUserId || saving || loading}
-          >
-            <Save size={17} />
-            {saving ? "Enregistrement..." : "Enregistrer"}
-          </button>
         </div>
       </div>
 
@@ -234,9 +268,10 @@ function Permissions() {
               {filteredUsers.map((user) => (
                 <button
                   type="button"
-                  key={user.id}
-                  className={String(selectedUserId) === String(user.id) ? "is-selected" : ""}
-                  onClick={() => setSelectedUserId(String(user.id))}
+                  key={getPermissionUserId(user) || user.email}
+                  className={String(selectedUserId) === String(getPermissionUserId(user)) ? "is-selected" : ""}
+                  onClick={() => selectUser(user)}
+                  disabled={loading || saving || !getPermissionUserId(user)}
                 >
                   <strong>{getUserName(user)}</strong>
                   <span>{user.email}</span>
@@ -257,7 +292,7 @@ function Permissions() {
                     <h4>{getUserName(selectedUser)}</h4>
                     <span>{selectedUser.email} - {selectedUser.role} - {getUserService(selectedUser)}</span>
                   </div>
-                  <button type="button" className="primary-action" onClick={savePermissions} disabled={saving || loading}>
+                  <button type="button" className="primary-action" onClick={savePermissions} disabled={!canManagePermissions || !selectedUserId || saving || loading}>
                     <Save size={17} />
                     {saving ? "Enregistrement..." : "Enregistrer les permissions"}
                   </button>
@@ -273,6 +308,7 @@ function Permissions() {
                             type="checkbox"
                             checked={selectedPermissions[permission.key] === true}
                             onChange={() => togglePermission(permission.key)}
+                            disabled={!canManagePermissions || loading || saving || !selectedUserId}
                           />
                           <span>
                             <strong>{permission.label}</strong>

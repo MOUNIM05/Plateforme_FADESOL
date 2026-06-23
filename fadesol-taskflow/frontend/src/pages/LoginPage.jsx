@@ -1,7 +1,7 @@
 import { useState } from "react";
 import { Navigate, useLocation, useNavigate } from "react-router-dom";
 import { Eye, EyeOff, LockKeyhole, Mail } from "lucide-react";
-import { getDashboardPath, useAuth } from "../context/AuthContext";
+import { getAuthorizedPath, getDashboardPath, useAuth } from "../context/AuthContext";
 import { API_BASE_URL } from "../services/api";
 import fadesolLogo from "../assets/fadesol-logo.png";
 import loginBackground from "../assets/login-energy-bg.png";
@@ -10,17 +10,17 @@ import "../styles/login.css";
 function LoginPage() {
   const navigate = useNavigate();
   const location = useLocation();
-  const { isAuthenticated, login } = useAuth();
+  const { currentUser, isAuthenticated, login } = useAuth();
   const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
   const [rememberMe, setRememberMe] = useState(false);
   const [showPassword, setShowPassword] = useState(false);
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState("");
-  const from = location.state?.from?.pathname || getDashboardPath();
+  const from = location.state?.from?.pathname;
 
   if (isAuthenticated) {
-    return <Navigate to={getDashboardPath()} replace />;
+    return <Navigate to={getDashboardPath(currentUser)} replace />;
   }
 
   async function handleSubmit(event) {
@@ -30,8 +30,8 @@ function LoginPage() {
 
     try {
       // AuthContext stocke le JWT, charge /auth/me, puis expose le rôle aux routes.
-      await login(email, password);
-      navigate(from, { replace: true });
+      const user = await login(email, password);
+      navigate(getAuthorizedPath(user, from), { replace: true });
     } catch (err) {
       console.error("Login error:", err);
 
