@@ -5,18 +5,23 @@ import { useNavigate } from "react-router-dom";
 import { useAuth } from "../../context/AuthContext";
 import { getMessages, getMessagesWebSocketUrl } from "../../services/messageService";
 import { getTasks } from "../../services/taskService";
-import { getMyUserProfile, getUsers } from "../../services/userService";
+import { getMyUserProfile } from "../../services/userService";
 import { DATA_EVENTS, subscribeDataEvents } from "../../utils/dataEvents";
+import {
+  getTaskAssigneeValues,
+  getUserIdentitySet,
+  isMessageReceivedByCurrentUser,
+  isNotificationMessageForCurrentUser,
+  isNotificationTaskForCurrentUser,
+  mergeNotificationRecords,
+} from "../../utils/notificationFilters";
+import {
+  getTaskNotificationId,
+  loadReadTaskNotificationIds,
+  markTaskNotificationAsRead,
+  TASK_NOTIFICATION_READ_EVENT,
+} from "../../utils/taskNotificationReadState";
 import { loadUserPreferences } from "../../utils/userPreferences";
-
-function getUserIdentifiers(user) {
-  // Regroupe les identifiants possibles pour reconnaitre les messages du compte courant.
-  return new Set(
-    [user?.uuid, user?.id, user?.user_id]
-      .filter((value) => value !== undefined && value !== null && value !== "")
-      .map(String)
-  );
-}
 
 function NotificationDropdown() {
   // Le menu agrege messages et taches, puis se met a jour via evenements et WebSocket.
@@ -25,57 +30,45 @@ function NotificationDropdown() {
   const [messages, setMessages] = useState([]);
   const [tasks, setTasks] = useState([]);
   const [profile, setProfile] = useState(null);
-  const [serviceUsers, setServiceUsers] = useState([]);
   const [preferences, setPreferences] = useState(() => loadUserPreferences(currentUser));
+  const [readTaskIds, setReadTaskIds] = useState(() => loadReadTaskNotificationIds(currentUser));
   const [open, setOpen] = useState(false);
   const dropdownRef = useRef(null);
 
   const role = currentUser?.role;
-  const isAdmin = role === "Admin" || role === "Administrateur";
-  const isManager = role === "Manager";
-  const isEmployee = role === "Employee" || role === "Employe" || role === "EmployÃ©";
-
-  const currentServiceId = profile?.id_service || profile?.service_id || currentUser?.id_service || currentUser?.service_id || "";
-
-  const userIds = useMemo(() => {
-    return new Set([...getUserIdentifiers(currentUser), ...getUserIdentifiers(profile)]);
-  }, [currentUser, profile]);
+  const userIds = useMemo(() => getUserIdentitySet(currentUser, profile), [currentUser, profile]);
 
   const loadNotifications = useCallback(async () => {
     // Recharge messages et taches en appliquant les filtres du role courant.
     try {
-      const taskFilters = isEmployee ? { assigned_to: "me" } : isManager && currentServiceId ? { service_id: currentServiceId } : {};
-
-      const [messagesData, tasksData] = await Promise.allSettled([getMessages(), getTasks(taskFilters)]);
+      const [messagesData, tasksData, myTasksData] = await Promise.allSettled([
+        getMessages(),
+        getTasks(),
+        getTasks({ assigned_to: "me" }),
+      ]);
 
       const rawMessages = messagesData.status === "fulfilled" && Array.isArray(messagesData.value) ? messagesData.value : [];
       const rawTasks = tasksData.status === "fulfilled" && Array.isArray(tasksData.value) ? tasksData.value : [];
+      const rawMyTasks = myTasksData.status === "fulfilled" && Array.isArray(myTasksData.value)
+        ? myTasksData.value.map((task) => ({ ...task, _notificationAssignedToCurrentUser: true }))
+        : [];
+      const mergedTasks = mergeNotificationRecords(rawTasks, rawMyTasks);
 
-      // Filtre les messages par role : employee direct, manager service, admin global.
-      let visibleMessages = rawMessages;
-
-      if (isEmployee) {
-        visibleMessages = rawMessages.filter((message) => {
-          const recipientId = String(message.destinataire_id || "");
-          return userIds.has(recipientId);
-        });
-      } else if (isManager && serviceUsers.length > 0) {
-        const serviceIds = new Set(serviceUsers.flatMap((u) => [String(u.id), String(u.uuid)]));
-        visibleMessages = rawMessages.filter((message) => {
-          const recipientId = String(message.destinataire_id || "");
-          const senderId = String(message.expediteur_id || "");
-          return serviceIds.has(recipientId) || serviceIds.has(senderId);
-        });
-      }
+      const visibleMessages = rawMessages.filter((message) =>
+        isNotificationMessageForCurrentUser(message, currentUser, profile)
+      );
+      const visibleTasks = mergedTasks.filter((task) =>
+        isNotificationTaskForCurrentUser(task, currentUser, profile)
+      );
 
       setMessages(visibleMessages);
-      setTasks(rawTasks);
+      setTasks(visibleTasks);
     } catch (error) {
       console.error("Notification load error:", error);
       setMessages([]);
       setTasks([]);
     }
-  }, [isEmployee, isManager, currentServiceId, serviceUsers, userIds]);
+  }, [currentUser, profile]);
 
   useEffect(() => {
     function handleSettingsChanged(event) {
@@ -92,6 +85,24 @@ function NotificationDropdown() {
   }, [currentUser]);
 
   useEffect(() => {
+    setReadTaskIds(loadReadTaskNotificationIds(currentUser, profile));
+  }, [currentUser, profile]);
+
+  useEffect(() => {
+    function syncReadTaskNotifications() {
+      setReadTaskIds(loadReadTaskNotificationIds(currentUser, profile));
+    }
+
+    window.addEventListener(TASK_NOTIFICATION_READ_EVENT, syncReadTaskNotifications);
+    window.addEventListener("storage", syncReadTaskNotifications);
+
+    return () => {
+      window.removeEventListener(TASK_NOTIFICATION_READ_EVENT, syncReadTaskNotifications);
+      window.removeEventListener("storage", syncReadTaskNotifications);
+    };
+  }, [currentUser, profile]);
+
+  useEffect(() => {
     // Ferme le menu au clic en dehors.
     function handleDocumentClick(event) {
       if (dropdownRef.current && !dropdownRef.current.contains(event.target)) {
@@ -101,7 +112,7 @@ function NotificationDropdown() {
 
     document.addEventListener("mousedown", handleDocumentClick);
     return () => document.removeEventListener("mousedown", handleDocumentClick);
-  }, []);
+  }, [currentUser]);
 
   useEffect(() => {
     // Recupere le profil metier pour connaitre le service courant.
@@ -120,16 +131,7 @@ function NotificationDropdown() {
     return () => {
       isMounted = false;
     };
-  }, []);
-
-  useEffect(() => {
-    // Pour un manager, charge les membres de son service afin de filtrer les messages.
-    if (isManager && currentServiceId) {
-      getUsers(currentServiceId)
-        .then((data) => setServiceUsers(Array.isArray(data) ? data : []))
-        .catch(() => setServiceUsers([]));
-    }
-  }, [isManager, currentServiceId]);
+  }, [currentUser]);
 
   useEffect(() => {
     loadNotifications();
@@ -163,17 +165,24 @@ function NotificationDropdown() {
     };
   }, [loadNotifications]);
 
-  const unreadCount = messages.filter((message) => {
+  const unreadMessagesCount = messages.filter((message) => {
     if (!preferences.notificationsEnabled || !preferences.messageNotifications) {
       return false;
     }
 
     // Compte seulement les messages recus et pas encore lus.
-    const recipientId = String(message.destinataire_id || "");
-    const senderId = String(message.expediteur_id || "");
+    const adminViewer = role === "Admin" || role === "Administrateur";
 
-    return !message.est_lu && userIds.has(recipientId) && !userIds.has(senderId);
+    return !message.est_lu && (adminViewer || isMessageReceivedByCurrentUser(message, currentUser, profile));
   }).length;
+  const unreadTasksCount = preferences.notificationsEnabled && preferences.taskNotifications
+    ? tasks.filter((task) => {
+        const taskId = getTaskNotificationId(task);
+
+        return taskId && !readTaskIds.has(String(taskId));
+      }).length
+    : 0;
+  const unreadCount = unreadMessagesCount + unreadTasksCount;
 
   const notificationItems = useMemo(() => {
     // Prepare une liste courte pour le menu deroulant.
@@ -182,7 +191,6 @@ function NotificationDropdown() {
     }
 
     const messageNotifications = preferences.messageNotifications ? messages
-      .slice(0, 3)
       .map((message) => ({
         id: `message-${message.id}`,
         type: "message",
@@ -190,21 +198,92 @@ function NotificationDropdown() {
         detail: message.contenu,
         date: message.date_creation || message.created_at,
         unread: !message.est_lu,
+        meta: message,
       })) : [];
 
     const taskNotifications = preferences.taskNotifications ? tasks
-      .slice(0, 3)
       .map((task) => ({
         id: `task-${task.id}`,
         type: "task",
         title: "Une tâche vous a été affectée",
         detail: task.title || task.titre || "Tâche",
         date: task.created_at || task.date_creation || task.due_date,
-        unread: false,
+        unread: !readTaskIds.has(String(getTaskNotificationId(task))),
+        meta: task,
       })) : [];
 
-    return [...messageNotifications, ...taskNotifications].slice(0, 5);
-  }, [messages, preferences, tasks]);
+    return [...messageNotifications, ...taskNotifications]
+      .map((item) => {
+        if (item.type !== "task") {
+          return item;
+        }
+
+        const task = tasks.find((candidate) => `task-${candidate.id}` === item.id) || item.meta || {};
+        const taskTitle = task.title || task.titre || item.detail || "Tâche";
+
+        return {
+          ...item,
+          title: "Nouvelle tâche affectée",
+          detail: `Une nouvelle tâche vous a été affectée : ${taskTitle}`,
+          meta: task,
+        };
+      })
+      .sort((firstItem, secondItem) => getNotificationTimestamp(secondItem.date) - getNotificationTimestamp(firstItem.date))
+      .slice(0, 5);
+  }, [messages, preferences, readTaskIds, tasks]);
+
+  function getNotificationTimestamp(value) {
+    if (!value) {
+      return 0;
+    }
+
+    const timestamp = new Date(value).getTime();
+
+    if (!Number.isNaN(timestamp)) {
+      return timestamp;
+    }
+
+    const normalized = String(value)
+      .toLowerCase()
+      .normalize("NFD")
+      .replace(/[\u0300-\u036f]/g, "");
+    const months = {
+      janvier: 0,
+      fevrier: 1,
+      mars: 2,
+      avril: 3,
+      mai: 4,
+      juin: 5,
+      juillet: 6,
+      aout: 7,
+      septembre: 8,
+      octobre: 9,
+      novembre: 10,
+      decembre: 11,
+    };
+    const frenchMatch = normalized.match(/(\d{1,2})\s+([a-z]+)(?:\s+(\d{4}))?(?:,\s*(\d{1,2})[:h](\d{2}))?/);
+
+    if (frenchMatch && months[frenchMatch[2]] !== undefined) {
+      const year = Number(frenchMatch[3] || new Date().getFullYear());
+      const hour = Number(frenchMatch[4] || 0);
+      const minute = Number(frenchMatch[5] || 0);
+
+      return new Date(year, months[frenchMatch[2]], Number(frenchMatch[1]), hour, minute).getTime();
+    }
+
+    const shortDateMatch = normalized.match(/(\d{1,2})[/-](\d{1,2})(?:[/-](\d{2,4}))?(?:\s+(\d{1,2}):(\d{2}))?/);
+
+    if (shortDateMatch) {
+      const rawYear = shortDateMatch[3] ? Number(shortDateMatch[3]) : new Date().getFullYear();
+      const year = rawYear < 100 ? 2000 + rawYear : rawYear;
+      const hour = Number(shortDateMatch[4] || 0);
+      const minute = Number(shortDateMatch[5] || 0);
+
+      return new Date(year, Number(shortDateMatch[2]) - 1, Number(shortDateMatch[1]), hour, minute).getTime();
+    }
+
+    return 0;
+  }
 
   function formatNotificationDate(value) {
     if (!value) return "";
@@ -215,6 +294,48 @@ function NotificationDropdown() {
       hour: "2-digit",
       minute: "2-digit",
     }).format(new Date(value));
+  }
+
+  function handleViewNotification(item) {
+    setOpen(false);
+
+    if (item.type === "task") {
+      const taskId = item.meta?.id || item.meta?.task_id;
+
+      if (!taskId) {
+        navigate("/notifications");
+        return;
+      }
+
+      const updatedReadIds = markTaskNotificationAsRead(currentUser, profile, item.meta);
+      setReadTaskIds(updatedReadIds);
+
+      const normalizedRole = String(profile?.role || currentUser?.role || "").toLowerCase();
+      const isPersonalTask =
+        item.meta?._notificationAssignedToCurrentUser === true ||
+        getTaskAssigneeValues(item.meta).some((value) => userIds.has(String(value)));
+      const shouldOpenMyTasks =
+        isPersonalTask &&
+        (normalizedRole.includes("manager") || normalizedRole.includes("employee") || normalizedRole.includes("employ"));
+
+      navigate(`${shouldOpenMyTasks ? "/my-tasks" : "/tasks"}?taskId=${taskId}`);
+      return;
+    }
+
+    if (item.type === "message") {
+      const conversationId = item.meta?.conversation_id || item.meta?.conversation || item.meta?.conversationId;
+
+      if (conversationId) {
+        navigate(`/messages?conversationId=${conversationId}`);
+      } else if (item.meta?.id) {
+        navigate(`/messages?messageId=${item.meta.id}`);
+      } else {
+        navigate("/messages");
+      }
+      return;
+    }
+
+    navigate("/notifications");
   }
 
   return (
@@ -250,6 +371,9 @@ function NotificationDropdown() {
                   <p>{item.detail}</p>
                 </div>
                 <time>{formatNotificationDate(item.date)}</time>
+                <button type="button" onClick={() => handleViewNotification(item)}>
+                  Voir
+                </button>
               </article>
             ))}
 

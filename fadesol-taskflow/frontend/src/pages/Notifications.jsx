@@ -5,28 +5,23 @@ import { useNavigate } from "react-router-dom";
 import { useAuth } from "../context/AuthContext";
 import { getMessages, markMessageAsRead } from "../services/messageService";
 import { getTasks } from "../services/taskService";
-import { getMyUserProfile, getUsers } from "../services/userService";
+import { getMyUserProfile } from "../services/userService";
+import {
+  getNotificationTimestamp,
+  getTaskAssigneeValues,
+  getUserIdentitySet,
+  isNotificationMessageForCurrentUser,
+  isNotificationTaskForCurrentUser,
+  mergeNotificationRecords,
+} from "../utils/notificationFilters";
+import {
+  getTaskNotificationId,
+  loadReadTaskNotificationIds,
+  markTaskNotificationAsRead,
+  markTaskNotificationsAsRead,
+  TASK_NOTIFICATION_READ_EVENT,
+} from "../utils/taskNotificationReadState";
 import { loadUserPreferences } from "../utils/userPreferences";
-
-function getUserIdentifiers(user) {
-  // Regroupe les identifiants possibles pour reconnaitre le compte courant.
-  return new Set(
-    [user?.uuid, user?.id, user?.user_id, user?.utilisateur_id, user?.email]
-      .filter((value) => value !== undefined && value !== null && value !== "")
-      .map(String)
-  );
-}
-
-function getTaskAssigneeValues(task) {
-  return [
-    task?.assigned_to,
-    task?.assigned_user_id,
-    task?.assignee_id,
-    task?.assignee_a,
-    task?.user_id,
-    task?.responsable_id,
-  ].filter((value) => value !== undefined && value !== null && value !== "");
-}
 
 function getUserName(user) {
   return (
@@ -53,26 +48,17 @@ function Notifications() {
   const { currentUser } = useAuth();
   const [messages, setMessages] = useState([]);
   const [tasks, setTasks] = useState([]);
-  const [users, setUsers] = useState([]);
   const [profile, setProfile] = useState(null);
   const [preferences, setPreferences] = useState(() => loadUserPreferences(currentUser));
+  const [readTaskIds, setReadTaskIds] = useState(() => loadReadTaskNotificationIds(currentUser));
   const [loading, setLoading] = useState(true);
   const [message, setMessage] = useState("");
   const [error, setError] = useState("");
 
   const userIds = useMemo(() => {
     // Fusionne les ids du contexte auth et du profil metier charge.
-    return new Set([...getUserIdentifiers(currentUser), ...getUserIdentifiers(profile)]);
+    return getUserIdentitySet(currentUser, profile);
   }, [currentUser, profile]);
-
-
-  const userById = useMemo(() => {
-    return users.reduce((accumulator, user) => {
-      accumulator[String(user.id)] = user;
-      accumulator[String(user.uuid)] = user;
-      return accumulator;
-    }, {});
-  }, [users]);
 
   const buildNotifications = useMemo(() => {
     // Transforme messages et taches en une liste unique triee par date.
@@ -99,17 +85,34 @@ function Notifications() {
         title: "Une tâche vous a été affectée",
         description: t.title || t.titre || t.name || "Tâche",
         date: t.created_at || t.date_creation || t.updated_at || t.due_date,
-        unread: false,
+        unread: getTaskNotificationId(t) ? !readTaskIds.has(String(getTaskNotificationId(t))) : false,
         meta: t,
       }))
       .filter(Boolean) : [];
 
-    const all = [...messageNotifications, ...taskNotifications];
+    const all = [...messageNotifications, ...taskNotifications].map((notification) => {
+      if (notification.type !== "task") {
+        return notification;
+      }
 
-    return all.sort((a, b) => new Date(b.date || 0).getTime() - new Date(a.date || 0).getTime());
-  }, [messages, preferences, tasks]);
+      const taskTitle =
+        notification.meta?.title ||
+        notification.meta?.titre ||
+        notification.meta?.name ||
+        notification.description ||
+        "TÃ¢che";
 
-  const unreadMessages = useMemo(() => buildNotifications.filter((n) => n.type === "message" && n.unread), [buildNotifications]);
+      return {
+        ...notification,
+        title: "Nouvelle tâche affectée",
+        description: `Une nouvelle tâche vous a été affectée : ${taskTitle}`,
+      };
+    });
+
+    return all.sort((a, b) => getNotificationTimestamp(b.date) - getNotificationTimestamp(a.date));
+  }, [messages, preferences, readTaskIds, tasks]);
+
+  const unreadNotifications = useMemo(() => buildNotifications.filter((n) => n.unread), [buildNotifications]);
 
   async function loadNotifications() {
     // Charge les donnees utiles puis applique les regles de visibilite par role.
@@ -120,45 +123,34 @@ function Notifications() {
       const profileResult = await getMyUserProfile();
       setProfile(profileResult || null);
 
-      const role = profileResult?.role || currentUser?.role;
-      const isEmployee = role === "Employee" || role === "Employe" || role === "EmployÃ©";
-      const isManager = role === "Manager";
-      const currentServiceId = profileResult?.id_service || profileResult?.service_id || currentUser?.id_service || currentUser?.service_id || "";
-
-      const [messagesResult, tasksResult, usersResult] = await Promise.allSettled([
+      const [messagesResult, tasksResult, myTasksResult] = await Promise.allSettled([
         getMessages(),
-        getTasks(isEmployee ? { assigned_to: "me" } : isManager && currentServiceId ? { service_id: currentServiceId } : {}),
-        getUsers(isManager && currentServiceId ? currentServiceId : undefined),
+        getTasks(),
+        getTasks({ assigned_to: "me" }),
       ]);
 
       const rawMessages = messagesResult.status === "fulfilled" && Array.isArray(messagesResult.value) ? messagesResult.value : [];
       const rawTasks = tasksResult.status === "fulfilled" && Array.isArray(tasksResult.value) ? tasksResult.value : [];
-      const rawUsers = usersResult.status === "fulfilled" && Array.isArray(usersResult.value) ? usersResult.value : [];
+      const rawMyTasks = myTasksResult.status === "fulfilled" && Array.isArray(myTasksResult.value)
+        ? myTasksResult.value.map((task) => ({ ...task, _notificationAssignedToCurrentUser: true }))
+        : [];
+      const mergedTasks = mergeNotificationRecords(rawTasks, rawMyTasks);
 
       // Applique les memes regles de visibilite que le menu de notifications.
-      let visibleMessages = rawMessages;
-
-      if (isEmployee) {
-        const userIdsSet = new Set([...getUserIdentifiers(currentUser), ...getUserIdentifiers(profileResult)]);
-        visibleMessages = rawMessages.filter((message) => userIdsSet.has(String(message.destinataire_id || "")));
-      } else if (isManager && rawUsers.length > 0) {
-        const serviceIds = new Set(rawUsers.flatMap((u) => [String(u.id), String(u.uuid)]));
-        visibleMessages = rawMessages.filter((message) => {
-          const recipientId = String(message.destinataire_id || "");
-          const senderId = String(message.expediteur_id || "");
-          return serviceIds.has(recipientId) || serviceIds.has(senderId);
-        });
-      }
+      const visibleMessages = rawMessages.filter((message) =>
+        isNotificationMessageForCurrentUser(message, currentUser, profileResult)
+      );
+      const visibleTasks = mergedTasks.filter((task) =>
+        isNotificationTaskForCurrentUser(task, currentUser, profileResult)
+      );
 
       setMessages(visibleMessages);
-      setTasks(rawTasks);
-      setUsers(rawUsers);
+      setTasks(visibleTasks);
     } catch (err) {
       console.error("Load notifications error:", err);
       setError("Impossible de charger les notifications.");
       setMessages([]);
       setTasks([]);
-      setUsers([]);
     } finally {
       setLoading(false);
     }
@@ -182,6 +174,24 @@ function Notifications() {
     setPreferences(loadUserPreferences(currentUser));
   }, [currentUser]);
 
+  useEffect(() => {
+    setReadTaskIds(loadReadTaskNotificationIds(currentUser, profile));
+  }, [currentUser, profile]);
+
+  useEffect(() => {
+    function syncReadTaskNotifications() {
+      setReadTaskIds(loadReadTaskNotificationIds(currentUser, profile));
+    }
+
+    window.addEventListener(TASK_NOTIFICATION_READ_EVENT, syncReadTaskNotifications);
+    window.addEventListener("storage", syncReadTaskNotifications);
+
+    return () => {
+      window.removeEventListener(TASK_NOTIFICATION_READ_EVENT, syncReadTaskNotifications);
+      window.removeEventListener("storage", syncReadTaskNotifications);
+    };
+  }, [currentUser, profile]);
+
   async function markOneAsRead(messageId) {
     // Marque une notification message comme lue.
     setMessage("");
@@ -202,14 +212,22 @@ function Notifications() {
     setMessage("");
     setError("");
 
-    const unread = messages.filter((m) => !m.est_lu).map((m) => m.id);
+    const unreadMessageIds = messages.filter((m) => !m.est_lu).map((m) => m.id);
+    const unreadTasks = tasks.filter((task) => {
+      const taskId = getTaskNotificationId(task);
 
-    if (!unread.length) {
+      return taskId && !readTaskIds.has(String(taskId));
+    });
+
+    if (!unreadMessageIds.length && !unreadTasks.length) {
       setMessage("Aucune notification non lue.");
       return;
     }
 
-    const results = await Promise.allSettled(unread.map((id) => markMessageAsRead(id)));
+    const updatedReadTaskIds = markTaskNotificationsAsRead(currentUser, profile, unreadTasks);
+    setReadTaskIds(updatedReadTaskIds);
+
+    const results = await Promise.allSettled(unreadMessageIds.map((id) => markMessageAsRead(id)));
 
     if (results.some((result) => result.status === "rejected")) {
       setError("Certaines notifications n'ont pas pu être marquées comme lues.");
@@ -217,7 +235,7 @@ function Notifications() {
       setMessage("Toutes les notifications sont marquées comme lues.");
     }
 
-    setMessages((current) => current.map((item) => (unread.includes(item.id) ? { ...item, est_lu: true } : item)));
+    setMessages((current) => current.map((item) => (unreadMessageIds.includes(item.id) ? { ...item, est_lu: true } : item)));
   }
 
   function handleView(notification) {
@@ -227,6 +245,9 @@ function Notifications() {
     if (notification.type === "task") {
       const taskId = notification.meta?.id || notification.meta?.task_id;
       if (taskId) {
+        const updatedReadIds = markTaskNotificationAsRead(currentUser, profile, notification.meta);
+        setReadTaskIds(updatedReadIds);
+
         const role = profile?.role || currentUser?.role || "";
         const normalizedRole = String(role).toLowerCase();
         const isPersonalTask = getTaskAssigneeValues(notification.meta).some((value) => userIds.has(String(value)));
@@ -266,7 +287,7 @@ function Notifications() {
             <RefreshCw size={17} />
             Actualiser
           </button>
-          <button type="button" className="secondary-action" onClick={markAllAsRead} disabled={!unreadMessages.length}>
+          <button type="button" className="secondary-action" onClick={markAllAsRead} disabled={!unreadNotifications.length}>
             <CheckCheck size={17} />
             Tout lire
           </button>
