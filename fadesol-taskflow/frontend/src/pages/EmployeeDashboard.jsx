@@ -227,10 +227,20 @@ function EmployeeDashboard({ currentUser }) {
   }, [loadDashboardStatistics]);
 
   const employeeKpis = useMemo(() => {
-    return employeeKpiDefinitions.map((kpi) => ({
-      ...kpi,
-      value: statisticsLoading ? "..." : String(statistics[kpi.statKey] ?? 0),
-    }));
+    const values = employeeKpiDefinitions.map((k) => Number(statistics[k.statKey] ?? 0));
+    const maxVal = Math.max(1, ...values);
+
+    return employeeKpiDefinitions.map((kpi) => {
+      const raw = statistics[kpi.statKey] ?? 0;
+      const numeric = statisticsLoading ? "..." : Number(raw);
+      const pct = statisticsLoading ? 0 : Math.round((Number(raw) / maxVal) * 100);
+
+      return {
+        ...kpi,
+        value: numeric,
+        percentage: pct,
+      };
+    });
   }, [statistics, statisticsLoading]);
 
   return (
@@ -257,13 +267,13 @@ function EmployeeDashboard({ currentUser }) {
 
       {statisticsWarning && <p className="notice warning">{statisticsWarning}</p>}
 
+      <DashboardCharts analytics={analytics} />
+
       <section className="kpi-grid manager-kpis" aria-label="Indicateurs employe">
         {employeeKpis.map((kpi) => (
           <KpiCard key={kpi.label} {...kpi} />
         ))}
       </section>
-
-      <DashboardCharts analytics={analytics} />
 
       <section className="role-dashboard-grid">
         <article className="dashboard-card">
