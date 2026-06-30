@@ -1,6 +1,6 @@
 """Logique metier du service de messagerie.
 
-Ce module filtre les messages selon le profil connecte, construit les
+Ce module filtre les messages selon les participants connectes, construit les
 conversations et applique les operations d'envoi, lecture et mise a jour.
 """
 
@@ -26,7 +26,7 @@ from shared.exceptions import not_found
 
 def list_messages(db: Session, skip: int = 0, limit: int = 100, authorization: str | None = None) -> list[Message]:
     """Liste les messages visibles avec pagination."""
-    # La visibilite est calculee en memoire pour croiser role, service et destinataire.
+    # La visibilite est calculee en memoire selon les participants, sans filtre role/service.
     profile = _fetch_current_profile(authorization)
     messages = db.query(Message).order_by(Message.date_creation.desc()).all()
     visible_messages = [message for message in messages if _message_visible_for_profile(message, profile)]
@@ -173,32 +173,12 @@ def _profile_identifiers(profile: dict) -> set[str]:
     }
 
 
-def _profile_service_id(profile: dict) -> str | None:
-    value = profile.get("id_service") or profile.get("service_id")
-    return str(value) if value not in {None, ""} else None
-
-
-def _role(profile: dict) -> str:
-    return str(profile.get("role") or "").lower()
-
-
 def _message_visible_for_profile(message: Message, profile: dict) -> bool:
     """Applique les regles de visibilite de la messagerie."""
-    role = _role(profile)
     identifiers = _profile_identifiers(profile)
 
-    if role in {"admin", "administrateur"}:
-        return True
-
-    # L'expediteur et le destinataire voient toujours leurs messages directs.
-    if str(message.expediteur_id or "") in identifiers or str(message.destinataire_id or "") in identifiers:
-        return True
-
-    # Un manager voit les messages rattaches a son service.
-    if role == "manager":
-        return bool(_profile_service_id(profile)) and message.service_id == _profile_service_id(profile)
-
-    return False
+    # Aucun filtrage par role ou service : seuls les participants lisent une conversation directe.
+    return str(message.expediteur_id or "") in identifiers or str(message.destinataire_id or "") in identifiers
 
 
 def _conversation_id(message: Message) -> str:

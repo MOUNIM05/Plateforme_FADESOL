@@ -1,3 +1,10 @@
+"""Routes HTTP du dashboard.
+
+Les endpoints exposent des agregations calculees depuis les microservices.
+La dependance require_dashboard_user garantit que seuls les utilisateurs
+autorises peuvent consulter les statistiques.
+"""
+
 from fastapi import APIRouter, Depends, Header, Query
 
 from app.core.security import require_dashboard_user
@@ -25,11 +32,13 @@ router = APIRouter(prefix="/dashboard", tags=["Dashboard"])
 
 @router.get("/", dependencies=[Depends(require_dashboard_user)])
 def global_dashboard(authorization: str | None = Header(default=None)):
+    """Alias historique de /analytics pour la page dashboard."""
     return get_dashboard_analytics(authorization)
 
 
 @router.get("/analytics", dependencies=[Depends(require_dashboard_user)])
 def dashboard_analytics(authorization: str | None = Header(default=None)):
+    """Retourne les donnees de graphiques et KPI analytiques."""
     return get_dashboard_analytics(authorization)
 
 
@@ -39,6 +48,7 @@ def dashboard_analytics(authorization: str | None = Header(default=None)):
     dependencies=[Depends(require_dashboard_user)],
 )
 def global_statistics(authorization: str | None = Header(default=None)):
+    """Retourne les compteurs principaux visibles par le profil courant."""
     return get_global_dashboard_statistics(authorization)
 
 
@@ -61,6 +71,7 @@ def members_workload(
     search: str | None = Query(default=None),
     authorization: str | None = Header(default=None),
 ):
+    """Retourne la charge par membre, filtrable par service ou recherche."""
     return get_members_workload(authorization, service_id, search)
 
 

@@ -31,7 +31,7 @@ router = APIRouter(prefix="/messages", tags=["Messages"])
 @router.get("/", response_model=list[MessageResponse])
 def list_all(request: Request, skip: int = 0, limit: int = 100, db: Session = Depends(get_db)):
     """Liste les messages visibles pour l'utilisateur connecte."""
-    # Le service applique ensuite les regles de visibilite selon le role et le service.
+    # Le service applique ensuite les regles de visibilite par participant.
     return list_messages(db, skip, limit, request.headers.get("authorization"))
 
 

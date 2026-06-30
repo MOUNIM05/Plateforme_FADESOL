@@ -1,12 +1,15 @@
+// Service API des tableaux de bord : statistiques, analytics et charge equipe.
 import api from "./api";
 
 export async function getDashboardStatistics() {
+  // KPIs principaux utilises par les dashboards Admin et Manager.
   const response = await api.get("/dashboard/statistics");
 
   return response.data;
 }
 
 export async function getDashboardAnalytics() {
+  // Donnees agregees pour les graphiques de repartition et de progression.
   const response = await api.get("/dashboard/analytics");
 
   return response.data;
@@ -25,6 +28,7 @@ export async function getServiceDashboard(serviceId) {
 }
 
 export async function getMembersWorkload(filters = {}) {
+  // Les filtres restent optionnels pour conserver la vue globale par defaut.
   const params = {};
 
   if (filters.service_id) {

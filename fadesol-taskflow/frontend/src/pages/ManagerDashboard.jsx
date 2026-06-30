@@ -1,3 +1,5 @@
+// Dashboard manager : synthese operationnelle du service, charge equipe
+// et evolution des taches sur le perimetre autorise.
 import { Building2, CheckCircle2, Clock3, FolderKanban, RefreshCw, Workflow } from "lucide-react";
 import { useCallback, useEffect, useMemo, useState } from "react";
 import AccountMenu from "../components/dashboard/AccountMenu";
@@ -6,6 +8,7 @@ import KpiCard from "../components/dashboard/KpiCard";
 import MembersWorkload from "../components/dashboard/MembersWorkload";
 import NotificationDropdown from "../components/dashboard/NotificationDropdown";
 import ServicesOverview from "../components/dashboard/ServicesOverview";
+import TaskEvolutionChart from "../components/dashboard/TaskEvolutionChart";
 import { getDashboardAnalytics, getDashboardStatistics } from "../services/dashboardService";
 import { DATA_EVENTS, subscribeDataEvents } from "../utils/dataEvents";
 
@@ -130,6 +133,10 @@ function ManagerDashboard({ currentUser }) {
 
       <ServicesOverview />
       <MembersWorkload />
+
+      <section className="dashboard-grid" aria-label="Tableau de bord analytique du service">
+        <TaskEvolutionChart />
+      </section>
     </div>
   );
 }

@@ -216,6 +216,7 @@ def _profile_service_scope(profile: dict | None, authorization_header: str | Non
 
 
 def can_access_task(task: Task, profile: dict | None, authorization_header: str | None = None) -> bool:
+    """Verifie si le profil courant peut lire ou manipuler une tache."""
     if not profile or _is_admin(profile):
         return True
 
@@ -233,6 +234,11 @@ def scoped_task_filters(
     assigned_to: str | None = None,
     service_id: str | None = None,
 ) -> tuple[str | None, str | list[str] | None]:
+    """Traduit les regles Admin/Manager/Employee en filtres SQL.
+
+    Admin conserve les filtres demandes, Manager est limite a son service,
+    Employee est limite a ses propres taches.
+    """
     profile = resolve_current_user_profile(authorization_header)
     resolved_assigned_to = str(profile.get("uuid") or "") if assigned_to == "me" else assigned_to
 

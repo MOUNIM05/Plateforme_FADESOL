@@ -106,9 +106,42 @@ function getFieldValue(...values) {
   return value ?? "Non renseigné";
 }
 
+function sameId(a, b) {
+  return a !== undefined && a !== null && b !== undefined && b !== null && String(a) === String(b);
+}
+
+function getStoredCurrentUser() {
+  try {
+    return JSON.parse(localStorage.getItem("current_user") || localStorage.getItem("user") || "null");
+  } catch {
+    return null;
+  }
+}
+
+function isCurrentUserRecord(user, currentUser) {
+  if (!user || !currentUser) {
+    return false;
+  }
+
+  const isCurrentById =
+    sameId(user.id, currentUser.id) ||
+    sameId(user.id, currentUser.user_id) ||
+    sameId(user.user_id, currentUser.id) ||
+    sameId(user.user_id, currentUser.user_id) ||
+    sameId(user.uuid, currentUser.uuid);
+
+  const isCurrentByEmail =
+    user.email &&
+    currentUser.email &&
+    user.email.toLowerCase() === currentUser.email.toLowerCase();
+
+  return isCurrentById || isCurrentByEmail;
+}
+
 function Users() {
   // Les permissions fines pilotent le mode lecture seule ou administration complete.
   const { currentUser, hasPermission } = useAuth();
+  const effectiveCurrentUser = useMemo(() => currentUser || getStoredCurrentUser(), [currentUser]);
   const [users, setUsers] = useState([]);
   const [formData, setFormData] = useState(emptyForm);
   const [editingUserId, setEditingUserId] = useState(null);
@@ -116,7 +149,6 @@ function Users() {
   const [roleFilter, setRoleFilter] = useState("");
   const [serviceFilter, setServiceFilter] = useState("");
   const [searchQuery, setSearchQuery] = useState("");
-  const [selectedUser, setSelectedUser] = useState(null);
   const [detailsOpen, setDetailsOpen] = useState(false);
   const [detailsUser, setDetailsUser] = useState(null);
   const [detailsPermissions, setDetailsPermissions] = useState({});
@@ -142,7 +174,6 @@ function Users() {
     try {
       const data = await getUsers();
       setUsers(data);
-      setSelectedUser((current) => current || data[0] || null);
     } catch (err) {
       console.error("Load users error:", err);
 
@@ -166,7 +197,6 @@ function Users() {
       .then((data) => {
         if (isMounted) {
           setUsers(data);
-          setSelectedUser(data[0] || null);
         }
       })
       .catch((err) => {
@@ -193,11 +223,16 @@ function Users() {
     return () => {
       isMounted = false;
     };
-  }, []);
+  }, [effectiveCurrentUser]);
+
+  const visibleUsers = useMemo(
+    () => users.filter((user) => !isCurrentUserRecord(user, effectiveCurrentUser)),
+    [users, effectiveCurrentUser]
+  );
 
   const filteredUsers = useMemo(() => {
     // Applique les filtres de recherche, role et service sans modifier la liste source.
-    return users.filter((user) => {
+    return visibleUsers.filter((user) => {
       const fullName = `${user.prenom || user.first_name || ""} ${user.nom || user.last_name || ""}`;
       const searchable = `${fullName} ${user.email || ""}`.toLowerCase();
       const matchesSearch = searchable.includes(searchQuery.trim().toLowerCase());
@@ -208,17 +243,17 @@ function Users() {
 
       return matchesSearch && matchesRole && matchesService;
     });
-  }, [users, roleFilter, serviceFilter, searchQuery]);
+  }, [visibleUsers, roleFilter, serviceFilter, searchQuery]);
 
   const userStats = useMemo(() => {
     // Calcule les compteurs affiches en haut de page.
     return {
-      total: users.length,
-      admins: users.filter((user) => normalizeRole(user.role) === ROLES.ADMIN).length,
-      managers: users.filter((user) => normalizeRole(user.role) === ROLES.MANAGER).length,
-      employees: users.filter((user) => normalizeRole(user.role) === ROLES.EMPLOYEE).length,
+      total: visibleUsers.length,
+      admins: visibleUsers.filter((user) => normalizeRole(user.role) === ROLES.ADMIN).length,
+      managers: visibleUsers.filter((user) => normalizeRole(user.role) === ROLES.MANAGER).length,
+      employees: visibleUsers.filter((user) => normalizeRole(user.role) === ROLES.EMPLOYEE).length,
     };
-  }, [users]);
+  }, [visibleUsers]);
 
   function handleChange(event) {
     // Met a jour le formulaire utilisateur, y compris le toggle actif/inactif.
@@ -232,7 +267,12 @@ function Users() {
 
   function startEdit(user) {
     // Pre-remplit le formulaire avec le profil selectionne.
-    setSelectedUser(user);
+    if (isCurrentUserRecord(user, effectiveCurrentUser)) {
+      setError("Vous ne pouvez pas modifier ou supprimer votre propre compte depuis cette page.");
+      setMessage("");
+      return;
+    }
+
     setEditingUserId(user.id);
     setDetailsOpen(false);
     setUserFormOpen(true);
@@ -266,7 +306,12 @@ function Users() {
 
   async function openUserDetails(user) {
     // Ouvre la modale et charge en parallele les details et permissions.
-    setSelectedUser(user);
+    if (isCurrentUserRecord(user, effectiveCurrentUser)) {
+      setError("Vous ne pouvez pas modifier ou supprimer votre propre compte depuis cette page.");
+      setMessage("");
+      return;
+    }
+
     setDetailsUser(user);
     setDetailsPermissions({});
     setDetailsError("");
@@ -338,12 +383,17 @@ function Users() {
 
     try {
       if (editingUserId) {
-        const updatedUser = await updateUser(editingUserId, normalizePayload(formData, false));
-        setSelectedUser(updatedUser);
+        const targetUser = users.find((user) => sameId(user.id, editingUserId) || sameId(user.user_id, editingUserId));
+
+        if (isCurrentUserRecord(targetUser || { id: editingUserId, email: formData.email }, effectiveCurrentUser)) {
+          setError("Vous ne pouvez pas modifier ou supprimer votre propre compte depuis cette page.");
+          return;
+        }
+
+        await updateUser(editingUserId, normalizePayload(formData, false));
         setMessage("Utilisateur modifié avec succès.");
       } else {
-        const createdUser = await createUser(normalizePayload(formData, true));
-        setSelectedUser(createdUser);
+        await createUser(normalizePayload(formData, true));
         setMessage("Utilisateur créé avec succès.");
       }
 
@@ -368,6 +418,14 @@ function Users() {
       return false;
     }
 
+    const targetUser = users.find((user) => sameId(user.id, userId) || sameId(user.user_id, userId));
+
+    if (isCurrentUserRecord(targetUser || { id: userId }, effectiveCurrentUser)) {
+      setError("Vous ne pouvez pas modifier ou supprimer votre propre compte depuis cette page.");
+      setMessage("");
+      return false;
+    }
+
     const confirmed = window.confirm(
       "Confirmer la suppression de cet utilisateur ? Ne supprimez pas le compte Admin principal."
     );
@@ -381,7 +439,6 @@ function Users() {
 
     try {
       await deleteUser(userId);
-      setSelectedUser((current) => (current?.id === userId ? null : current));
       setMessage("Utilisateur supprimé avec succès.");
       await loadUsers();
       dispatchDataChanged(DATA_EVENTS.USERS_CHANGED);

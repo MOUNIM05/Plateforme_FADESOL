@@ -1,8 +1,9 @@
 import api from "./api";
 
-// Appel simple utilisé pour tester les permissions par rôle.
-// Le backend autorise Admin + Manager et refuse Employé avec 403.
+// Appel simple utilise par l'administration et la messagerie pour charger les contacts.
+// Le backend renvoie uniquement les champs publics du profil utilisateur.
 export async function getUsers(serviceId) {
+  // Sans serviceId, la messagerie recupere tous les utilisateurs actifs disponibles.
   const response = await api.get("/users/", {
     params: serviceId ? { id_service: serviceId } : undefined,
   });

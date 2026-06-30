@@ -1,3 +1,4 @@
+// Service API du referentiel des services internes FADESOL.
 import api, { resolveApiUrl } from "./api";
 
 export async function getServices() {

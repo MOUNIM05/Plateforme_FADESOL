@@ -1,6 +1,8 @@
+// Service API des projets : portefeuille, creation, edition et suppression.
 import api, { resolveApiUrl } from "./api";
 
 export async function getProjects(filters = {}) {
+  // Les filtres service/statut permettent aux vues manager de rester dans leur perimetre.
   const endpoint = "/projects/";
   const params = {};
 

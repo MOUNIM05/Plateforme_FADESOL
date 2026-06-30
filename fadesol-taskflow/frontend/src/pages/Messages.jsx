@@ -22,6 +22,14 @@ function getUserId(user) {
   return String(user?.uuid || user?.id || user?.user_id || "");
 }
 
+function sameId(a, b) {
+  return a !== undefined && a !== null && b !== undefined && b !== null && String(a) === String(b);
+}
+
+function isActiveUser(user) {
+  return user?.est_actif !== false && user?.is_active !== false;
+}
+
 function getUserName(user) {
   return (
     [user?.first_name || user?.prenom, user?.last_name || user?.nom].filter(Boolean).join(" ") ||
@@ -120,9 +128,7 @@ function Messages() {
 
   const currentMessagingUserId =
     String(myProfile?.uuid || myProfile?.id || currentUser?.user_id || currentUser?.uuid || currentUser?.id || "");
-  const currentServiceId = myProfile?.id_service || myProfile?.service_id || currentUser?.id_service || currentUser?.service_id || "";
   const currentRole = currentUser?.role;
-  const isAdmin = currentRole === "Admin" || currentRole === "Administrateur";
   
   function computeDisplayName(name, conversation) {
     // Pour les employes, privilegie un nom lisible et evite d'afficher un UUID complet.
@@ -151,21 +157,37 @@ function Messages() {
     return users.reduce((accumulator, user) => {
       accumulator[String(user.id)] = user;
       accumulator[String(user.uuid)] = user;
+      accumulator[String(user.user_id)] = user;
       return accumulator;
     }, {});
   }, [users]);
 
   const visibleUsers = useMemo(() => {
-    // Admin voit tout; les autres utilisateurs restent limites a leur service.
-    if (isAdmin || !currentServiceId) {
-      return users;
-    }
+    // La messagerie affiche tous les utilisateurs actifs, sans restriction de role ou de service.
+    return users.filter((user) => {
+      if (!isActiveUser(user)) {
+        return false;
+      }
 
-    return users.filter((user) =>
-      [user.id_service, user.service_id, user.service].map(String).includes(String(currentServiceId)) ||
-      user.service === myProfile?.service
-    );
-  }, [currentServiceId, isAdmin, myProfile?.service, users]);
+      const isCurrentById =
+        currentUserIdentifiers.has(String(user.id || "")) ||
+        currentUserIdentifiers.has(String(user.user_id || "")) ||
+        currentUserIdentifiers.has(String(user.uuid || "")) ||
+        sameId(user.id, currentUser?.id) ||
+        sameId(user.id, currentUser?.user_id) ||
+        sameId(user.user_id, currentUser?.id) ||
+        sameId(user.user_id, currentUser?.user_id) ||
+        sameId(user.uuid, currentUser?.uuid) ||
+        sameId(user.uuid, myProfile?.uuid);
+
+      const isCurrentByEmail =
+        user.email &&
+        (currentUser?.email || myProfile?.email) &&
+        user.email.toLowerCase() === String(currentUser?.email || myProfile?.email).toLowerCase();
+
+      return !isCurrentById && !isCurrentByEmail;
+    });
+  }, [currentUser, currentUserIdentifiers, myProfile, users]);
 
   const serviceById = useMemo(() => {
     return services.reduce((accumulator, service) => {

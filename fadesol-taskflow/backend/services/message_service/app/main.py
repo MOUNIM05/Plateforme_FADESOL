@@ -1,3 +1,5 @@
+"""Point d'entree FastAPI du service de messagerie."""
+
 from fastapi import FastAPI, WebSocket, WebSocketDisconnect
 
 from app import models  # noqa: F401
@@ -12,6 +14,7 @@ app.include_router(message_router, prefix="/api")
 
 @app.on_event("startup")
 def on_startup():
+    """Cree les tables du service message au demarrage si necessaire."""
     Base.metadata.create_all(bind=engine)
 
 
@@ -22,6 +25,7 @@ def health_check():
 
 @app.websocket("/ws/messages")
 async def messages_websocket(websocket: WebSocket):
+    """Endpoint WebSocket direct du service message."""
     await message_ws_manager.connect(websocket)
 
     try:

@@ -1,9 +1,12 @@
+"""Schemas Pydantic de la messagerie interne."""
+
 from datetime import datetime
 
 from pydantic import BaseModel
 
 
 class MessageBase(BaseModel):
+    """Champs communs d'un message direct ou rattache a un objet metier."""
     expediteur_id: str
     destinataire_id: str | None = None
     service_id: str | None = None
@@ -37,6 +40,7 @@ class MessageResponse(MessageBase):
 
 
 class ConversationSummary(BaseModel):
+    """Resume affiche dans la liste laterale des conversations."""
     conversation_id: str
     type: str
     title: str
@@ -52,5 +56,6 @@ class ConversationSummary(BaseModel):
 
 
 class ConversationDetail(BaseModel):
+    """Conversation complete avec son historique de messages."""
     conversation: ConversationSummary
     messages: list[MessageResponse]

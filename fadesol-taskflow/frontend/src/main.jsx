@@ -1,3 +1,5 @@
+// Point d'entree React : applique les preferences utilisateur stockees
+// avant le rendu afin d'eviter un flash de theme clair/sombre.
 import { StrictMode } from 'react'
 import { createRoot } from 'react-dom/client'
 import './index.css'

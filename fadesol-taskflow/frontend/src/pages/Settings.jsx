@@ -1,3 +1,5 @@
+// Page Parametres : preferences locales de plateforme et preferences
+// utilisateur comme le theme, les notifications et l'affichage compact.
 import { useEffect, useMemo, useState } from "react";
 import {
   Bell,
@@ -32,6 +34,7 @@ const defaultSettings = {
 };
 
 function loadSettings() {
+  // Les parametres plateforme sont locaux au navigateur pour la soutenance/demo.
   try {
     const raw = localStorage.getItem(storageKey);
     return raw ? { ...defaultSettings, ...JSON.parse(raw) } : defaultSettings;
@@ -41,6 +44,7 @@ function loadSettings() {
 }
 
 function SettingSwitch({ checked, label, name, onChange }) {
+  // Controle reutilisable pour les options booleennes des parametres.
   return (
     <label className="settings-switch">
       <span>
@@ -67,6 +71,7 @@ function Settings() {
   
 
   const activeSecurityRules = useMemo(() => {
+    // Resume visuel des regles de securite activees dans la configuration locale.
     return [
       settings.requireStrongPassword,
       settings.autoLogout,

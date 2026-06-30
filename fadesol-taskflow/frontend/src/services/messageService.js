@@ -38,6 +38,7 @@ export async function getMessages() {
 }
 
 export async function getConversations() {
+  // Liste agregee pour la colonne gauche de la messagerie.
   const response = await api.get("/messages/conversations");
 
   return response.data;
@@ -61,6 +62,7 @@ export async function getUserMessages(userId) {
 }
 
 export async function createMessage(messageData) {
+  // Envoi direct : le backend force l'expediteur depuis le token JWT.
   const response = await api.post("/messages/", messageData);
 
   return response.data;
@@ -72,6 +74,7 @@ export async function sendMessage(messageData) {
 }
 
 export async function markMessageAsRead(messageId) {
+  // Met a jour l'etat lu/non lu et declenche la notification temps reel cote backend.
   const response = await api.patch(`/messages/${messageId}/lu`);
 
   return response.data;

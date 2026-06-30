@@ -1,6 +1,8 @@
+// Service API de compatibilite pour les services FADESOL et leurs details.
 import api from "./api";
 
 function extractServices(payload) {
+  // Accepte les differents formats de reponse renvoyes par les microservices.
   if (Array.isArray(payload)) {
     return payload;
   }

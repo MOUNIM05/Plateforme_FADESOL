@@ -1,7 +1,8 @@
+// Dashboard employe : resume personnel des taches affectees et indicateurs
+// calcules cote frontend a partir des taches visibles par l'utilisateur.
 import { CalendarDays, CheckCircle2, Clock3, MessageSquareText, RefreshCw, UserRound, Workflow } from "lucide-react";
 import { useCallback, useEffect, useMemo, useState } from "react";
 import AccountMenu from "../components/dashboard/AccountMenu";
-import DashboardCharts from "../components/dashboard/DashboardCharts";
 import KpiCard from "../components/dashboard/KpiCard";
 import NotificationDropdown from "../components/dashboard/NotificationDropdown";
 import { getTasks } from "../services/taskService";
@@ -33,11 +34,11 @@ const employeeKpiDefinitions = [
     sparkline: [10, 12, 16, 14, 20, 18, 22],
   },
   {
-    label: "Bloquees",
-    statKey: "tasks_blocked",
-    trend: "A debloquer",
+    label: "En retard",
+    statKey: "tasks_late",
+    trend: "A traiter",
     icon: CalendarDays,
-    tone: "orange",
+    tone: "red",
     sparkline: [22, 24, 20, 18, 16, 14, 12],
   },
   {
@@ -64,10 +65,6 @@ function normalizeText(value) {
 
 function getTaskStatus(task) {
   return task?.status ?? task?.statut ?? "";
-}
-
-function getTaskPriority(task) {
-  return task?.priority ?? task?.priorite ?? "Non definie";
 }
 
 function getTaskDueDate(task) {
@@ -147,16 +144,6 @@ function isLateTask(task) {
   return parsedDate < today;
 }
 
-function groupTasksBy(tasks, getLabel) {
-  const counters = tasks.reduce((accumulator, task) => {
-    const label = getLabel(task) || "Non renseigne";
-    accumulator[label] = (accumulator[label] || 0) + 1;
-    return accumulator;
-  }, {});
-
-  return Object.entries(counters).map(([label, value]) => ({ label, value }));
-}
-
 function buildEmployeeStatistics(tasks) {
   return {
     total_tasks: tasks.length,
@@ -167,19 +154,9 @@ function buildEmployeeStatistics(tasks) {
   };
 }
 
-function buildEmployeeAnalytics(tasks, displayName) {
-  return {
-    tasks_by_status: groupTasksBy(tasks, (task) => getTaskStatus(task) || "Non defini"),
-    tasks_by_service: [{ label: "Mes taches", value: tasks.length }],
-    workload_by_member: [{ label: displayName, value: tasks.length, completed: tasks.filter(isCompletedTask).length }],
-    tasks_by_priority: groupTasksBy(tasks, getTaskPriority),
-  };
-}
-
 function EmployeeDashboard({ currentUser }) {
   const displayName = currentUser?.prenom || currentUser?.first_name || currentUser?.email || "Employe";
   const [statistics, setStatistics] = useState(fallbackStatistics);
-  const [analytics, setAnalytics] = useState(null);
   const [statisticsLoading, setStatisticsLoading] = useState(true);
   const [statisticsWarning, setStatisticsWarning] = useState("");
 
@@ -203,11 +180,9 @@ function EmployeeDashboard({ currentUser }) {
 
       const employeeStatistics = buildEmployeeStatistics(employeeTasks);
       setStatistics({ ...fallbackStatistics, ...employeeStatistics });
-      setAnalytics(buildEmployeeAnalytics(employeeTasks, displayName));
     } catch (error) {
       console.error("Dashboard statistics error:", error);
       setStatistics(fallbackStatistics);
-      setAnalytics(null);
       setStatisticsWarning("Statistiques temporairement indisponibles.");
     } finally {
       if (showLoading) {
@@ -266,8 +241,6 @@ function EmployeeDashboard({ currentUser }) {
       </header>
 
       {statisticsWarning && <p className="notice warning">{statisticsWarning}</p>}
-
-      <DashboardCharts analytics={analytics} />
 
       <section className="kpi-grid manager-kpis" aria-label="Indicateurs employe">
         {employeeKpis.map((kpi) => (

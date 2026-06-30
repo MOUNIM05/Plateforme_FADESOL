@@ -1,3 +1,5 @@
+// Dashboard administrateur : vision globale de la plateforme, KPIs,
+// graphiques analytiques, activite temps reel et raccourcis de pilotage.
 import {
   Building2,
   CheckCircle2,

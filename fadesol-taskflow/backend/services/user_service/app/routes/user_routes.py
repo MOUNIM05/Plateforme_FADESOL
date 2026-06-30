@@ -46,7 +46,7 @@ def create(payload: UserCreate, db: Session = Depends(get_db)):
     return create_user(db, payload)
 
 
-@router.get("/", response_model=list[UserResponse], dependencies=[Depends(require_admin_or_manager)])
+@router.get("/", response_model=list[UserResponse], dependencies=[Depends(get_current_claims)])
 def list_all(
     skip: int = 0,
     limit: int = 100,
@@ -56,7 +56,7 @@ def list_all(
 ):
     """Liste les utilisateurs avec pagination et filtre optionnel par service."""
     # Liste les utilisateurs avec pagination et filtre optionnel par service.
-    # Admin et Manager peuvent consulter, mais les mots de passe ne sont jamais retournes.
+    # Tous les utilisateurs authentifies peuvent consulter les contacts, mais les mots de passe ne sont jamais retournes.
     return list_users(db, skip, limit, id_service or service_id)
 
 
